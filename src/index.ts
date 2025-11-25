@@ -7,40 +7,32 @@ import {
   ResourceTemplate,
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
 import { readFile, readdir } from "fs/promises";
 import { join } from "path";
-import { registerCreateSignalTool } from "./tools/index.js";
+import { registerCreateSignalTool, registerSelectTenantTool } from "./tools/index.js";
+import { initializeServices } from "./services/audako-services.js";
 
 const docsDir = join(import.meta.dirname, "docs");
 
-const server = new McpServer({
-  name: "audako-mcp",
-  version: "1.0.0",
-});
+const systemUrl = process.env.AUDAKO_SYSTEM_URL ?? "not configured";
 
-// Register tools
-server.registerTool(
-  "hello",
+const server = new McpServer(
   {
-    description: "A simple hello world tool",
-    inputSchema: {
-      name: z.string().optional().describe("Name to greet"),
-    },
+    name: "audako-mcp",
+    version: "1.0.0",
   },
-  async ({ name }) => {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Hello, ${name ?? "World"}!`,
-        },
-      ],
-    };
+  {
+    instructions: `You are connected to the Audako system at: ${systemUrl}
+
+IMPORTANT: Before performing any operations, you MUST first select a tenant using the select-tenant tool.
+Use list-tenants to see available tenants, then select one by ID or name.
+
+All operations (creating signals, etc.) will be performed in the context of the selected tenant.`,
   }
 );
 
 registerCreateSignalTool(server);
+registerSelectTenantTool(server);
 
 // Register resource to list available docs
 server.registerResource(
@@ -83,6 +75,8 @@ server.registerResource(
 
 // Start the server
 async function main() {
+  await initializeServices();
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error("Audako MCP Server running on stdio");

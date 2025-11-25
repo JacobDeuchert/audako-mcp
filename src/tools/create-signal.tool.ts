@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BitSelectConversionTypes, SignalType } from "audako-core";
+import { BitSelectConversionTypes, EntityType, Signal, SignalType } from "audako-core";
 import { SignalDTO } from "../dtos/Signal.dto.js";
+import { audakoServices, getSelectedTenant } from "../services/audako-services.js";
 
 export function registerCreateSignalTool(server: McpServer) {
   server.registerTool(
@@ -12,7 +13,7 @@ export function registerCreateSignalTool(server: McpServer) {
         // Common properties
         name: z.string().describe("Name of the signal"),
         description: z.string().optional().describe("Description of the signal"),
-        groupId: z.string().optional().describe("ID of the parent group"),
+        groupId: z.string().optional().describe("ID of the parent group, uses root if not provided"),
         type: z
           .enum([
             SignalType.AnalogInput,
@@ -23,8 +24,8 @@ export function registerCreateSignalTool(server: McpServer) {
           ])
           .describe("Type of signal"),
         alias: z.string().optional().describe("Alias name for the signal"),
-        dataConnectionId: z.string().optional().describe("ID of the data connection"),
-        address: z.string().optional().describe("Address for data acquisition"),
+        dataConnectionId: z.string().optional().describe("ID of the data connection. Required for physical signals with address"),
+        address: z.string().optional().describe("Address for data acquisition, is a virtual if not provided"),
 
         // Analog settings (AnalogInput, AnalogInOut)
         minValue: z.number().optional().describe("Analog: minimum value"),
@@ -61,6 +62,19 @@ export function registerCreateSignalTool(server: McpServer) {
       },
     },
     async (params) => {
+      const tenant = getSelectedTenant();
+      if (!tenant) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No tenant selected. Please use the select-tenant tool first.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
       const dto = new SignalDTO();
 
       // Map all params to DTO
@@ -97,19 +111,40 @@ export function registerCreateSignalTool(server: McpServer) {
       // Recording settings
       dto.recordingInterval = params.recordingInterval;
 
+      // Use tenant root group if no groupId provided
+      if (!dto.groupId) {
+        dto.groupId = tenant.Root;
+      }
+
       // Convert to Signal entity
       const signal = dto.toSignal();
 
-      // TODO: Save signal to backend API
-      // For now, return the created signal data
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(SignalDTO.fromSignal(signal), null, 2),
-          },
-        ],
-      };
+      try {
+        // Save signal to backend
+        const createdSignal = await audakoServices.entityService.addEntity<Signal>(
+          EntityType.Signal,
+          signal
+        );
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Signal "${createdSignal.Name?.Value}" created successfully.\n\n${JSON.stringify(SignalDTO.fromSignal(createdSignal), null, 2)}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Failed to create signal: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
   );
 }
