@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audako Chat UI - OpenCode Example</title>
+  
+  <!-- Import the chat widget CSS -->
+  <link rel="stylesheet" href="./dist/audako-chat.css">
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    h1 {
+      color: #0f172a;
+      margin-bottom: 1rem;
+    }
+    
+    .description {
+      color: #64748b;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    
+    .chat-container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .info-box h3 {
+      margin: 0 0 0.5rem 0;
+      color: #1e40af;
+      font-size: 1rem;
+    }
+
+    .info-box p {
+      margin: 0.25rem 0;
+      color: #1e40af;
+      font-size: 0.875rem;
+    }
+
+    .info-box code {
+      background: #dbeafe;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+    }
+
+    .controls {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      margin-bottom: 2rem;
+      border: 1px solid #e2e8f0;
+    }
+
+    .controls h2 {
+      margin: 0 0 1rem 0;
+      font-size: 1.125rem;
+      color: #0f172a;
+    }
+
+    .controls label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #475569;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .controls input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .controls button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.625rem 1.25rem;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-right: 0.5rem;
+    }
+
+    .controls button:hover {
+      background: #1d4ed8;
+    }
+
+    .controls button.secondary {
+      background: #64748b;
+    }
+
+    .controls button.secondary:hover {
+      background: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Audako Chat UI - OpenCode Integration</h1>
+    <p class="description">
+      This example demonstrates how to use the OpenCode adapter to connect the chat UI
+      to a running OpenCode server. Make sure you have OpenCode server running on localhost:4096.
+    </p>
+
+    <div class="info-box">
+      <h3>Prerequisites</h3>
+      <p>1. Install OpenCode SDK: <code>npm install @opencode-ai/sdk</code></p>
+      <p>2. Start OpenCode server (usually runs on <code>http://localhost:4096</code>)</p>
+      <p>3. The adapter will automatically create a new session when you send your first message</p>
+    </div>
+
+    <div class="controls">
+      <h2>OpenCode Configuration</h2>
+      
+      <label for="server-url">Server URL</label>
+      <input type="text" id="server-url" value="http://localhost:4096">
+
+      <label for="provider-id">Provider ID</label>
+      <input type="text" id="provider-id" value="anthropic" placeholder="e.g., anthropic, openai">
+
+      <label for="model-id">Model ID</label>
+      <input type="text" id="model-id" value="claude-3-5-sonnet-20241022" placeholder="e.g., claude-3-5-sonnet-20241022">
+
+      <button id="apply-config">Apply Configuration</button>
+      <button id="new-session" class="secondary">Start New Session</button>
+    </div>
+    
+    <div class="chat-container">
+      <!-- The chat widget will be rendered here -->
+      <audako-chat></audako-chat>
+    </div>
+  </div>
+
+  <!-- Import and register the chat widget -->
+  <script type="module">
+    import { 
+      registerChatWidget, 
+      configureChatWidget,
+      OpenCodeAdapter 
+    } from './dist/audako-chat.js';
+    
+    let currentAdapter = null;
+
+    // Initialize with OpenCode adapter
+    function initializeAdapter(config = {}) {
+      const serverUrl = config.serverUrl || document.getElementById('server-url').value;
+      const providerID = config.providerID || document.getElementById('provider-id').value;
+      const modelID = config.modelID || document.getElementById('model-id').value;
+
+      currentAdapter = new OpenCodeAdapter({
+        baseUrl: serverUrl,
+        model: {
+          providerID,
+          modelID
+        },
+        createSession: true
+      });
+
+      return currentAdapter;
+    }
+
+    // Register the widget with OpenCode adapter
+    const adapter = initializeAdapter();
+    registerChatWidget({
+      adapter,
+      title: 'OpenCode Assistant',
+      initialMessage: 'Connected to OpenCode! Ask me anything.',
+      placeholder: 'Type your message...'
+    });
+
+    console.log('Audako Chat Widget registered with OpenCode Adapter');
+
+    // Handle configuration changes
+    document.getElementById('apply-config').addEventListener('click', () => {
+      const adapter = initializeAdapter();
+      
+      configureChatWidget('audako-chat', {
+        adapter,
+        title: 'OpenCode Assistant',
+        initialMessage: 'Configuration updated! Ready to chat.',
+        placeholder: 'Type your message...'
+      });
+
+      console.log('OpenCode adapter reconfigured');
+      alert('OpenCode configuration applied!');
+    });
+
+    // Handle new session
+    document.getElementById('new-session').addEventListener('click', () => {
+      if (currentAdapter) {
+        currentAdapter.clearSession();
+        console.log('Session cleared - new session will be created on next message');
+        alert('New session will be created when you send your next message.');
+      }
+    });
+  </script>
+</body>
+</html>

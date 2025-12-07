@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audako Chat UI - Adapter Example</title>
+  
+  <!-- Import the chat widget CSS -->
+  <link rel="stylesheet" href="./dist/audako-chat.css">
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    h1 {
+      color: #0f172a;
+      margin-bottom: 1rem;
+    }
+    
+    .description {
+      color: #64748b;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    
+    .chat-container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .controls {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+      margin-bottom: 2rem;
+      border: 1px solid #e2e8f0;
+    }
+
+    .controls h2 {
+      margin: 0 0 1rem 0;
+      font-size: 1.125rem;
+      color: #0f172a;
+    }
+
+    .controls label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #475569;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .controls input,
+    .controls select {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+    }
+
+    .controls button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.625rem 1.25rem;
+      border-radius: 0.375rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .controls button:hover {
+      background: #1d4ed8;
+    }
+
+    .info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+
+    .info p {
+      margin: 0;
+      color: #1e40af;
+      font-size: 0.875rem;
+    }
+
+    .info code {
+      background: #dbeafe;
+      padding: 0.125rem 0.375rem;
+      border-radius: 0.25rem;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Audako Chat UI - Adapter API Demo</h1>
+    <p class="description">
+      This example demonstrates how to use the adapter pattern to connect the chat UI
+      to different LLM backends. Try the mock adapter (built-in) or configure your own
+      OpenAI-compatible endpoint below.
+    </p>
+
+    <div class="controls">
+      <h2>Adapter Configuration</h2>
+      
+      <label for="adapter-type">Adapter Type</label>
+      <select id="adapter-type">
+        <option value="mock" selected>Mock Adapter (Demo)</option>
+        <option value="openai">OpenAI Adapter</option>
+      </select>
+
+      <div id="openai-config" style="display: none;">
+        <label for="api-key">API Key</label>
+        <input type="password" id="api-key" placeholder="sk-...">
+
+        <label for="api-url">API URL</label>
+        <input type="text" id="api-url" value="https://api.openai.com/v1/chat/completions">
+
+        <label for="model">Model</label>
+        <input type="text" id="model" value="gpt-4">
+      </div>
+
+      <button id="apply-config">Apply Configuration</button>
+
+      <div class="info">
+        <p>
+          <strong>Mock Adapter:</strong> Uses simulated responses for testing.<br>
+          <strong>OpenAI Adapter:</strong> Connects to OpenAI or compatible endpoints.
+        </p>
+      </div>
+    </div>
+    
+    <div class="chat-container">
+      <!-- The chat widget will be rendered here -->
+      <audako-chat></audako-chat>
+    </div>
+  </div>
+
+  <!-- Import and register the chat widget -->
+  <script type="module">
+    import { 
+      registerChatWidget, 
+      configureChatWidget,
+      MockAdapter,
+      OpenAIAdapter 
+    } from './dist/audako-chat.js';
+    
+    // Initially register with mock adapter
+    const mockAdapter = new MockAdapter();
+    registerChatWidget({
+      adapter: mockAdapter,
+      title: 'Audako Assistant (Mock)',
+      initialMessage: 'Welcome! I\'m using the mock adapter for demonstration.',
+      placeholder: 'Type a message...'
+    });
+
+    console.log('Audako Chat Widget registered with Mock Adapter');
+
+    // Handle adapter type selection
+    const adapterTypeSelect = document.getElementById('adapter-type');
+    const openaiConfig = document.getElementById('openai-config');
+
+    adapterTypeSelect.addEventListener('change', (e) => {
+      if (e.target.value === 'openai') {
+        openaiConfig.style.display = 'block';
+      } else {
+        openaiConfig.style.display = 'none';
+      }
+    });
+
+    // Handle configuration application
+    document.getElementById('apply-config').addEventListener('click', () => {
+      const adapterType = adapterTypeSelect.value;
+      let adapter;
+      let config;
+
+      if (adapterType === 'mock') {
+        adapter = new MockAdapter();
+        config = {
+          adapter,
+          title: 'Audako Assistant (Mock)',
+          initialMessage: 'Welcome! I\'m using the mock adapter.',
+          placeholder: 'Type a message...'
+        };
+      } else if (adapterType === 'openai') {
+        const apiKey = document.getElementById('api-key').value;
+        const apiUrl = document.getElementById('api-url').value;
+        const model = document.getElementById('model').value;
+
+        if (!apiKey) {
+          alert('Please enter an API key');
+          return;
+        }
+
+        adapter = new OpenAIAdapter({
+          apiKey,
+          apiUrl,
+          model,
+          systemPrompt: 'You are a helpful assistant.'
+        });
+
+        config = {
+          adapter,
+          title: `AI Assistant (${model})`,
+          initialMessage: 'Hello! I\'m connected to OpenAI. How can I help you?',
+          placeholder: 'Ask me anything...'
+        };
+      }
+
+      // Reconfigure the widget
+      configureChatWidget('audako-chat', config);
+      console.log(`Adapter switched to: ${adapterType}`);
+      alert(`Chat widget configured with ${adapterType} adapter!`);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "@audako/backend-bridge",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Backend bridge between the chat UI and MCP server.",
+  "type": "module",
+  "scripts": {
+    "dev": "echo \"TODO: implement backend dev server\"",
+    "build": "echo \"TODO: backend build\"",
+    "test": "echo \"No backend tests yet\""
+  }
+}

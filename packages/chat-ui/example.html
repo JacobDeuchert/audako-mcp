@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audako Chat UI - Standalone Example</title>
+
+  <!-- Import the chat widget CSS -->
+  <link rel="stylesheet" href="./dist/audako-chat.css">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    h1 {
+      color: #0f172a;
+      margin-bottom: 1rem;
+    }
+
+    .description {
+      color: #64748b;
+      margin-bottom: 2rem;
+    }
+
+    .chat-container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Audako Chat UI</h1>
+    <p class="description">
+      This is a standalone example of the Audako Chat UI web component.
+      The chat includes streaming responses and Material Design styling.
+    </p>
+
+    <div class="chat-container">
+      <!-- The chat widget will be rendered here -->
+      <audako-chat></audako-chat>
+    </div>
+  </div>
+
+  <!-- Import and register the chat widget -->
+  <script type="module">
+    import { registerChatWidget, MockAdapter, OpenCodeAdapter } from './dist/audako-chat.js';
+
+    // Create mock adapter instance
+    const mockAdapter = new MockAdapter({ showThinking: true });
+
+    const adapter = new OpenCodeAdapter({
+      baseUrl: 'http://localhost:4096',  // OpenCode server URL
+      model: {
+        providerID: 'anthropic',
+        modelID: 'claude-3-5-sonnet-20241022'
+      },
+      createSession: true  // Auto-create sessions
+    });
+
+    // Register the custom element with config
+    registerChatWidget({
+      adapter: adapter,
+      title: 'Audako Assistant',
+      initialMessage: 'Welcome to Audako MCP Chat. How can I assist you today?',
+      placeholder: 'Type a message...'
+    });
+
+    console.log('Audako Chat Widget registered successfully!');
+  </script>
+</body>
+
+</html>

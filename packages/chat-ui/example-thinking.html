@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audako Chat UI - Thinking Feature Demo</title>
+  
+  <!-- Import the chat widget CSS -->
+  <link rel="stylesheet" href="./dist/audako-chat.css">
+  
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    h1 {
+      color: #0f172a;
+      margin-bottom: 1rem;
+    }
+    
+    .description {
+      color: #64748b;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .feature-highlight {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border-left: 4px solid #f59e0b;
+      padding: 1rem 1.5rem;
+      border-radius: 0.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .feature-highlight h2 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.125rem;
+      color: #92400e;
+    }
+
+    .feature-highlight p {
+      margin: 0;
+      color: #78350f;
+      font-size: 0.875rem;
+    }
+
+    .feature-highlight ul {
+      margin: 0.5rem 0 0 1.5rem;
+      color: #78350f;
+      font-size: 0.875rem;
+    }
+    
+    .chat-container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Audako Chat UI - Thinking Feature</h1>
+    <p class="description">
+      This demo showcases the thinking/reasoning feature. The chat widget can display
+      the model's internal reasoning process separately from the final response.
+    </p>
+
+    <div class="feature-highlight">
+      <h2>✨ Extended Thinking Support</h2>
+      <p>The chat UI now supports displaying thinking blocks that show the model's reasoning process:</p>
+      <ul>
+        <li>Thinking content streams separately from the response</li>
+        <li>Collapsible UI - click to expand/collapse thinking sections</li>
+        <li>Distinct visual styling with amber/yellow theme</li>
+        <li>Perfect for models like Claude with extended thinking or o1</li>
+      </ul>
+    </div>
+    
+    <div class="chat-container">
+      <!-- The chat widget will be rendered here -->
+      <audako-chat></audako-chat>
+    </div>
+  </div>
+
+  <!-- Import and register the chat widget -->
+  <script type="module">
+    import { registerChatWidget, MockAdapter } from './dist/audako-chat.js';
+    
+    // Create mock adapter with thinking enabled
+    const adapter = new MockAdapter({ showThinking: true });
+    
+    registerChatWidget({
+      adapter,
+      title: 'Audako Assistant with Thinking',
+      initialMessage: 'Hello! I can show you my thinking process. Try asking me a question!',
+      placeholder: 'Ask me anything...'
+    });
+
+    console.log('Audako Chat Widget registered with thinking support!');
+  </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "name": "@audako/chat-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Svelte 5 + Vite + Tailwind chat UI that can also be consumed as a web component.",
+  "type": "module",
+  "main": "./dist/audako-chat.js",
+  "module": "./dist/audako-chat.js",
+  "exports": {
+    ".": {
+      "import": "./dist/audako-chat.js",
+      "types": "./dist/register.d.ts"
+    },
+    "./style.css": "./dist/audako-chat.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:wc": "vite build --config vite.config.wc.ts",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "lint": "npm run check"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@tsconfig/svelte": "^5.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.48",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.0.134"
+  }
+}

@@ -1,8 +1,10 @@
 # Dependencies
 node_modules/
+**/node_modules/
 
 # Build output
 dist/
+**/dist/
 
 # IDE
 .idea/
@@ -22,6 +24,9 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+**/.env
+**/.env.local
+**/.env.*.local
 
 # Coverage
 coverage/
