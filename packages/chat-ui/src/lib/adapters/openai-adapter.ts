@@ -25,6 +25,14 @@ export class OpenAIAdapter implements ChatAdapter {
     this.systemPrompt = config.systemPrompt || 'You are a helpful assistant.';
   }
 
+  /**
+   * Initialize the OpenAI adapter
+   * For OpenAIAdapter, this is a no-op since authentication happens per-request
+   */
+  async init(): Promise<void> {
+    // Nothing to initialize - authentication is per-request via API key
+  }
+
   async sendMessage(
     request: ChatRequest,
     callbacks: StreamCallbacks

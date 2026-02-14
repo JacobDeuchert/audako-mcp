@@ -48,6 +48,13 @@ export interface StreamCallbacks {
 
 export interface ChatAdapter {
   /**
+   * Initialize the adapter (optional)
+   * Called once when the adapter is set up, before any messages are sent
+   * Use this to set up connections, authenticate, or perform other setup tasks
+   */
+  init?(): Promise<void>;
+
+  /**
    * Send a message and receive a streaming response
    * @param request - The chat request containing the user message
    * @param callbacks - Callbacks for handling the streaming response
@@ -68,4 +75,10 @@ export interface ChatWidgetConfig {
   initialMessage?: string;
   placeholder?: string;
   title?: string;
+}
+
+export interface ChatWidgetThemeProps {
+  primary?: string;
+  secondary?: string;
+  darkMode?: boolean;
 }

@@ -1,51 +1,49 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { registerChatWidget, MockAdapter } from './lib/register';
+  import { ChatWidget, MockAdapter, type ChatWidgetConfig } from './lib';
 
-  onMount(() => {
-    // Enable thinking simulation in mock adapter
-    const adapter = new MockAdapter({ showThinking: true });
-    
-    registerChatWidget({
-      adapter,
-      title: 'Audako Assistant',
-      initialMessage: 'Welcome to Audako MCP Chat. I can show you my thinking process!',
-      placeholder: 'Type a message'
-    });
-  });
+  const adapter = new MockAdapter({ showThinking: true });
+
+  let config: ChatWidgetConfig = {
+    adapter,
+    title: 'Audako Assistant',
+    initialMessage: 'Welcome to Audako MCP Chat. I can show you my thinking process!',
+    placeholder: 'Type a message'
+  };
+
+  let primary = '#0057B8';
+  let secondary = '#146C5B';
+  let darkMode = false;
 </script>
 
+{#snippet widgetHeader(title: string)}
+  <div class="flex items-center justify-between gap-3">
+    <h2 class="text-sm font-medium text-slate-900 leading-tight">{title}</h2>
+    <span class="text-xs text-slate-500">Chat</span>
+  </div>
+{/snippet}
+
 <main class="min-h-screen flex items-center justify-center">
-  <div class="max-w-3xl w-full px-6">
+  <div class="max-w-4xl w-full px-6 py-10">
     <h1 class="text-3xl font-semibold text-slate-900 mb-4">Audako Chat UI</h1>
-    <p class="text-slate-600 mb-6">This page renders the chat widget as a custom element.</p>
+    <p class="text-slate-600 mb-6">This preview renders the widget as a regular Svelte component.</p>
 
     <section class="bg-white rounded-2xl shadow-xl border border-slate-200/60 p-6">
-      <div class="grid md:grid-cols-[1fr,320px] gap-6 items-start">
-        <div>
-          <h2 class="text-xl font-semibold text-slate-900 mb-3">Live preview</h2>
-          <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
-            <audako-chat class="block"></audako-chat>
-          </div>
+      <div class="grid md:grid-cols-[1fr,300px] gap-6 items-start">
+        <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50">
+          <ChatWidget {config} header={widgetHeader} {primary} {secondary} {darkMode} />
         </div>
         <div class="space-y-3 text-sm text-slate-600">
-          <p>
-            The component is compiled as a web component. Import <code class="px-1 py-0.5 bg-slate-100 rounded">registerChatWidget</code>
-            and drop <code class="px-1 py-0.5 bg-slate-100 rounded">&lt;audako-chat&gt;</code> into any page.
-          </p>
+          <p>Import the component directly in your Svelte app (including Chrome extensions).</p>
+          <label class="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" bind:checked={darkMode} />
+            Dark mode
+          </label>
           <div class="bg-slate-900 text-slate-100 rounded-xl p-3 font-mono text-xs">
-            import {'{'} registerChatWidget {'}'} from '@audako/chat-ui';<br />
-            registerChatWidget();
+            import {'{'} ChatWidget, MockAdapter {'}'} from '@audako/chat-ui';<br />
+            import '@audako/chat-ui/style.css';
           </div>
         </div>
       </div>
     </section>
   </div>
 </main>
-
-<style>
-  code {
-    font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
-      monospace;
-  }
-</style>

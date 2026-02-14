@@ -12,6 +12,14 @@ export class MockAdapter implements ChatAdapter {
     this.showThinking = options?.showThinking ?? false;
   }
 
+  /**
+   * Initialize the mock adapter
+   * For MockAdapter, this is a no-op since there's no real connection to set up
+   */
+  async init(): Promise<void> {
+    // Nothing to initialize for mock adapter
+  }
+
   async sendMessage(
     _request: ChatRequest,
     callbacks: StreamCallbacks
