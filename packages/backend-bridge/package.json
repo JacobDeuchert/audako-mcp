@@ -1,12 +1,33 @@
 {
   "name": "@audako/backend-bridge",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
-  "description": "Backend bridge between the chat UI and MCP server.",
+  "description": "Backend bridge between chat UI and OpenCode servers for SCADA systems",
   "type": "module",
   "scripts": {
-    "dev": "echo \"TODO: implement backend dev server\"",
-    "build": "echo \"TODO: backend build\"",
-    "test": "echo \"No backend tests yet\""
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write 'src/**/*.ts'"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.1.53",
+    "fastify": "^4.25.0",
+    "@fastify/cors": "^8.4.0",
+    "dotenv": "^16.3.1",
+    "pino": "^8.16.0",
+    "pino-pretty": "^10.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "tsx": "^4.7.0",
+    "vitest": "^1.0.0",
+    "eslint": "^8.54.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "prettier": "^3.1.0"
   }
 }
