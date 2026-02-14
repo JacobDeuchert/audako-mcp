@@ -9,8 +9,9 @@ import {
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { readFile, readdir } from "fs/promises";
 import { join } from "path";
-import { registerCreateSignalTool, registerSelectTenantTool } from "./tools/index.js";
+import { autoRegisterTools } from "./tools/auto-register.js";
 import { initializeServices } from "./services/audako-services.js";
+import { logger } from "./services/logger.js";
 
 const docsDir = join(import.meta.dirname, "docs");
 
@@ -24,15 +25,11 @@ const server = new McpServer(
   {
     instructions: `You are connected to the Audako system at: ${systemUrl}
 
-IMPORTANT: Before performing any operations, you MUST first select a tenant using the select-tenant tool.
-Use list-tenants to see available tenants, then select one by ID or name.
-
-All operations (creating signals, etc.) will be performed in the context of the selected tenant.`,
-  }
+Before creating or updating entities, select a tenant with select-tenant.
+Use list-entity-types to discover supported entity types.
+Use get-entity-definition before create-entity or update-entity to get the expected fields and enums.`,
+  },
 );
-
-registerCreateSignalTool(server);
-registerSelectTenantTool(server);
 
 // Register resource to list available docs
 server.registerResource(
@@ -40,8 +37,13 @@ server.registerResource(
   "docs://index",
   { description: "List of all available documentation files" },
   async () => {
+    await logger.trace("docs-index", "listing documentation files");
     const files = await readdir(docsDir);
     const mdFiles = files.filter((f) => f.endsWith(".md"));
+    await logger.debug("docs-index: found documentation files", {
+      count: mdFiles.length,
+      files: mdFiles,
+    });
     return {
       contents: [
         {
@@ -51,7 +53,7 @@ server.registerResource(
         },
       ],
     };
-  }
+  },
 );
 
 // Register resource template for individual docs
@@ -60,29 +62,70 @@ server.registerResource(
   new ResourceTemplate("docs://files/{filename}", { list: undefined }),
   { description: "Read a specific documentation file by name" },
   async (uri, { filename }) => {
-    const content = await readFile(join(docsDir, filename as string), "utf-8");
-    return {
-      contents: [
-        {
-          uri: uri.href,
-          mimeType: "text/markdown",
-          text: content,
-        },
-      ],
-    };
-  }
+    await logger.trace("doc", "reading documentation file", { filename });
+    try {
+      const content = await readFile(
+        join(docsDir, filename as string),
+        "utf-8",
+      );
+      await logger.debug("doc: file read successfully", {
+        filename,
+        size: content.length,
+      });
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "text/markdown",
+            text: content,
+          },
+        ],
+      };
+    } catch (error) {
+      await logger.error("doc: failed to read file", {
+        filename,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  },
 );
 
 // Start the server
 async function main() {
-  await initializeServices();
+  await logger.info("Audako MCP Server starting", {
+    version: "1.0.0",
+    systemUrl: systemUrl,
+    logFilePath: logger.getLogFilePath(),
+    logLevel: logger.getMinLevel(),
+  });
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Audako MCP Server running on stdio");
+  try {
+    await autoRegisterTools(server);
+    await logger.info("Tools registered", { source: "auto-discovery" });
+
+    await initializeServices();
+    await logger.info("Services initialized successfully");
+
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+
+    await logger.info("Audako MCP Server running on stdio");
+    console.error("Audako MCP Server running on stdio");
+  } catch (error) {
+    await logger.error("Failed to start server", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error;
+  }
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
+  await logger.error("Fatal error in main", {
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+  });
   console.error("Fatal error:", error);
   process.exit(1);
 });

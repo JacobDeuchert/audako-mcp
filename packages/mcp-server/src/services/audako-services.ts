@@ -8,6 +8,7 @@ import {
   DataSourceHttpService,
   TenantView,
 } from "audako-core";
+import { logger } from "./logger.js";
 
 // Configure axios to ignore self-signed certificates
 axios.defaults.httpsAgent = new https.Agent({
@@ -36,24 +37,43 @@ class AudakoServices {
   }
 
   public async initialize(): Promise<void> {
+    await logger.debug("AudakoServices: initializing");
+
     const systemUrl = process.env.AUDAKO_SYSTEM_URL;
     const token = process.env.AUDAKO_TOKEN;
 
     if (!systemUrl) {
+      await logger.error("AudakoServices: AUDAKO_SYSTEM_URL not configured");
       throw new Error("AUDAKO_SYSTEM_URL environment variable is required");
     }
 
     if (!token) {
+      await logger.error("AudakoServices: AUDAKO_TOKEN not configured");
       throw new Error("AUDAKO_TOKEN environment variable is required");
     }
 
-    this._httpConfig = await BaseHttpService.requestHttpConfig(systemUrl);
-    this._accessToken = token;
+    await logger.debug("AudakoServices: requesting HTTP config", { systemUrl });
 
-    // Initialize service singletons
-    this._tenantService = new TenantHttpService(this._httpConfig, this._accessToken);
-    this._entityService = new EntityHttpService(this._httpConfig, this._accessToken);
-    this._dataSourceService = new DataSourceHttpService(this._httpConfig, this._accessToken);
+    try {
+      this._httpConfig = await BaseHttpService.requestHttpConfig(systemUrl);
+      this._accessToken = token;
+
+      await logger.debug("AudakoServices: HTTP config received");
+
+      // Initialize service singletons
+      this._tenantService = new TenantHttpService(this._httpConfig, this._accessToken);
+      this._entityService = new EntityHttpService(this._httpConfig, this._accessToken);
+      this._dataSourceService = new DataSourceHttpService(this._httpConfig, this._accessToken);
+
+      await logger.info("AudakoServices: all services initialized successfully");
+    } catch (error) {
+      await logger.error("AudakoServices: initialization failed", {
+        systemUrl,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
   }
 
   public get httpConfig(): HttpConfig {
@@ -76,6 +96,14 @@ class AudakoServices {
 
   public set selectedTenant(tenant: TenantView | undefined) {
     this._selectedTenant = tenant;
+    if (tenant) {
+      logger.info("AudakoServices: tenant selected", {
+        tenantId: tenant.Id,
+        tenantName: tenant.Name,
+      });
+    } else {
+      logger.debug("AudakoServices: tenant deselected");
+    }
   }
 
   public get selectedTenantId(): string | undefined {
