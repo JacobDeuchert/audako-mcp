@@ -1,13 +1,13 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { appConfig } from '../config/index.js';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { appConfig, createLogger } from '../config/index.js';
 import type { OpencodeFactory } from '../services/opencode-factory.js';
+import type { ServerRegistry } from '../services/server-registry.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
 import {
   SessionRequestCancelledError,
   type SessionRequestHub,
   SessionRequestTimeoutError,
 } from '../services/session-request-hub.js';
-import type { ServerRegistry } from '../services/server-registry.js';
 import type {
   ErrorResponse,
   PushSessionEventPayload,
@@ -23,19 +23,13 @@ import type {
   SessionBootstrapResponse,
   SessionEventEnvelope,
   SessionInfo,
+  SessionInfoFields,
   SessionInfoResponse,
   SessionInfoSnapshot,
-  SessionInfoUpdateRequest,
   SessionSnapshotPayload,
+  SessionSocket,
 } from '../types/index.js';
-
-interface SessionSocket {
-  readyState: number;
-  send(data: string): void;
-  close(code?: number, reason?: string): void;
-  on(event: string, handler: (...args: unknown[]) => void): void;
-  ping?: () => void;
-}
+import { getErrorMessage } from '../utils.js';
 
 export async function sessionRoutes(
   fastify: FastifyInstance,
@@ -44,61 +38,106 @@ export async function sessionRoutes(
   eventHub: SessionEventHub,
   sessionRequestHub: SessionRequestHub,
 ) {
+  const logger = createLogger('session-routes');
+
+  // ── Route map ────────────────────────────────────────────────────────
+  fastify.post<{ Body: SessionBootstrapRequest; Reply: SessionBootstrapResponse | ErrorResponse }>(
+    '/api/session/bootstrap',
+    handleBootstrap,
+  );
+  fastify.get<{ Params: { sessionId: string } }>(
+    '/api/session/:sessionId/ws',
+    { websocket: true },
+    handleWebSocket,
+  );
+  fastify.put<{
+    Params: { sessionId: string };
+    Body: SessionInfoFields;
+    Reply: SessionInfoResponse | ErrorResponse;
+  }>('/api/session/:sessionId/info', handleUpdateSessionInfo);
+  fastify.get<{ Params: { sessionId: string }; Reply: SessionInfoResponse | ErrorResponse }>(
+    '/api/session/:sessionId/info',
+    handleGetSessionInfo,
+  );
+  fastify.post<{
+    Params: { sessionId: string };
+    Body: PushSessionEventRequest;
+    Reply: PushSessionEventResponse | ErrorResponse;
+  }>('/api/session/:sessionId/events', handlePushEvent);
+  fastify.post<{
+    Params: { sessionId: string };
+    Body: RequestSessionEventRequest;
+    Reply: RequestSessionEventResponse | ErrorResponse;
+  }>('/api/session/:sessionId/events/request', handleRequestEvent);
+  fastify.post<{
+    Params: { sessionId: string; requestId: string };
+    Body: ResolveSessionEventResponseRequest;
+    Reply: ResolveSessionEventResponse | ErrorResponse;
+  }>('/api/session/:sessionId/events/request/:requestId/response', handleResolveRequest);
+  fastify.get<{ Reply: ServerListResponse }>('/api/session/servers', handleListServers);
+
+  // ── Constants ────────────────────────────────────────────────────────
   const DEFAULT_EVENT_REQUEST_TIMEOUT_MS = 180000;
   const MIN_EVENT_REQUEST_TIMEOUT_MS = 1000;
   const MAX_EVENT_REQUEST_TIMEOUT_MS = 180000;
 
-  const toSessionInfoSnapshot = (
-    sessionInfo: SessionInfo | null | undefined,
-  ): SessionInfoSnapshot => ({
-    tenantId: sessionInfo?.tenantId,
-    groupId: sessionInfo?.groupId,
-    entityType: sessionInfo?.entityType,
-    app: sessionInfo?.app,
-    updatedAt: sessionInfo?.updatedAt?.toISOString(),
-  });
+  // ── Helpers ──────────────────────────────────────────────────────────
 
-  const toSessionInfoResponse = (
+  function toSessionInfoSnapshot(sessionInfo: SessionInfo | null | undefined): SessionInfoSnapshot {
+    return {
+      tenantId: sessionInfo?.tenantId,
+      groupId: sessionInfo?.groupId,
+      entityType: sessionInfo?.entityType,
+      app: sessionInfo?.app,
+      updatedAt: sessionInfo?.updatedAt?.toISOString(),
+    };
+  }
+
+  function toSessionInfoResponse(
     sessionId: string,
     sessionInfo: SessionInfo | null | undefined,
-  ): SessionInfoResponse => ({
-    sessionId,
-    ...toSessionInfoSnapshot(sessionInfo),
-  });
+  ): SessionInfoResponse {
+    return {
+      sessionId,
+      ...toSessionInfoSnapshot(sessionInfo),
+    };
+  }
 
-  const sanitizeSessionInfoUpdate = (body: SessionInfoUpdateRequest): SessionInfoUpdateRequest => ({
-    tenantId: body.tenantId?.trim() || undefined,
-    groupId: body.groupId?.trim() || undefined,
-    entityType: body.entityType?.trim() || undefined,
-    app: body.app?.trim() || undefined,
-  });
+  function sanitizeSessionInfoUpdate(body: SessionInfoFields): SessionInfoFields {
+    return {
+      tenantId: body.tenantId?.trim() || undefined,
+      groupId: body.groupId?.trim() || undefined,
+      entityType: body.entityType?.trim() || undefined,
+      app: body.app?.trim() || undefined,
+    };
+  }
 
-  const normalizeScadaUrl = (value: string): string => {
+  function normalizeScadaUrl(value: string): string {
     const trimmed = value.trim();
 
     try {
       const parsed = new URL(trimmed);
-      const normalizedPath = parsed.pathname.replace(/\/+$/, '');
-      const pathSuffix = normalizedPath && normalizedPath !== '/' ? normalizedPath : '';
-
-      return `${parsed.protocol}//${parsed.host}${pathSuffix}`;
+      const path = parsed.pathname.replace(/\/+$/, '');
+      return parsed.origin + (path === '/' ? '' : path);
     } catch {
       return trimmed.replace(/\/+$/, '');
     }
-  };
+  }
 
-  const buildSessionEvent = <T>(
+  function buildSessionEvent<T>(
     type: string,
     sessionId: string,
     payload: T,
-  ): SessionEventEnvelope<T> => ({
-    type,
-    sessionId,
-    timestamp: new Date().toISOString(),
-    payload,
-  });
+  ): SessionEventEnvelope<T> {
+    return {
+      type,
+      sessionId,
+      timestamp: new Date().toISOString(),
+      payload,
+    };
+  }
 
-  const normalizeEventRequestTimeoutMs = (value: number | undefined): number => {
+  function normalizeEventRequestTimeoutMs(value: number | undefined): number {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
       return DEFAULT_EVENT_REQUEST_TIMEOUT_MS;
     }
@@ -113,40 +152,45 @@ export async function sessionRoutes(
     }
 
     return normalized;
-  };
+  }
 
-  const getHeaderValue = (value: string | string[] | undefined): string | undefined =>
-    Array.isArray(value) ? value[0] : value;
+  function getHeaderValue(value: string | string[] | undefined): string | undefined {
+    return Array.isArray(value) ? value[0] : value;
+  }
 
-  const getForwardedValue = (value: string | undefined): string | undefined => {
+  function getForwardedValue(value: string | undefined): string | undefined {
     if (!value) {
       return undefined;
     }
 
     const first = value.split(',')[0]?.trim();
     return first || undefined;
-  };
+  }
 
-  const resolvePublicBridgeUrl = (request: FastifyRequest): string => {
+  function resolvePublicBridgeUrl(request: FastifyRequest): string {
+    let url: string;
+
     if (appConfig.bridge.publicUrl?.trim()) {
-      return appConfig.bridge.publicUrl.trim().replace(/\/+$/, '');
+      url = appConfig.bridge.publicUrl.trim();
+    } else {
+      const host =
+        getForwardedValue(getHeaderValue(request.headers['x-forwarded-host'])) ||
+        getHeaderValue(request.headers.host);
+
+      if (!host) {
+        url = appConfig.bridge.internalUrl;
+      } else {
+        const protocol =
+          getForwardedValue(getHeaderValue(request.headers['x-forwarded-proto'])) ||
+          request.protocol;
+        url = `${protocol}://${host}`;
+      }
     }
 
-    const host =
-      getForwardedValue(getHeaderValue(request.headers['x-forwarded-host'])) ||
-      getHeaderValue(request.headers.host);
+    return url.replace(/\/+$/, '');
+  }
 
-    if (!host) {
-      return appConfig.bridge.internalUrl.replace(/\/+$/, '');
-    }
-
-    const protocol =
-      getForwardedValue(getHeaderValue(request.headers['x-forwarded-proto'])) || request.protocol;
-
-    return `${protocol}://${host}`.replace(/\/+$/, '');
-  };
-
-  const buildWebsocketUrl = (bridgeUrl: string, sessionId: string): string => {
+  function buildWebsocketUrl(bridgeUrl: string, sessionId: string): string {
     const url = new URL(bridgeUrl);
     const basePath = url.pathname.replace(/\/+$/, '');
     const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -159,21 +203,21 @@ export async function sessionRoutes(
     url.hash = '';
 
     return url.toString();
-  };
+  }
 
-  // POST /api/session/bootstrap - Create or reuse a chat session
-  fastify.post<{
-    Body: SessionBootstrapRequest;
-    Reply: SessionBootstrapResponse | ErrorResponse;
-  }>('/api/session/bootstrap', async (request, reply) => {
-    const { scadaUrl, accessToken, model, sessionInfo } = request.body;
+  // ── Handlers ─────────────────────────────────────────────────────────
+
+  async function handleBootstrap(
+    request: FastifyRequest<{ Body: SessionBootstrapRequest }>,
+    reply: FastifyReply,
+  ) {
+    const { scadaUrl, accessToken, sessionInfo } = request.body;
     const requestOrigin = Array.isArray(request.headers.origin)
       ? request.headers.origin[0]
       : request.headers.origin;
 
     const normalizedScadaUrl = scadaUrl ? normalizeScadaUrl(scadaUrl) : undefined;
     const normalizedAccessToken = accessToken?.trim();
-    const normalizedModel = model?.trim() || undefined;
 
     if (!normalizedScadaUrl || !normalizedAccessToken) {
       return reply.status(400).send({
@@ -182,10 +226,9 @@ export async function sessionRoutes(
       });
     }
 
-    fastify.log.info(
+    logger.info(
       {
         scadaUrl: normalizedScadaUrl,
-        model: normalizedModel,
         hasSessionInfo: Boolean(sessionInfo),
       },
       'Bootstrap request received',
@@ -195,14 +238,12 @@ export async function sessionRoutes(
       const { entry, isNew } = await registry.getOrCreateServer(
         normalizedScadaUrl,
         normalizedAccessToken,
-        normalizedModel,
         async (port: number, sessionId: string) => {
           return opencodeFactory.createServer(
             normalizedScadaUrl,
             normalizedAccessToken,
             port,
             sessionId,
-            normalizedModel,
             requestOrigin ? [requestOrigin] : undefined,
           );
         },
@@ -232,7 +273,7 @@ export async function sessionRoutes(
         sessionInfo: toSessionInfoSnapshot(effectiveSessionInfo),
       };
 
-      fastify.log.info(
+      logger.info(
         {
           scadaUrl: entry.scadaUrl,
           sessionId: entry.sessionId,
@@ -244,95 +285,91 @@ export async function sessionRoutes(
 
       return reply.send(response);
     } catch (error) {
-      fastify.log.error(
+      logger.error(
         {
           scadaUrl: normalizedScadaUrl,
-          error: error instanceof Error ? error.message : String(error),
+          error: getErrorMessage(error),
         },
         'Bootstrap request failed',
       );
 
       return reply.status(500).send({
         error: 'Failed to bootstrap chat session',
-        message: error instanceof Error ? error.message : String(error),
+        message: getErrorMessage(error),
       });
     }
-  });
+  }
 
-  // GET /api/session/:sessionId/ws - Session scoped websocket stream
-  fastify.get<{ Params: { sessionId: string } }>(
-    '/api/session/:sessionId/ws',
-    { websocket: true },
-    (connection: unknown, request) => {
-      const { sessionId } = request.params;
-      const socket = (
-        connection && typeof connection === 'object' && 'socket' in connection
-          ? (connection as { socket: SessionSocket }).socket
-          : (connection as SessionSocket)
-      ) as SessionSocket;
-
-      if (!registry.hasSession(sessionId)) {
-        socket.close(4404, 'session_not_found');
-        return;
-      }
-
-      eventHub.subscribe(sessionId, socket);
-
-      const snapshot = registry.getSessionSnapshot(sessionId);
-      if (!snapshot) {
-        eventHub.unsubscribe(sessionId, socket);
-        socket.close(4404, 'session_not_found');
-        return;
-      }
-
-      const payload: SessionSnapshotPayload = {
-        sessionId: snapshot.sessionId,
-        scadaUrl: snapshot.scadaUrl,
-        opencodeUrl: snapshot.opencodeUrl,
-        sessionInfo: toSessionInfoSnapshot(snapshot.sessionInfo),
-        isActive: true,
-      };
-
-      try {
-        socket.send(JSON.stringify(buildSessionEvent('session.snapshot', sessionId, payload)));
-      } catch {
-        eventHub.unsubscribe(sessionId, socket);
-        socket.close(1011, 'snapshot_delivery_failed');
-        return;
-      }
-
-      let isAlive = true;
-      const heartbeat = setInterval(() => {
-        if (!isAlive) {
-          socket.close(1001, 'heartbeat_timeout');
-          return;
-        }
-
-        isAlive = false;
-        socket.ping?.();
-      }, 30000);
-
-      const onDisconnect = () => {
-        clearInterval(heartbeat);
-        eventHub.unsubscribe(sessionId, socket);
-      };
-
-      socket.on('pong', () => {
-        isAlive = true;
-      });
-      socket.on('close', onDisconnect);
-      socket.on('error', onDisconnect);
-    },
-  );
-
-  // PUT /api/session/:sessionId/info - Update client location context
-  fastify.put<{
-    Params: { sessionId: string };
-    Body: SessionInfoUpdateRequest;
-    Reply: SessionInfoResponse | ErrorResponse;
-  }>('/api/session/:sessionId/info', async (request, reply) => {
+  function handleWebSocket(
+    connection: unknown,
+    request: FastifyRequest<{ Params: { sessionId: string } }>,
+  ) {
     const { sessionId } = request.params;
-    const body = request.body ?? ({} as SessionInfoUpdateRequest);
+    const socket = (
+      connection && typeof connection === 'object' && 'socket' in connection
+        ? (connection as { socket: SessionSocket }).socket
+        : (connection as SessionSocket)
+    ) as SessionSocket;
+
+    if (!registry.hasSession(sessionId)) {
+      socket.close(4404, 'session_not_found');
+      return;
+    }
+
+    eventHub.subscribe(sessionId, socket);
+
+    const snapshot = registry.getSessionSnapshot(sessionId);
+    if (!snapshot) {
+      eventHub.unsubscribe(sessionId, socket);
+      socket.close(4404, 'session_not_found');
+      return;
+    }
+
+    const payload: SessionSnapshotPayload = {
+      sessionId: snapshot.sessionId,
+      scadaUrl: snapshot.scadaUrl,
+      opencodeUrl: snapshot.opencodeUrl,
+      sessionInfo: toSessionInfoSnapshot(snapshot.sessionInfo),
+      isActive: true,
+    };
+
+    try {
+      socket.send(JSON.stringify(buildSessionEvent('session.snapshot', sessionId, payload)));
+    } catch {
+      eventHub.unsubscribe(sessionId, socket);
+      socket.close(1011, 'snapshot_delivery_failed');
+      return;
+    }
+
+    let isAlive = true;
+    const heartbeat = setInterval(() => {
+      if (!isAlive) {
+        socket.close(1001, 'heartbeat_timeout');
+        return;
+      }
+
+      isAlive = false;
+      socket.ping?.();
+    }, 30000);
+
+    const onDisconnect = () => {
+      clearInterval(heartbeat);
+      eventHub.unsubscribe(sessionId, socket);
+    };
+
+    socket.on('pong', () => {
+      isAlive = true;
+    });
+    socket.on('close', onDisconnect);
+    socket.on('error', onDisconnect);
+  }
+
+  async function handleUpdateSessionInfo(
+    request: FastifyRequest<{ Params: { sessionId: string }; Body: SessionInfoFields }>,
+    reply: FastifyReply,
+  ) {
+    const { sessionId } = request.params;
+    const body = request.body ?? ({} as SessionInfoFields);
 
     const sessionInfo = registry.updateSessionInfo(sessionId, sanitizeSessionInfoUpdate(body));
 
@@ -347,13 +384,12 @@ export async function sessionRoutes(
     eventHub.publish(sessionId, buildSessionEvent('session.info.updated', sessionId, response));
 
     return reply.send(response);
-  });
+  }
 
-  // GET /api/session/:sessionId/info - Read session context (used by MCP)
-  fastify.get<{
-    Params: { sessionId: string };
-    Reply: SessionInfoResponse | ErrorResponse;
-  }>('/api/session/:sessionId/info', async (request, reply) => {
+  async function handleGetSessionInfo(
+    request: FastifyRequest<{ Params: { sessionId: string } }>,
+    reply: FastifyReply,
+  ) {
     const { sessionId } = request.params;
     const sessionInfo = registry.getSessionInfo(sessionId);
 
@@ -365,14 +401,12 @@ export async function sessionRoutes(
     }
 
     return reply.send(toSessionInfoResponse(sessionId, sessionInfo));
-  });
+  }
 
-  // POST /api/session/:sessionId/events - Publish generic event to subscribers
-  fastify.post<{
-    Params: { sessionId: string };
-    Body: PushSessionEventRequest;
-    Reply: PushSessionEventResponse | ErrorResponse;
-  }>('/api/session/:sessionId/events', async (request, reply) => {
+  async function handlePushEvent(
+    request: FastifyRequest<{ Params: { sessionId: string }; Body: PushSessionEventRequest }>,
+    reply: FastifyReply,
+  ) {
     const { sessionId } = request.params;
 
     if (!registry.hasSession(sessionId)) {
@@ -401,14 +435,12 @@ export async function sessionRoutes(
     );
 
     return reply.send({ sessionId, deliveredTo });
-  });
+  }
 
-  // POST /api/session/:sessionId/events/request - Publish event and wait for response
-  fastify.post<{
-    Params: { sessionId: string };
-    Body: RequestSessionEventRequest;
-    Reply: RequestSessionEventResponse | ErrorResponse;
-  }>('/api/session/:sessionId/events/request', async (request, reply) => {
+  async function handleRequestEvent(
+    request: FastifyRequest<{ Params: { sessionId: string }; Body: RequestSessionEventRequest }>,
+    reply: FastifyReply,
+  ) {
     const { sessionId } = request.params;
 
     if (!registry.hasSession(sessionId)) {
@@ -475,12 +507,12 @@ export async function sessionRoutes(
         });
       }
 
-      fastify.log.error(
+      logger.error(
         {
           sessionId,
           requestId: pendingRequest.requestId,
           type,
-          error: error instanceof Error ? error.message : String(error),
+          error: getErrorMessage(error),
         },
         'Failed to resolve session request',
       );
@@ -490,14 +522,15 @@ export async function sessionRoutes(
         message: 'Failed to resolve session request',
       });
     }
-  });
+  }
 
-  // POST /api/session/:sessionId/events/request/:requestId/response - Resolve pending event request
-  fastify.post<{
-    Params: { sessionId: string; requestId: string };
-    Body: ResolveSessionEventResponseRequest;
-    Reply: ResolveSessionEventResponse | ErrorResponse;
-  }>('/api/session/:sessionId/events/request/:requestId/response', async (request, reply) => {
+  async function handleResolveRequest(
+    request: FastifyRequest<{
+      Params: { sessionId: string; requestId: string };
+      Body: ResolveSessionEventResponseRequest;
+    }>,
+    reply: FastifyReply,
+  ) {
     const { sessionId, requestId } = request.params;
 
     if (!registry.hasSession(sessionId)) {
@@ -508,7 +541,7 @@ export async function sessionRoutes(
     }
 
     const body = request.body ?? ({} as ResolveSessionEventResponseRequest);
-    if (!Object.prototype.hasOwnProperty.call(body, 'response')) {
+    if (!Object.hasOwn(body, 'response')) {
       return reply.status(400).send({
         error: 'Bad Request',
         message: 'response is required',
@@ -528,10 +561,9 @@ export async function sessionRoutes(
       requestId,
       resolved: true,
     });
-  });
+  }
 
-  // GET /api/session/servers - List active servers (for debugging)
-  fastify.get<{ Reply: ServerListResponse }>('/api/session/servers', async (_request, reply) => {
+  async function handleListServers(_request: FastifyRequest, reply: FastifyReply) {
     const servers = registry.getAllServers();
     const now = Date.now();
 
@@ -550,5 +582,5 @@ export async function sessionRoutes(
     });
 
     return reply.send({ servers: serverList });
-  });
+  }
 }

@@ -1,11 +1,7 @@
+import { appConfig, createLogger } from './config/index.js';
 import { createServer } from './server.js';
-import { appConfig } from './config/index.js';
-import { pino } from 'pino';
 
-const logger = pino({
-  name: 'main',
-  level: appConfig.logLevel,
-});
+const logger = createLogger('main');
 
 async function start() {
   try {

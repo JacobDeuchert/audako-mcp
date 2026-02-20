@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
-import { pino } from 'pino';
+import { createLogger } from '../config/index.js';
 
-const logger = pino({ name: 'session-request-hub' });
+const logger = createLogger('session-request-hub');
 
 export interface SessionRequestResolution {
   response: unknown;
@@ -118,7 +118,7 @@ export class SessionRequestHub {
     };
   }
 
-  cancel(sessionId: string, requestId: string, reason: string): boolean {
+  private cancel(sessionId: string, requestId: string, reason: string): boolean {
     const entry = this.remove(sessionId, requestId);
     if (!entry) {
       return false;
@@ -143,13 +143,7 @@ export class SessionRequestHub {
       this.cancel(sessionId, requestId, reason);
     }
 
-    logger.debug(
-      {
-        sessionId,
-        reason,
-      },
-      'Cancelled pending session requests',
-    );
+    logger.debug({ sessionId, reason }, 'Cancelled pending session requests');
   }
 
   cancelAll(reason: string = 'server_shutdown'): void {

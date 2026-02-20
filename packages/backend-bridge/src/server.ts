@@ -1,32 +1,24 @@
-import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
-import { pino } from 'pino';
-import { appConfig } from './config/index.js';
-import { PortAllocator } from './services/port-allocator.js';
-import { ServerRegistry } from './services/server-registry.js';
-import { OpencodeFactory } from './services/opencode-factory.js';
-import { SessionEventHub } from './services/session-event-hub.js';
-import { SessionRequestHub } from './services/session-request-hub.js';
+import Fastify from 'fastify';
+import { appConfig, createLogger } from './config/index.js';
 import { healthRoutes } from './routes/health.routes.js';
 import { sessionRoutes } from './routes/session.routes.js';
+import { OpencodeFactory } from './services/opencode-factory.js';
+import { PortAllocator } from './services/port-allocator.js';
+import { ServerRegistry } from './services/server-registry.js';
+import { SessionEventHub } from './services/session-event-hub.js';
+import { SessionRequestHub } from './services/session-request-hub.js';
 
-const logger = pino({
-  name: 'backend-bridge',
-  level: appConfig.logLevel,
-});
+const logger = createLogger('server');
 
 export async function createServer() {
-  // Create Fastify instance
   const fastify = Fastify({
-    logger: {
-      level: appConfig.logLevel,
-    },
+    logger: { level: appConfig.logLevel },
   });
 
-  // Register CORS
   await fastify.register(cors, {
-    origin: true, // Allow all origins for now (configure as needed)
+    origin: true,
   });
 
   await fastify.register(websocket);

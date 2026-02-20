@@ -1,6 +1,6 @@
-import { pino } from 'pino';
+import { createLogger } from '../config/index.js';
 
-const logger = pino({ name: 'port-allocator' });
+const logger = createLogger('port-allocator');
 
 export class PortAllocator {
   private usedPorts: Set<number>;
@@ -11,9 +11,7 @@ export class PortAllocator {
     this.usedPorts = new Set();
     this.basePort = basePort;
     this.maxPort = maxPort;
-    logger.info(
-      `PortAllocator initialized: ${basePort}-${maxPort} (${maxPort - basePort} ports available)`,
-    );
+    logger.info({ basePort, maxPort, available: maxPort - basePort }, 'PortAllocator initialized');
   }
 
   /**
@@ -40,8 +38,6 @@ export class PortAllocator {
     if (this.usedPorts.has(port)) {
       this.usedPorts.delete(port);
       logger.debug({ port }, 'Port released');
-    } else {
-      logger.warn({ port }, 'Attempted to release port that was not allocated');
     }
   }
 
@@ -51,22 +47,5 @@ export class PortAllocator {
    */
   getAvailableCount(): number {
     return this.maxPort - this.basePort - this.usedPorts.size;
-  }
-
-  /**
-   * Gets the count of used ports
-   * @returns number of used ports
-   */
-  getUsedCount(): number {
-    return this.usedPorts.size;
-  }
-
-  /**
-   * Checks if a specific port is in use
-   * @param port - port number to check
-   * @returns true if port is in use
-   */
-  isPortInUse(port: number): boolean {
-    return this.usedPorts.has(port);
   }
 }

@@ -1,54 +1,62 @@
+/**
+ * Minimal shape of the object returned by `createOpencode()`.
+ * We only need to reach `.server.close()` for teardown.
+ */
+export interface OpencodeRuntime {
+  server?: {
+    close?: () => void;
+  };
+}
+
+/** Minimal WebSocket interface used across session services and routes. */
+export interface SessionSocket {
+  readyState: number;
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  on(event: string, handler: (...args: unknown[]) => void): void;
+  ping?: () => void;
+}
+
 export interface ServerRegistryEntry {
   sessionId: string;
   scadaUrl: string;
   accessToken: string; // Stored in-memory for MCP session bootstrapping
   accessTokenHash: string; // SHA-256 hash for lookup
-  opencodeServer: any; // Current runtime instance (OpenCode)
+  opencodeServer: OpencodeRuntime;
   opencodeUrl: string;
   port: number;
   createdAt: Date;
   lastAccessedAt: Date;
-  model?: string; // Client-specified model
   sessionInfo: SessionInfo;
 }
 
-export interface SessionInfo {
+/** Fields that a client may send when updating session info. */
+export interface SessionInfoFields {
   tenantId?: string;
   groupId?: string;
   entityType?: string;
   app?: string;
+}
+
+/** Internal session info stored in the registry (Date for updatedAt). */
+export interface SessionInfo extends SessionInfoFields {
   updatedAt?: Date;
 }
 
-export interface SessionInfoUpdateRequest {
-  tenantId?: string;
-  groupId?: string;
-  entityType?: string;
-  app?: string;
+/** Serialised session info sent over the wire (ISO string for updatedAt). */
+export interface SessionInfoSnapshot extends SessionInfoFields {
+  updatedAt?: string;
 }
 
-export interface SessionInfoResponse {
+/** Serialised session info with the owning sessionId attached. */
+export interface SessionInfoResponse extends SessionInfoSnapshot {
   sessionId: string;
-  tenantId?: string;
-  groupId?: string;
-  entityType?: string;
-  app?: string;
-  updatedAt?: string;
-}
-
-export interface SessionInfoSnapshot {
-  tenantId?: string;
-  groupId?: string;
-  entityType?: string;
-  app?: string;
-  updatedAt?: string;
 }
 
 export interface SessionBootstrapRequest {
   scadaUrl: string;
   accessToken: string;
-  model?: string;
-  sessionInfo?: SessionInfoUpdateRequest;
+  sessionInfo?: SessionInfoFields;
 }
 
 export interface SessionBootstrapResponse {

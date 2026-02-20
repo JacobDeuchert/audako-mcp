@@ -1,16 +1,11 @@
-import { pino } from 'pino';
-import type { SessionEventEnvelope } from '../types/index.js';
+import { createLogger } from '../config/index.js';
+import type { SessionEventEnvelope, SessionSocket } from '../types/index.js';
+import { getErrorMessage } from '../utils.js';
 
-const logger = pino({ name: 'session-event-hub' });
+const logger = createLogger('session-event-hub');
 
 const WS_OPEN_STATE = 1;
 const WS_CLOSED_STATE = 3;
-
-interface SessionSocket {
-  readyState: number;
-  send(data: string): void;
-  close(code?: number, reason?: string): void;
-}
 
 export class SessionEventHub {
   private readonly subscribers = new Map<string, Set<SessionSocket>>();
@@ -61,7 +56,7 @@ export class SessionEventHub {
         logger.debug(
           {
             sessionId,
-            error: error instanceof Error ? error.message : String(error),
+            error: getErrorMessage(error),
           },
           'Failed to send websocket event',
         );
