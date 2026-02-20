@@ -11,7 +11,9 @@ export class PortAllocator {
     this.usedPorts = new Set();
     this.basePort = basePort;
     this.maxPort = maxPort;
-    logger.info(`PortAllocator initialized: ${basePort}-${maxPort} (${maxPort - basePort} ports available)`);
+    logger.info(
+      `PortAllocator initialized: ${basePort}-${maxPort} (${maxPort - basePort} ports available)`,
+    );
   }
 
   /**
@@ -48,7 +50,7 @@ export class PortAllocator {
    * @returns number of available ports
    */
   getAvailableCount(): number {
-    return (this.maxPort - this.basePort) - this.usedPorts.size;
+    return this.maxPort - this.basePort - this.usedPorts.size;
   }
 
   /**

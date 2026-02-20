@@ -24,7 +24,7 @@ async function start() {
         opencodeMaxPort: appConfig.opencode.maxPort,
         maxServers: appConfig.opencode.maxServers,
       },
-      'Backend Bridge server started'
+      'Backend Bridge server started',
     );
   } catch (error) {
     logger.error({ error }, 'Failed to start server');

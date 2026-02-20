@@ -1,102 +1,92 @@
 # Backend Bridge
 
-A Node.js service that dynamically creates and manages OpenCode server instances for SCADA systems. When a chat UI connects with SCADA credentials, it returns a URL to a dedicated OpenCode server configured with custom SCADA-specific MCP server and agent.
+Backend Bridge provisions and reuses OpenCode servers for SCADA sessions, stores in-memory session context, and exposes a session-scoped WebSocket event channel.
 
 ## Features
 
-- **Dynamic Server Creation**: Creates dedicated OpenCode server instances per SCADA system
-- **Server Reuse**: Same credentials always return the same server instance
-- **Resource Management**: Automatic cleanup of idle servers (1 hour timeout)
-- **Port Management**: Dynamic port allocation from a configurable pool (30000-31000)
-- **Capacity Control**: Maximum 50 concurrent servers (configurable)
-- **Custom Agent**: SCADA-optimized primary agent with specialized prompts
-- **MCP Integration**: Pre-configured MCP server with SCADA credentials
-- **Session Context**: Per-server session IDs with updateable tenant/group/entity context
+- Session bootstrap API with one-call connection metadata (`opencodeUrl`, `websocketUrl`, `sessionId`)
+- Deterministic server reuse for the same `(scadaUrl, accessToken)` pair
+- Session context storage (`tenantId`, `groupId`, `entityType`, `app`)
+- Session-scoped WebSocket subscriptions with snapshot + pushed events
+- Generic server-side push endpoint for session event fanout
+- Request/response session events for interactive hub flows (for example question prompts)
+- Idle server cleanup with automatic resource release
 
-## Quick Start
+## Configuration
 
-### Installation
-
-```bash
-npm install
-```
-
-### Configuration
-
-Copy `.env.example` to `.env` and configure as needed:
+Copy `.env.example` to `.env`:
 
 ```bash
 cp .env.example .env
 ```
 
-Key configuration options:
+Important variables:
 
-- `PORT`: Backend bridge API port (default: 3000)
-- `BACKEND_BRIDGE_INTERNAL_URL`: Internal URL used by MCP to query session context (default: `http://127.0.0.1:${PORT}`)
-- `OPENCODE_BASE_PORT`: Starting port for OpenCode instances (default: 30000)
-- `OPENCODE_MAX_PORT`: Maximum port for OpenCode instances (default: 31000)
-- `OPENCODE_MAX_SERVERS`: Maximum concurrent servers (default: 50)
-- `OPENCODE_IDLE_TIMEOUT`: Idle timeout in ms (default: 3600000 - 1 hour)
+- `PORT` (default: `3000`)
+- `HOST` (default: `0.0.0.0`)
+- `BACKEND_BRIDGE_INTERNAL_URL` (used by MCP process callbacks)
+- `BACKEND_BRIDGE_PUBLIC_URL` (optional public/proxied URL used to build `websocketUrl`)
+- `OPENCODE_BASE_PORT`, `OPENCODE_MAX_PORT`
+- `OPENCODE_MAX_SERVERS`
+- `OPENCODE_IDLE_TIMEOUT`, `OPENCODE_CLEANUP_INTERVAL`
+- `OPENCODE_CORS_ORIGINS`
+- `DEFAULT_MODEL`, `LOG_LEVEL`
 
-### Development
+## API
 
-```bash
-npm run dev
-```
+### POST `/api/session/bootstrap`
 
-### Production
+Create or reuse an OpenCode session server.
 
-```bash
-npm run build
-npm start
-```
-
-## API Endpoints
-
-### Create/Get OpenCode Server
-
-**POST** `/api/opencode/create`
-
-Creates a new OpenCode server instance or returns an existing one for the given SCADA credentials.
-
-Request:
+Request body:
 
 ```json
 {
   "scadaUrl": "https://scada.example.com",
   "accessToken": "Bearer xxx...",
-  "model": "anthropic/claude-sonnet-4-20250514"
+  "model": "anthropic/claude-sonnet-4-20250514",
+  "sessionInfo": {
+    "tenantId": "tenant-123",
+    "groupId": "group-456",
+    "entityType": "signal",
+    "app": "designer"
+  }
 }
 ```
 
-Response (New):
+Response:
 
 ```json
 {
-  "opencodeUrl": "http://localhost:30001",
   "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
   "isNew": true,
-  "scadaUrl": "https://scada.example.com"
+  "scadaUrl": "https://scada.example.com",
+  "opencodeUrl": "http://localhost:30001",
+  "websocketUrl": "ws://bridge.example.com/api/session/0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f/ws",
+  "sessionInfo": {
+    "tenantId": "tenant-123",
+    "groupId": "group-456",
+    "entityType": "signal",
+    "app": "designer",
+    "updatedAt": "2026-02-15T10:30:00.000Z"
+  }
 }
 ```
 
-Response (Existing):
+### GET `/api/session/:sessionId/ws`
 
-````json
-{
-  "opencodeUrl": "http://localhost:30001",
-  "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
-  "isNew": false,
-  "scadaUrl": "https://scada.example.com"
-}
+Open session-scoped WebSocket connection.
 
-### Update Session Context
+- Sends `session.snapshot` immediately on connect.
+- Emits pushed events (`session.info.updated`, `session.event`, `session.closed`).
+- Supports heartbeat (`ping`/`pong`) and stale socket cleanup.
 
-**PUT** `/api/opencode/sessions/:sessionId/info`
+### PUT `/api/session/:sessionId/info`
 
-Updates location-aware session context used by MCP tools. `tenantId`, `groupId`, `entityType`, and `app` are optional.
+Update session context used by MCP tools.
 
-Request:
+Request body:
+
 ```json
 {
   "tenantId": "tenant-123",
@@ -104,7 +94,7 @@ Request:
   "entityType": "signal",
   "app": "designer"
 }
-````
+```
 
 Response:
 
@@ -115,132 +105,178 @@ Response:
   "groupId": "group-456",
   "entityType": "signal",
   "app": "designer",
-  "updatedAt": "2026-02-12T10:30:00.000Z"
+  "updatedAt": "2026-02-15T10:30:00.000Z"
 }
 ```
 
-### Get Session Context
+Also broadcasts `session.info.updated` to subscribers on that session.
 
-**GET** `/api/opencode/sessions/:sessionId/info`
+### GET `/api/session/:sessionId/info`
 
-Returns the current session context for MCP lookups.
+Fetch current session context (used by MCP server process).
 
-````
+### POST `/api/session/:sessionId/events`
 
-### Health Check
+Publish a session event to WebSocket subscribers.
 
-**GET** `/health`
+Request body:
 
-Returns server status and metrics.
-
-Response:
 ```json
 {
-  "status": "ok",
-  "activeServers": 12,
-  "maxServers": 50,
-  "availablePorts": 988
+  "type": "ui.notification",
+  "payload": {
+    "level": "info",
+    "message": "Background sync completed"
+  }
 }
-````
-
-### List Active Servers
-
-**GET** `/api/opencode/servers`
-
-Returns list of active OpenCode servers (for debugging).
+```
 
 Response:
 
 ```json
 {
-  "servers": [
-    {
-      "scadaUrl": "https://scada.example.com",
-      "opencodeUrl": "http://localhost:30001",
-      "port": 30001,
-      "createdAt": "2024-12-07T10:00:00Z",
-      "lastAccessedAt": "2024-12-07T10:45:00Z",
-      "idleMinutes": 15
+  "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
+  "deliveredTo": 2
+}
+```
+
+### POST `/api/session/:sessionId/events/request`
+
+Publish a session event and wait for a correlated response.
+
+Request body:
+
+```json
+{
+  "type": "question.ask",
+  "payload": {
+    "text": "Which response style should I use?",
+    "options": [
+      { "label": "Concise", "value": "concise" },
+      { "label": "Detailed", "value": "detailed" }
+    ],
+    "allowMultiple": false
+  },
+  "timeoutMs": 180000
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
+  "requestId": "f2bc1589-2d2d-4a30-9600-7c1fc7f4fe06",
+  "response": ["concise"],
+  "respondedAt": "2026-02-16T12:01:00.000Z"
+}
+```
+
+Notes:
+
+- `timeoutMs` defaults to `180000` (3 minutes).
+- Values are clamped between `1000` and `180000`.
+- Returns `503` if no active websocket subscribers are available.
+- Returns `504` if no response is received before timeout.
+
+### POST `/api/session/:sessionId/events/request/:requestId/response`
+
+Resolve a pending request event.
+
+Request body:
+
+```json
+{
+  "response": ["concise"]
+}
+```
+
+Response:
+
+```json
+{
+  "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
+  "requestId": "f2bc1589-2d2d-4a30-9600-7c1fc7f4fe06",
+  "resolved": true
+}
+```
+
+### GET `/api/session/servers`
+
+Debug endpoint to list active OpenCode server mappings.
+
+### GET `/health`
+
+Service health and capacity snapshot.
+
+## Event Envelope
+
+All WebSocket events follow this envelope:
+
+```json
+{
+  "type": "session.snapshot",
+  "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
+  "timestamp": "2026-02-15T10:30:00.000Z",
+  "payload": {}
+}
+```
+
+Common event types:
+
+- `session.snapshot`
+- `session.info.updated`
+- `session.event`
+- `session.closed`
+
+Domain events emitted by the MCP server are delivered through `session.event` and exposed as `payload.type` values. Current domain event types:
+
+- `entity.created`
+- `entity.updated`
+- `hub.request` (bridge-generated request/response prompt event)
+
+Example websocket message for an entity domain event:
+
+```json
+{
+  "type": "session.event",
+  "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
+  "timestamp": "2026-02-15T10:30:00.000Z",
+  "payload": {
+    "type": "entity.updated",
+    "payload": {
+      "entityType": "Signal",
+      "entityId": "signal-123",
+      "tenantId": "tenant-123",
+      "groupId": "group-456",
+      "changedFields": ["name", "description"],
+      "sourceTool": "update-entity",
+      "timestamp": "2026-02-15T10:30:00.000Z"
     }
-  ]
+  }
 }
 ```
-
-## Architecture
-
-```
-Chat UI → Backend Bridge → OpenCode Server Instance ← MCP Server (Audako SCADA)
-          (HTTP/REST)        (per SCADA system)        (stdio transport)
-```
-
-### Components
-
-1. **Backend Bridge API** (Fastify)
-   - REST endpoints for server management
-   - No authentication required (trusts chat UI)
-
-2. **Server Registry**
-   - Maps `(scadaUrl, accessToken)` to OpenCode server instances
-   - Ensures one server per unique SCADA connection
-   - Auto-cleanup of idle servers
-
-3. **OpenCode Server Instances**
-   - Created using `@opencode-ai/sdk`
-   - Each runs on a unique port (30000-31000)
-   - Pre-configured with SCADA-specific agent and MCP server
-
-4. **MCP Server Integration**
-   - Each OpenCode instance spawns its own MCP server process
-   - MCP server initialized with SCADA credentials
-   - Communicates via stdio transport
-
-## Security
-
-- Access tokens are hashed (SHA-256) for registry lookups
-- Tokens never logged in plaintext
-- Tokens stored only in memory (not persisted)
-- OpenCode servers bind to localhost only (127.0.0.1)
-- CORS enabled (configure origins as needed)
 
 ## Development
 
-### Project Structure
-
-```
-packages/backend-bridge/
-├── src/
-│   ├── index.ts                 # Main entry point
-│   ├── server.ts                # Fastify server setup
-│   ├── routes/
-│   │   ├── opencode.routes.ts  # OpenCode endpoints
-│   │   └── health.routes.ts    # Health check
-│   ├── services/
-│   │   ├── server-registry.ts  # Server registry management
-│   │   ├── port-allocator.ts   # Port management
-│   │   └── opencode-factory.ts # OpenCode server creation
-│   ├── types/
-│   │   └── index.ts            # TypeScript interfaces
-│   └── config/
-│       └── index.ts            # Configuration management
-├── prompts/
-│   └── scada-agent.md          # Custom agent prompt
-├── package.json
-├── tsconfig.json
-└── PLAN.md
+```bash
+npm run dev --workspace @audako/backend-bridge
 ```
 
-### Next Steps
+Build:
 
-See [PLAN.md](./PLAN.md) for detailed implementation plan and progress tracking.
+```bash
+npm run build --workspace @audako/backend-bridge
+```
 
-Remaining tasks:
+Full local integration build order:
 
-- Test OpenCode server creation with SDK
-- Test MCP server connectivity
-- Write integration tests
-- Complete API documentation
-- Create deployment guide
+```bash
+npm run build --workspace audako-ai
+npm run build --workspace @audako/backend-bridge
+```
 
-## License
+## Notes
 
-Private - Audako
+- Legacy `/api/opencode/*` routes are removed.
+- Access tokens are stored in memory and never logged in plaintext.

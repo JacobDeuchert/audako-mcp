@@ -7,13 +7,13 @@ export async function healthRoutes(
   fastify: FastifyInstance,
   registry: ServerRegistry,
   portAllocator: PortAllocator,
-  maxServers: number
+  maxSessions: number,
 ) {
   fastify.get<{ Reply: HealthResponse }>('/health', async (_request, reply) => {
     const health: HealthResponse = {
       status: 'ok',
       activeServers: registry.getActiveServerCount(),
-      maxServers: maxServers,
+      maxServers: maxSessions,
       availablePorts: portAllocator.getAvailableCount(),
     };
 

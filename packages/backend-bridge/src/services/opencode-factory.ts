@@ -1,15 +1,16 @@
-import { createOpencode } from "@opencode-ai/sdk/v2";
-import { pino } from "pino";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
-import { appConfig } from "../config/index.js";
+import { createOpencode } from '@opencode-ai/sdk/v2';
+import { pino } from 'pino';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { appConfig } from '../config/index.js';
 
-const logger = pino({ name: "opencode-factory" });
+const logger = pino({ name: 'opencode-factory' });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const agentPromptPath = path.resolve(__dirname, "../../prompts/scada-agent.md");
+const agentPromptPath = path.resolve(__dirname, '../../.opencode/prompts/scada-agent.md');
+const agentPrompt = fs.readFileSync(agentPromptPath, 'utf-8');
 
 export interface OpencodeServerConfig {
   scadaUrl: string;
@@ -22,51 +23,35 @@ export interface OpencodeServerConfig {
 }
 
 /**
- * Creates an OpenCode server instance configured for a specific SCADA system
- * @param config - Server configuration
- * @returns OpenCode server instance
+ * Creates an OpenCode runtime instance for a specific SCADA context.
  */
 export async function createOpencodeServer(config: OpencodeServerConfig) {
-  const {
-    scadaUrl,
-    accessToken,
-    port,
-    sessionId,
-    bridgeUrl,
-    model,
-    corsOrigins = [],
-  } = config;
-  const mcpServerPath = path.resolve(
-    __dirname,
-    "../../../mcp-server/dist/index.js",
-  );
-  const allowedCorsOrigins = [
-    ...new Set([...appConfig.opencode.corsOrigins, ...corsOrigins]),
-  ];
+  const { scadaUrl, accessToken, port, sessionId, bridgeUrl, model, corsOrigins = [] } = config;
+
+  const mcpServerPath = path.resolve(__dirname, '../../../mcp-server/dist/index.js');
+
+  const allowedCorsOrigins = [...new Set([...appConfig.opencode.corsOrigins, ...corsOrigins])];
 
   logger.info(
     { scadaUrl, port, sessionId, model, corsOrigins: allowedCorsOrigins },
-    "Creating OpenCode server instance",
+    'Creating OpenCode runtime',
   );
 
   logger.info(
     { mcpServerPath, agentPromptPath },
-    "Resolved paths for MCP server and agent prompt",
-  )
+    'Resolved paths for OpenCode runtime dependencies',
+  );
 
   try {
-    const agentPrompt = fs.readFileSync(agentPromptPath, "utf-8");
-
     const opencode = await createOpencode({
-      port: port,
+      port,
       config: {
-        // Custom primary agent for SCADA operations
-        default_agent: "audako",
+        default_agent: 'audako',
         agent: {
           audako: {
-            mode: "primary",
-            description: "SCADA system assistant with Audako tools",
-            model: model || "mistral/devstral-2512",
+            mode: 'primary',
+            description: 'SCADA system assistant with Audako tools',
+            model: model || 'openai/gpt-5.3-codex',
             prompt: agentPrompt,
           },
         },
@@ -80,58 +65,50 @@ export async function createOpencodeServer(config: OpencodeServerConfig) {
           glob: false,
           list: false,
           lsp: false,
-          path: false,
+          patch: false,
+          apply_patch: false,
           webfetch: false,
-          websearch: true,
-
-          // Enable all MCP tools from our SCADA server
-          "audako-mcp": true,
+          websearch: false,
+          task: false,
+          todowrite: false,
+          'audako-mcp*': true,
+          // "weblate-mcp*": false,
         },
-
-        //   // Configure MCP server with SCADA credentials
         mcp: {
-          "audako-mcp": {
-            type: "local",
-            command: ["node", mcpServerPath],
+          'audako-mcp': {
+            type: 'local',
+            command: ['node', mcpServerPath],
             enabled: true,
             environment: {
               AUDAKO_SYSTEM_URL: scadaUrl,
               AUDAKO_TOKEN: accessToken,
               AUDAKO_SESSION_ID: sessionId,
               AUDAKO_BRIDGE_URL: bridgeUrl,
+              AUDAKO_MUTATION_DELAY_MS: process.env.AUDAKO_MUTATION_DELAY_MS ?? '150',
             },
           },
         },
-        //   model: model || 'openai/gpt-5.2-codex',
       },
     });
 
-    logger.info(
-      { scadaUrl, port, sessionId },
-      "OpenCode server instance created successfully",
-    );
+    logger.info({ scadaUrl, port, sessionId }, 'OpenCode runtime created successfully');
+
     return opencode;
   } catch (error) {
     logger.error(
-      { error, scadaUrl, port, sessionId },
-      "Failed to create OpenCode server instance",
+      {
+        scadaUrl,
+        port,
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to create OpenCode runtime',
     );
     throw error;
   }
 }
 
-/**
- * Factory class for creating and managing OpenCode servers
- */
 export class OpencodeFactory {
-  /**
-   * Creates a new OpenCode server instance
-   * @param scadaUrl - SCADA system URL
-   * @param accessToken - Access token for SCADA system
-   * @param port - Port to bind the server to
-   * @param model - Optional model override
-   * @returns OpenCode server instance
-   */
   async createServer(
     scadaUrl: string,
     accessToken: string,
