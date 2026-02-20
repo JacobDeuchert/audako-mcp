@@ -1,15 +1,13 @@
-import { ConfigurationEntity, EntityType } from "audako-core";
-import { z } from "zod";
-import {
-  buildFieldDefinitionsFromSchema,
-  formatZodValidationErrors,
-} from "./zod-utils.js";
+import { ConfigurationEntity, EntityType } from 'audako-core';
+import { z } from 'zod';
+import { formatZodValidationErrors } from './zod-utils.js';
 import {
   EntityContractContext,
+  EntityFieldDefinition,
   EntityTypeDefinition,
   EntityTypeExamples,
   ValidationMode,
-} from "./types.js";
+} from './types.js';
 
 export abstract class BaseEntityContract<
   TEntity extends ConfigurationEntity,
@@ -26,6 +24,7 @@ export abstract class BaseEntityContract<
 
   protected abstract readonly createSchema: z.ZodType<TCreatePayload>;
   protected abstract readonly updateSchema: z.ZodType<TUpdatePayload>;
+  protected abstract readonly fieldDefinitions: EntityFieldDefinition[];
 
   private cachedDefinition?: EntityTypeDefinition;
 
@@ -44,16 +43,21 @@ export abstract class BaseEntityContract<
 
   public getDefinition(): EntityTypeDefinition {
     if (!this.cachedDefinition) {
-      const schema = this.createSchema as unknown as z.AnyZodObject;
-
       this.cachedDefinition = {
-        key: this.key,
+        key: this.entityType,
         aliases: this.aliases,
         entityType: this.entityType,
         description: this.description,
-        fields: buildFieldDefinitionsFromSchema(schema, {
-          appliesTo: this.appliesTo,
-        }),
+        fields: this.fieldDefinitions.map(field => ({
+          key: field.key,
+          dtoName: field.dtoName ?? field.key,
+          type: field.type,
+          description: field.description,
+          entityPath: field.entityPath,
+          requiredOnCreate: field.requiredOnCreate ?? false,
+          enumValues: field.enumValues,
+          appliesTo: field.appliesTo ?? this.appliesTo[field.key],
+        })),
         examples: this.examples,
       };
     }
@@ -61,11 +65,8 @@ export abstract class BaseEntityContract<
     return this.cachedDefinition;
   }
 
-  public validate(
-    payload: Record<string, unknown>,
-    mode: ValidationMode,
-  ): string[] {
-    const schema = mode === "create" ? this.createSchema : this.updateSchema;
+  public validate(payload: Record<string, unknown>, mode: ValidationMode): string[] {
+    const schema = mode === 'create' ? this.createSchema : this.updateSchema;
     const result = schema.safeParse(payload);
 
     if (result.success) {
@@ -75,10 +76,7 @@ export abstract class BaseEntityContract<
     return formatZodValidationErrors(result.error);
   }
 
-  public fromPayload(
-    payload: Record<string, unknown>,
-    context?: EntityContractContext,
-  ): TEntity {
+  public fromPayload(payload: Record<string, unknown>, context?: EntityContractContext): TEntity {
     const parsedPayload = this.parseCreatePayload(payload);
     return this.fromCreatePayload(parsedPayload, context);
   }
@@ -98,7 +96,7 @@ export abstract class BaseEntityContract<
       return result.data;
     }
 
-    throw new Error(formatZodValidationErrors(result.error).join("; "));
+    throw new Error(formatZodValidationErrors(result.error).join('; '));
   }
 
   private parseUpdatePayload(payload: Record<string, unknown>): TUpdatePayload {
@@ -107,6 +105,6 @@ export abstract class BaseEntityContract<
       return result.data;
     }
 
-    throw new Error(formatZodValidationErrors(result.error).join("; "));
+    throw new Error(formatZodValidationErrors(result.error).join('; '));
   }
 }

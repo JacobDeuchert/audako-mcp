@@ -1,89 +1,60 @@
-import { z } from "zod";
-import { DefinitionFieldType, EntityFieldDefinition } from "./types.js";
+import { z } from 'zod';
+import { EntityFieldDefinition } from './types.js';
 
-interface FieldTypeDetails {
-  type: DefinitionFieldType;
-  enumValues?: string[];
+function toZodFieldSchema(field: EntityFieldDefinition): z.ZodTypeAny {
+  let schema: z.ZodTypeAny;
+
+  switch (field.type) {
+    case 'string':
+      schema = z.string();
+      break;
+    case 'number':
+      schema = z.number();
+      break;
+    case 'boolean':
+      schema = z.boolean();
+      break;
+    case 'enum': {
+      const enumValues = field.enumValues ?? [];
+      if (enumValues.length === 0) {
+        throw new Error(`Field '${field.key}' is enum but has no enumValues configured.`);
+      }
+
+      const [firstValue, ...otherValues] = enumValues;
+      schema = z.enum([firstValue, ...otherValues] as [string, ...string[]]);
+      break;
+    }
+    default:
+      throw new Error(`Unsupported field type '${String(field.type)}'.`);
+  }
+
+  return schema.describe(field.description || field.key);
 }
 
-function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
-  let current = schema;
+export function buildZodSchemaFromFieldDefinitions(
+  fields: EntityFieldDefinition[],
+  mode: 'create' | 'update',
+): z.AnyZodObject {
+  const shape: Record<string, z.ZodTypeAny> = {};
 
-  while (true) {
-    if (current instanceof z.ZodOptional || current instanceof z.ZodNullable) {
-      current = current.unwrap();
-      continue;
+  for (const field of fields) {
+    const dtoFieldName = field.dtoName ?? field.key;
+
+    if (shape[dtoFieldName]) {
+      throw new Error(`Duplicate DTO field definition '${dtoFieldName}'.`);
     }
 
-    if (current instanceof z.ZodDefault) {
-      current = current.removeDefault();
-      continue;
-    }
-
-    if (current instanceof z.ZodEffects) {
-      current = current.innerType();
-      continue;
-    }
-
-    return current;
-  }
-}
-
-function toFieldTypeDetails(
-  fieldKey: string,
-  schema: z.ZodTypeAny,
-): FieldTypeDetails {
-  const unwrapped = unwrapSchema(schema);
-
-  if (unwrapped instanceof z.ZodString) {
-    return { type: "string" };
+    const isRequired = mode === 'create' && (field.requiredOnCreate ?? false);
+    const baseSchema = toZodFieldSchema(field);
+    shape[dtoFieldName] = isRequired ? baseSchema : baseSchema.optional();
   }
 
-  if (unwrapped instanceof z.ZodNumber) {
-    return { type: "number" };
-  }
-
-  if (unwrapped instanceof z.ZodBoolean) {
-    return { type: "boolean" };
-  }
-
-  if (unwrapped instanceof z.ZodEnum) {
-    return { type: "enum", enumValues: [...unwrapped.options] };
-  }
-
-  if (unwrapped instanceof z.ZodNativeEnum) {
-    const enumValues = Object.values(unwrapped.enum).filter(
-      (value): value is string => typeof value === "string",
-    );
-    return { type: "enum", enumValues };
-  }
-
-  throw new Error(`Unsupported zod schema type for field '${fieldKey}'.`);
-}
-
-export function buildFieldDefinitionsFromSchema(
-  schema: z.AnyZodObject,
-  options?: { appliesTo?: Record<string, string[]> },
-): EntityFieldDefinition[] {
-  const shape = schema.shape as Record<string, z.ZodTypeAny>;
-
-  return Object.entries(shape).map(([fieldKey, fieldSchema]) => {
-    const details = toFieldTypeDetails(fieldKey, fieldSchema);
-
-    return {
-      key: fieldKey,
-      type: details.type,
-      description: fieldSchema.description ?? fieldKey,
-      requiredOnCreate: !fieldSchema.isOptional(),
-      enumValues: details.enumValues,
-      appliesTo: options?.appliesTo?.[fieldKey],
-    };
-  });
+  return z.object(shape).strict();
 }
 
 export function formatZodValidationErrors(error: z.ZodError): string[] {
-  return error.issues.map((issue) => {
-    const path = issue.path.join(".");
+  return error.issues.map(issue => {
+    const path = issue.path.join('.');
     return path.length > 0 ? `${path}: ${issue.message}` : issue.message;
   });
 }

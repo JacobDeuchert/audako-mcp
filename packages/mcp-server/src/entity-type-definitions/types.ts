@@ -1,12 +1,14 @@
-import { EntityType } from "audako-core";
+import { EntityType } from 'audako-core';
 
-export type DefinitionFieldType = "string" | "number" | "boolean" | "enum";
-export type ValidationMode = "create" | "update";
+export type DefinitionFieldType = 'string' | 'number' | 'boolean' | 'enum';
+export type ValidationMode = 'create' | 'update';
 
 export interface EntityFieldDefinition {
   key: string;
+  dtoName?: string;
   type: DefinitionFieldType;
   description: string;
+  entityPath?: string;
   requiredOnCreate?: boolean;
   enumValues?: string[];
   appliesTo?: string[];

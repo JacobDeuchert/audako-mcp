@@ -1,10 +1,10 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { readdir } from "fs/promises";
-import { join } from "path";
-import { pathToFileURL } from "url";
-import { registerToolDefinitions, ToolDefinition } from "./registry.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { readdir } from 'fs/promises';
+import { join } from 'path';
+import { pathToFileURL } from 'url';
+import { registerToolDefinitions, ToolDefinition } from './registry.js';
 
-const TOOL_FILE_SUFFIX = ".tool.js";
+const TOOL_FILE_SUFFIX = '.tool.js';
 
 interface ToolModule {
   toolDefinitions?: unknown;
@@ -14,22 +14,20 @@ async function findToolFiles(dirPath: string): Promise<string[]> {
   const entries = await readdir(dirPath, { withFileTypes: true });
   const nestedFiles = await Promise.all(
     entries
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => findToolFiles(join(dirPath, entry.name))),
+      .filter(entry => entry.isDirectory())
+      .map(entry => findToolFiles(join(dirPath, entry.name))),
   );
 
   const localToolFiles = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(TOOL_FILE_SUFFIX))
-    .map((entry) => join(dirPath, entry.name));
+    .filter(entry => entry.isFile() && entry.name.endsWith(TOOL_FILE_SUFFIX))
+    .map(entry => join(dirPath, entry.name));
 
   return [...localToolFiles, ...nestedFiles.flat()].sort();
 }
 
 function getDefinitions(modulePath: string, module: ToolModule): ToolDefinition[] {
   if (!Array.isArray(module.toolDefinitions)) {
-    throw new Error(
-      `Tool module ${modulePath} must export a 'toolDefinitions' array.`,
-    );
+    throw new Error(`Tool module ${modulePath} must export a 'toolDefinitions' array.`);
   }
 
   return module.toolDefinitions as ToolDefinition[];
@@ -46,10 +44,8 @@ export async function autoRegisterTools(server: McpServer) {
     const definitions = getDefinitions(toolFile, module);
 
     for (const definition of definitions) {
-      if (!definition || typeof definition.name !== "string") {
-        throw new Error(
-          `Tool module ${toolFile} contains an invalid tool definition.`,
-        );
+      if (!definition || typeof definition.name !== 'string') {
+        throw new Error(`Tool module ${toolFile} contains an invalid tool definition.`);
       }
 
       if (seenToolNames.has(definition.name)) {

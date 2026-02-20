@@ -1,11 +1,11 @@
-import { appendFile, mkdir } from "fs/promises";
-import { isAbsolute, join } from "path";
+import { appendFile, mkdir } from 'fs/promises';
+import { isAbsolute, join } from 'path';
 
 export enum LogLevel {
-  DEBUG = "DEBUG",
-  INFO = "INFO",
-  WARN = "WARN",
-  ERROR = "ERROR",
+  DEBUG = 'DEBUG',
+  INFO = 'INFO',
+  WARN = 'WARN',
+  ERROR = 'ERROR',
 }
 
 class Logger {
@@ -22,10 +22,10 @@ class Logger {
       ? isAbsolute(configuredLogDir)
         ? configuredLogDir
         : join(process.cwd(), configuredLogDir)
-      : join(process.cwd(), "logs");
+      : join(process.cwd(), 'logs');
 
     const configuredLogFile = process.env.AUDAKO_LOG_FILE?.trim();
-    const timestamp = new Date().toISOString().split("T")[0];
+    const timestamp = new Date().toISOString().split('T')[0];
     this.logFilePath = join(
       this.logsDir,
       configuredLogFile && configuredLogFile.length > 0
@@ -81,24 +81,20 @@ class Logger {
 
   private formatLogEntry(level: LogLevel, message: string, meta?: any): string {
     const timestamp = new Date().toISOString();
-    let metaStr = "";
+    let metaStr = '';
 
-    if (typeof meta !== "undefined") {
+    if (typeof meta !== 'undefined') {
       try {
         metaStr = ` | ${JSON.stringify(meta)}`;
       } catch {
-        metaStr = " | [unserializable metadata]";
+        metaStr = ' | [unserializable metadata]';
       }
     }
 
     return `[${timestamp}] [${level}] ${message}${metaStr}\n`;
   }
 
-  private async writeLog(
-    level: LogLevel,
-    message: string,
-    meta?: any,
-  ): Promise<void> {
+  private async writeLog(level: LogLevel, message: string, meta?: any): Promise<void> {
     if (!this.shouldWrite(level)) {
       return;
     }
@@ -110,7 +106,7 @@ class Logger {
         .catch(() => {})
         .then(async () => {
           await this.ensureLogDirectory();
-          await appendFile(this.logFilePath, logEntry, "utf-8");
+          await appendFile(this.logFilePath, logEntry, 'utf-8');
         });
 
       await this.writeQueue;
@@ -144,11 +140,7 @@ class Logger {
     await this.writeLog(LogLevel.ERROR, message, meta);
   }
 
-  public async trace(
-    toolName: string,
-    action: string,
-    meta?: any,
-  ): Promise<void> {
+  public async trace(toolName: string, action: string, meta?: any): Promise<void> {
     await this.debug(`[TRACE] ${toolName} - ${action}`, meta);
   }
 }

@@ -1,77 +1,261 @@
 import {
   BitSelectConversionTypes,
   EntityType,
-  Field,
+  EntityUtils,
   Signal,
   SignalAnalogSettings,
   SignalCounterSettings,
   SignalDigitalSettings,
   SignalRecordingSettings,
   SignalType,
-} from "audako-core";
-import { z } from "zod";
-import { BaseEntityContract } from "./base-entity.contract.js";
-import { EntityContractContext } from "./types.js";
+} from 'audako-core';
+import { z } from 'zod';
+import { BaseEntityContract } from './base-entity.contract.js';
+import { EntityContractContext, EntityFieldDefinition } from './types.js';
+import { buildZodSchemaFromFieldDefinitions } from './zod-utils.js';
 
-const signalCreateSchema = z
-  .object({
-    name: z.string().describe("Name of the signal"),
-    description: z.string().optional().describe("Description of the signal"),
-    groupId: z
-      .string()
-      .optional()
-      .describe("Parent group ID (defaults to selected tenant root when omitted)"),
-    type: z.nativeEnum(SignalType).describe("Signal type"),
-    alias: z.string().optional().describe("Alias name"),
-    dataConnectionId: z
-      .string()
-      .optional()
-      .describe("Data connection ID (required by backend for physical signals)"),
-    address: z.string().optional().describe("Address for data acquisition"),
-    minValue: z.number().optional().describe("Analog minimum value"),
-    maxValue: z.number().optional().describe("Analog/counter maximum value"),
-    defaultValue: z.number().optional().describe("Analog default value"),
-    decimalPlaces: z.number().optional().describe("Number of decimal places"),
-    unit: z.string().optional().describe("Unit of measurement"),
-    factor: z.number().optional().describe("Multiplication factor"),
-    offset: z.number().optional().describe("Offset value"),
-    digitalTrueCaption: z
-      .string()
-      .optional()
-      .describe("Caption when digital value is true"),
-    digitalFalseCaption: z
-      .string()
-      .optional()
-      .describe("Caption when digital value is false"),
-    digitalTrueColor: z
-      .string()
-      .optional()
-      .describe("Color when digital value is true"),
-    digitalFalseColor: z
-      .string()
-      .optional()
-      .describe("Color when digital value is false"),
-    invert: z.boolean().optional().describe("Invert digital value"),
-    bitSelect: z.number().optional().describe("Bit position to select"),
-    bitSelectConversion: z
-      .nativeEnum(BitSelectConversionTypes)
-      .optional()
-      .describe("Bit select conversion type"),
-    offsetAutomatic: z.boolean().optional().describe("Counter automatic offset"),
-    offsetDetection: z.boolean().optional().describe("Counter offset detection"),
-    recordingInterval: z
-      .number()
-      .optional()
-      .describe("Recording interval in seconds"),
-  })
-  .strict();
+const signalTypeEnumValues = Object.values(SignalType).filter(
+  value => typeof value === 'string',
+) as string[];
 
-const signalUpdateSchema = signalCreateSchema.partial().strict().refine(
-  (value) => Object.keys(value).length > 0,
+const bitSelectConversionEnumValues = Object.values(BitSelectConversionTypes).filter(
+  value => typeof value === 'string',
+) as string[];
+
+type SignalContractFieldDefinition = EntityFieldDefinition & {
+  isEntityField?: boolean;
+};
+
+const signalFieldDefinitions: SignalContractFieldDefinition[] = [
   {
-    message: "At least one field must be provided in 'changes'.",
+    key: 'name',
+    dtoName: 'name',
+    description: 'Name of the signal',
+    type: 'string',
+    entityPath: 'Name',
+    isEntityField: true,
+    requiredOnCreate: true,
   },
-);
+  {
+    key: 'description',
+    dtoName: 'description',
+    description: 'Description of the signal',
+    type: 'string',
+    entityPath: 'Description',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'groupId',
+    dtoName: 'groupId',
+    description:
+      'Parent group ID (defaults to selected tenant root when omitted). The group must exist before creating the signal. Take from session info if not provided.',
+    type: 'string',
+    entityPath: 'GroupId',
+    requiredOnCreate: true,
+  },
+  {
+    key: 'type',
+    dtoName: 'type',
+    description: 'Signal type',
+    type: 'enum',
+    enumValues: signalTypeEnumValues,
+    entityPath: 'Type',
+    isEntityField: true,
+    requiredOnCreate: true,
+  },
+  {
+    key: 'alias',
+    dtoName: 'alias',
+    description: 'Alias name',
+    type: 'string',
+    entityPath: 'Alias',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'dataConnectionId',
+    dtoName: 'dataConnectionId',
+    description:
+      'Data connection ID (required by backend for online signals). Should always be provided, when user specifically asks for virtual signals set it to "virtual". If set to "context" the system will try to find a suitable data connection based on session info.',
+    type: 'string',
+    entityPath: 'DataConnectionId',
+    isEntityField: true,
+    requiredOnCreate: true,
+  },
+  {
+    key: 'address',
+    dtoName: 'address',
+    description: 'Address for data acquisition',
+    type: 'string',
+    entityPath: 'Address',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'minValue',
+    dtoName: 'minValue',
+    description: 'Analog minimum value',
+    type: 'number',
+    entityPath: 'Settings.MinValue',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'maxValue',
+    dtoName: 'maxValue',
+    description: 'Analog/counter maximum value',
+    type: 'number',
+    entityPath: 'Settings.MaxValue',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'defaultValue',
+    dtoName: 'defaultValue',
+    description: 'Analog default value',
+    type: 'number',
+    entityPath: 'Settings.DefaultValue',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'decimalPlaces',
+    dtoName: 'decimalPlaces',
+    description: 'Number of decimal places',
+    type: 'number',
+    entityPath: 'Settings.DecimalPlaces',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'unit',
+    dtoName: 'unit',
+    description: 'Unit of measurement',
+    type: 'string',
+    entityPath: 'Settings.Unit',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'factor',
+    dtoName: 'factor',
+    description: 'Multiplication factor',
+    type: 'number',
+    entityPath: 'Settings.Factor',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'offset',
+    dtoName: 'offset',
+    description: 'Offset value',
+    type: 'number',
+    entityPath: 'Settings.Offset',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'digitalTrueCaption',
+    dtoName: 'digitalTrueCaption',
+    description: 'Caption when digital value is true',
+    type: 'string',
+    entityPath: 'Settings.DigitalTrueCaption',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'digitalFalseCaption',
+    dtoName: 'digitalFalseCaption',
+    description: 'Caption when digital value is false',
+    type: 'string',
+    entityPath: 'Settings.DigitalFalseCaption',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'digitalTrueColor',
+    dtoName: 'digitalTrueColor',
+    description: 'Color when digital value is true',
+    type: 'string',
+    entityPath: 'Settings.DigitalTrueColor',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'digitalFalseColor',
+    dtoName: 'digitalFalseColor',
+    description: 'Color when digital value is false',
+    type: 'string',
+    entityPath: 'Settings.DigitalFalseColor',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'invert',
+    dtoName: 'invert',
+    description: 'Invert digital value',
+    type: 'boolean',
+    entityPath: 'Settings.Invert',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'bitSelect',
+    dtoName: 'bitSelect',
+    description: 'Bit position to select',
+    type: 'number',
+    entityPath: 'Settings.BitSelect',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'bitSelectConversion',
+    dtoName: 'bitSelectConversion',
+    description: 'Bit select conversion type',
+    type: 'enum',
+    enumValues: bitSelectConversionEnumValues,
+    entityPath: 'Settings.BitSelectConversion',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'offsetAutomatic',
+    dtoName: 'offsetAutomatic',
+    description: 'Counter automatic offset',
+    type: 'boolean',
+    entityPath: 'Settings.OffsetAutomatic',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'offsetDetection',
+    dtoName: 'offsetDetection',
+    description: 'Counter offset detection',
+    type: 'boolean',
+    entityPath: 'Settings.OffsetDetection',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+  {
+    key: 'recordingInterval',
+    dtoName: 'recordingInterval',
+    description: 'Recording interval in seconds',
+    type: 'number',
+    entityPath: 'RecordingSettings.Interval',
+    isEntityField: true,
+    requiredOnCreate: false,
+  },
+];
+
+const signalCreateSchema = buildZodSchemaFromFieldDefinitions(signalFieldDefinitions, 'create');
+
+const signalUpdateSchema = buildZodSchemaFromFieldDefinitions(
+  signalFieldDefinitions,
+  'update',
+).refine(value => Object.keys(value).length > 0, {
+  message: "At least one field must be provided in 'changes'.",
+});
 
 type SignalCreatePayload = z.infer<typeof signalCreateSchema>;
 type SignalUpdatePayload = z.infer<typeof signalUpdateSchema>;
@@ -86,24 +270,24 @@ class SignalEntityContract extends BaseEntityContract<
   SignalCreatePayload,
   SignalUpdatePayload
 > {
-  public readonly key = "Signal";
-  public readonly aliases = ["signal"];
+  public readonly key = 'Signal';
+  public readonly aliases = ['signal'];
   public readonly entityType = EntityType.Signal;
-  public readonly description = "Audako signal configuration entity";
+  public readonly description = 'Audako signal configuration entity';
   public readonly examples = {
     create: {
-      name: "Boiler Temperature",
+      name: 'Boiler Temperature',
       type: SignalType.AnalogInput,
-      address: "40001",
+      address: '40001',
       minValue: 0,
       maxValue: 150,
-      unit: "C",
+      unit: 'C',
       decimalPlaces: 1,
-      dataConnectionId: "connection-id",
+      dataConnectionId: 'connection-id',
       recordingInterval: 5,
     },
     update: {
-      description: "Updated signal description",
+      description: 'Updated signal description',
       maxValue: 200,
       recordingInterval: 10,
     },
@@ -111,6 +295,7 @@ class SignalEntityContract extends BaseEntityContract<
 
   protected readonly createSchema = signalCreateSchema;
   protected readonly updateSchema = signalUpdateSchema;
+  protected readonly fieldDefinitions: SignalContractFieldDefinition[] = signalFieldDefinitions;
   protected readonly appliesTo: Record<string, string[]> = {
     minValue: [SignalType.AnalogInput, SignalType.AnalogInOut],
     maxValue: [
@@ -195,64 +380,22 @@ class SignalEntityContract extends BaseEntityContract<
   private toSignalModel(signal: Signal): SignalModel {
     const model: SignalModel = {};
 
-    this.setIfDefined(model, "id", signal.Id);
-    this.setIfDefined(model, "path", signal.Path ? [...signal.Path] : undefined);
-    this.setIfDefined(model, "name", signal.Name?.Value);
-    this.setIfDefined(model, "description", signal.Description?.Value);
-    this.setIfDefined(model, "groupId", signal.GroupId);
-    this.setIfDefined(model, "type", signal.Type?.Value);
-    this.setIfDefined(model, "alias", signal.Alias?.Value);
-    this.setIfDefined(model, "dataConnectionId", signal.DataConnectionId?.Value);
-    this.setIfDefined(model, "address", signal.Address?.Value);
+    this.setModelValueIfDefined(model, 'id', signal.Id);
+    this.setModelValueIfDefined(model, 'path', signal.Path ? [...signal.Path] : undefined);
 
-    const settings = signal.Settings;
-    if (settings instanceof SignalAnalogSettings) {
-      this.setIfDefined(model, "minValue", settings.MinValue?.Value);
-      this.setIfDefined(model, "maxValue", settings.MaxValue?.Value);
-      this.setIfDefined(model, "defaultValue", settings.DefaultValue?.Value);
-      this.setIfDefined(model, "decimalPlaces", settings.DecimalPlaces?.Value);
-      this.setIfDefined(model, "unit", settings.Unit?.Value);
-      this.setIfDefined(model, "factor", settings.Factor?.Value);
-      this.setIfDefined(model, "offset", settings.Offset?.Value);
-    } else if (settings instanceof SignalDigitalSettings) {
-      this.setIfDefined(model, "digitalTrueColor", settings.DigitalTrueColor?.Value);
-      this.setIfDefined(
-        model,
-        "digitalTrueCaption",
-        settings.DigitalTrueCaption?.Value,
+    const signalType = signal.Type?.Value;
+    for (const field of this.fieldDefinitions) {
+      if (!field.entityPath || !this.isApplicableForSignalType(field, signalType)) {
+        continue;
+      }
+
+      const value = EntityUtils.getPropertyValue<Signal, unknown>(
+        signal,
+        field.entityPath,
+        field.isEntityField,
       );
-      this.setIfDefined(
-        model,
-        "digitalFalseColor",
-        settings.DigitalFalseColor?.Value,
-      );
-      this.setIfDefined(
-        model,
-        "digitalFalseCaption",
-        settings.DigitalFalseCaption?.Value,
-      );
-      this.setIfDefined(model, "invert", settings.Invert?.Value);
-      this.setIfDefined(model, "bitSelect", settings.BitSelect?.Value);
-      this.setIfDefined(
-        model,
-        "bitSelectConversion",
-        settings.BitSelectConversion?.Value,
-      );
-    } else if (settings instanceof SignalCounterSettings) {
-      this.setIfDefined(model, "maxValue", settings.MaxValue?.Value);
-      this.setIfDefined(model, "decimalPlaces", settings.DecimalPlaces?.Value);
-      this.setIfDefined(model, "unit", settings.Unit?.Value);
-      this.setIfDefined(model, "factor", settings.Factor?.Value);
-      this.setIfDefined(model, "offset", settings.Offset?.Value);
-      this.setIfDefined(model, "offsetAutomatic", settings.OffsetAutomatic?.Value);
-      this.setIfDefined(model, "offsetDetection", settings.OffsetDetection?.Value);
+      this.setModelValueIfDefined(model, this.getDtoFieldName(field), value);
     }
-
-    this.setIfDefined(
-      model,
-      "recordingInterval",
-      signal.RecordingSettings?.Interval?.Value,
-    );
 
     return model;
   }
@@ -260,24 +403,33 @@ class SignalEntityContract extends BaseEntityContract<
   private toSignal(model: SignalModel): Signal {
     const signal = new Signal();
 
-    if (typeof model.id !== "undefined") signal.Id = model.id;
-    if (typeof model.path !== "undefined") signal.Path = [...model.path];
-    this.setFieldIfDefined(signal, "Name", model.name);
-    this.setFieldIfDefined(signal, "Description", model.description);
-    if (typeof model.groupId !== "undefined") signal.GroupId = model.groupId;
+    if (typeof model.id !== 'undefined') {
+      signal.Id = model.id;
+    }
 
-    this.setFieldIfDefined(signal, "Type", model.type);
-    this.setFieldIfDefined(signal, "Alias", model.alias);
-    this.setFieldIfDefined(signal, "DataConnectionId", model.dataConnectionId);
-    this.setFieldIfDefined(signal, "Address", model.address);
+    if (typeof model.path !== 'undefined') {
+      signal.Path = [...model.path];
+    }
 
     signal.Settings = this.createSignalSettings(model);
+    signal.RecordingSettings = new SignalRecordingSettings();
 
-    const recordingSettings = new SignalRecordingSettings();
-    if (typeof model.recordingInterval !== "undefined") {
-      recordingSettings.Interval = new Field(model.recordingInterval);
+    const signalType = model.type ?? SignalType.AnalogInput;
+    const modelValues = model as Record<string, unknown>;
+
+    for (const field of this.fieldDefinitions) {
+      if (!field.entityPath || !this.isApplicableForSignalType(field, signalType)) {
+        continue;
+      }
+
+      const dtoFieldName = this.getDtoFieldName(field);
+      const value = modelValues[dtoFieldName];
+      if (typeof value === 'undefined') {
+        continue;
+      }
+
+      EntityUtils.setPropertyValue(signal, field.entityPath, value, field.isEntityField);
     }
-    signal.RecordingSettings = recordingSettings;
 
     return signal;
   }
@@ -288,58 +440,43 @@ class SignalEntityContract extends BaseEntityContract<
     const type = model.type ?? SignalType.AnalogInput;
 
     if (type === SignalType.DigitalInput || type === SignalType.DigitalInOut) {
-      const settings = new SignalDigitalSettings();
-      this.setFieldIfDefined(settings, "DigitalTrueColor", model.digitalTrueColor);
-      this.setFieldIfDefined(settings, "DigitalTrueCaption", model.digitalTrueCaption);
-      this.setFieldIfDefined(settings, "DigitalFalseColor", model.digitalFalseColor);
-      this.setFieldIfDefined(settings, "DigitalFalseCaption", model.digitalFalseCaption);
-      this.setFieldIfDefined(settings, "Invert", model.invert);
-      this.setFieldIfDefined(settings, "BitSelect", model.bitSelect);
-      this.setFieldIfDefined(settings, "BitSelectConversion", model.bitSelectConversion);
-      return settings;
+      return new SignalDigitalSettings();
     }
 
     if (type === SignalType.Counter) {
-      const settings = new SignalCounterSettings();
-      this.setFieldIfDefined(settings, "MaxValue", model.maxValue);
-      this.setFieldIfDefined(settings, "DecimalPlaces", model.decimalPlaces);
-      this.setFieldIfDefined(settings, "Unit", model.unit);
-      this.setFieldIfDefined(settings, "Factor", model.factor);
-      this.setFieldIfDefined(settings, "Offset", model.offset);
-      this.setFieldIfDefined(settings, "OffsetAutomatic", model.offsetAutomatic);
-      this.setFieldIfDefined(settings, "OffsetDetection", model.offsetDetection);
-      return settings;
+      return new SignalCounterSettings();
     }
 
-    const settings = new SignalAnalogSettings();
-    this.setFieldIfDefined(settings, "MinValue", model.minValue);
-    this.setFieldIfDefined(settings, "MaxValue", model.maxValue);
-    this.setFieldIfDefined(settings, "DefaultValue", model.defaultValue);
-    this.setFieldIfDefined(settings, "DecimalPlaces", model.decimalPlaces);
-    this.setFieldIfDefined(settings, "Unit", model.unit);
-    this.setFieldIfDefined(settings, "Factor", model.factor);
-    this.setFieldIfDefined(settings, "Offset", model.offset);
-    return settings;
+    return new SignalAnalogSettings();
   }
 
-  private setIfDefined<K extends keyof SignalModel>(
-    target: SignalModel,
-    key: K,
-    value: SignalModel[K],
-  ): void {
-    if (typeof value !== "undefined") {
-      target[key] = value;
-    }
+  private getDtoFieldName(field: EntityFieldDefinition): string {
+    return field.dtoName ?? field.key;
   }
 
-  private setFieldIfDefined<Target, K extends keyof Target, Value>(
-    target: Target,
-    key: K,
-    value: Value,
-  ): void {
-    if (typeof value !== "undefined") {
-      (target[key] as Field<Value> | undefined) = new Field(value);
+  private isApplicableForSignalType(
+    field: EntityFieldDefinition,
+    signalType: string | undefined,
+  ): boolean {
+    const appliesTo = field.appliesTo ?? this.appliesTo[field.key];
+    if (!appliesTo || appliesTo.length === 0) {
+      return true;
     }
+
+    if (!signalType) {
+      return false;
+    }
+
+    return appliesTo.includes(signalType);
+  }
+
+  private setModelValueIfDefined(model: SignalModel, key: string, value: unknown): void {
+    if (typeof value === 'undefined' || value === null) {
+      return;
+    }
+
+    const modelValues = model as Record<string, unknown>;
+    modelValues[key] = Array.isArray(value) ? [...value] : value;
   }
 }
 
