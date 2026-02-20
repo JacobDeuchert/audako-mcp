@@ -30,6 +30,7 @@
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
     "@tsconfig/svelte": "^5.0.0",
+    "@types/markdown-it": "^14.1.2",
     "autoprefixer": "^10.4.20",
     "postcss": "^8.4.48",
     "svelte": "^5.50.0",
@@ -43,6 +44,7 @@
     "svelte": "^5.50.0"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "^1.1.53"
+    "@opencode-ai/sdk": "^1.1.53",
+    "markdown-it": "^14.1.1"
   }
 }

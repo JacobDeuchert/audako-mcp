@@ -6,14 +6,15 @@ export type {
   Message,
   ThinkingBlock,
   StreamChunk,
+  ChatQuestionOption,
+  ChatQuestion,
   ChatRequest,
   StreamCallbacks,
   ChatAdapter,
   ChatWidgetConfig,
-  ChatWidgetThemeProps
+  ChatWidgetThemeProps,
 } from './types';
 
 // Export adapters for convenience
 export { MockAdapter } from './adapters/mock-adapter';
-export { OpenAIAdapter } from './adapters/openai-adapter';
 export { OpenCodeAdapter } from './adapters/opencode-adapter';

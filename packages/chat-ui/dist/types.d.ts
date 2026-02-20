@@ -14,6 +14,16 @@ export interface StreamChunk {
     content: string;
     done?: boolean;
 }
+export interface ChatQuestionOption {
+    label: string;
+    value?: string;
+    description?: string;
+}
+export interface ChatQuestion {
+    text: string;
+    options: ChatQuestionOption[];
+    allowMultiple?: boolean;
+}
 export interface ChatRequest {
     message: string;
     conversationHistory?: Message[];
@@ -29,6 +39,11 @@ export interface StreamCallbacks {
      * @param chunk - The accumulated thinking content so far
      */
     onThinking?: (chunk: string) => void;
+    /**
+     * Called when the adapter needs user input via explicit options.
+     * The UI should present the question and return selected answer values.
+     */
+    onQuestion?: (question: ChatQuestion) => Promise<string[]>;
     /**
      * Called when streaming is complete
      */
@@ -61,6 +76,7 @@ export interface ChatWidgetConfig {
     initialMessage?: string;
     placeholder?: string;
     title?: string;
+    showThinking?: boolean;
 }
 export interface ChatWidgetThemeProps {
     primary?: string;

@@ -8,6 +8,21 @@ export interface OpenCodeAdapterConfig {
     };
     agent?: string;
     createSession?: boolean;
+    logCombinedEvents?: boolean;
+}
+export interface OpenCodeCombinedLogEntry {
+    at: string;
+    category: 'request' | 'event' | 'state';
+    type: string;
+    sessionId?: string;
+    messageId?: string;
+    role?: string;
+    partType?: string;
+    delta?: string;
+    text?: string;
+    ignored?: boolean;
+    reason?: string;
+    payload?: unknown;
 }
 /**
  * OpenCode adapter for connecting to OpenCode server
@@ -19,12 +34,22 @@ export declare class OpenCodeAdapter implements ChatAdapter {
     private model?;
     private agent?;
     private createSession;
+    private logCombinedEvents;
     private client;
     private abortController;
     private eventStream;
+    private initPromise;
     private currentCallbacks;
     private currentAssistantMessageId;
     private currentUserMessageId;
+    private currentText;
+    private currentReasoning;
+    private currentToolThinking;
+    private toolThinkingEntryKeys;
+    private lastEmittedThinking;
+    private activeMessageLog;
+    private lastMessageLog;
+    private combinedMessageLog;
     constructor(config?: OpenCodeAdapterConfig);
     private ensureClient;
     /**
@@ -37,10 +62,20 @@ export declare class OpenCodeAdapter implements ChatAdapter {
      * Start the background event listener
      */
     private startEventListener;
+    private appendCombinedLog;
+    private startCombinedLog;
+    private recordEvent;
+    private finalizeCombinedLog;
     /**
      * Handle incoming events from the stream
      */
     private handleEvent;
+    private resolveAccumulatedContent;
+    private getCombinedThinkingContent;
+    private emitThinkingUpdate;
+    private stringifyToolValue;
+    private formatToolOutput;
+    private buildToolThinkingEntry;
     /**
      * Clear current message tracking
      */
@@ -48,6 +83,14 @@ export declare class OpenCodeAdapter implements ChatAdapter {
     private ensureSession;
     sendMessage(request: ChatRequest, callbacks: StreamCallbacks): Promise<void>;
     cancel(): void;
+    /**
+     * Returns the most recent per-request combined log.
+     */
+    getLastCombinedLog(): OpenCodeCombinedLogEntry[];
+    /**
+     * Returns a flat combined log of all request entries captured by this adapter instance.
+     */
+    getCombinedLog(): OpenCodeCombinedLogEntry[];
     /**
      * Get the current session ID
      */

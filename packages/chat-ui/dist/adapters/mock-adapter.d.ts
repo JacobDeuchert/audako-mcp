@@ -6,8 +6,10 @@ import { ChatAdapter, ChatRequest, StreamCallbacks } from '../types';
 export declare class MockAdapter implements ChatAdapter {
     private abortController;
     private showThinking;
+    private showQuestion;
     constructor(options?: {
         showThinking?: boolean;
+        showQuestion?: boolean;
     });
     /**
      * Initialize the mock adapter

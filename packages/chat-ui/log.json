@@ -1,0 +1,693 @@
+[
+  {
+    "at": "2026-02-15T16:58:23.742Z",
+    "category": "request",
+    "type": "sendMessage.started",
+    "text": "In welcher gruppe bin ich gerade?",
+    "payload": {
+      "conversationHistoryLength": 2
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:23.762Z",
+    "category": "state",
+    "type": "session.ready",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "payload": {
+      "agent": "audako"
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:23.763Z",
+    "category": "request",
+    "type": "session.prompt",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "payload": {
+      "agent": "audako",
+      "parts": [
+        {
+          "type": "text",
+          "text": "In welcher gruppe bin ich gerade?"
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:23.785Z",
+    "category": "event",
+    "type": "message.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32a2001RJhHlKjmhInIzh",
+    "role": "user",
+    "ignored": false,
+    "payload": {
+      "type": "message.updated",
+      "properties": {
+        "info": {
+          "id": "msg_c623d32a2001RJhHlKjmhInIzh",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "role": "user",
+          "time": {
+            "created": 1771174703778
+          },
+          "agent": "audako",
+          "model": {
+            "providerID": "openai",
+            "modelID": "gpt-5.3-codex"
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:23.825Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32a2001RJhHlKjmhInIzh",
+    "partType": "text",
+    "text": "In welcher gruppe bin ich gerade?",
+    "ignored": true,
+    "reason": "not-assistant-message",
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d32a3001kU2Ddc9IYY7X2r",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32a2001RJhHlKjmhInIzh",
+          "type": "text",
+          "text": "In welcher gruppe bin ich gerade?"
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:23.826Z",
+    "category": "event",
+    "type": "session.updated",
+    "messageId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "ignored": true,
+    "reason": "unsupported-event-type",
+    "payload": {
+      "type": "session.updated",
+      "properties": {
+        "info": {
+          "id": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "slug": "curious-squid",
+          "version": "1.1.65",
+          "projectID": "d325400debe8147f64623b100d88135e422d7c5a",
+          "directory": "/home/jacob/Development/github/audako-mcp-gateway/packages/backend-bridge",
+          "title": "Chat 15.2.2026, 17:58:23",
+          "time": {
+            "created": 1771174703754,
+            "updated": 1771174703818
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:23.826Z",
+    "category": "event",
+    "type": "session.status",
+    "ignored": true,
+    "reason": "unsupported-event-type",
+    "payload": {
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:23.855Z",
+    "category": "event",
+    "type": "message.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "role": "assistant",
+    "ignored": false,
+    "payload": {
+      "type": "message.updated",
+      "properties": {
+        "info": {
+          "id": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "role": "assistant",
+          "time": {
+            "created": 1771174703830
+          },
+          "parentID": "msg_c623d32a2001RJhHlKjmhInIzh",
+          "modelID": "gpt-5.3-codex",
+          "providerID": "openai",
+          "mode": "audako",
+          "agent": "audako",
+          "path": {
+            "cwd": "/home/jacob/Development/github/audako-mcp-gateway/packages/backend-bridge",
+            "root": "/home/jacob/Development/github/audako-mcp-gateway"
+          },
+          "cost": 0,
+          "tokens": {
+            "input": 0,
+            "output": 0,
+            "reasoning": 0,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:24.203Z",
+    "category": "event",
+    "type": "session.status",
+    "ignored": true,
+    "reason": "unsupported-event-type",
+    "payload": {
+      "type": "session.status",
+      "properties": {
+        "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+        "status": {
+          "type": "busy"
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:24.213Z",
+    "category": "event",
+    "type": "message.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32a2001RJhHlKjmhInIzh",
+    "role": "user",
+    "ignored": false,
+    "payload": {
+      "type": "message.updated",
+      "properties": {
+        "info": {
+          "id": "msg_c623d32a2001RJhHlKjmhInIzh",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "role": "user",
+          "time": {
+            "created": 1771174703778
+          },
+          "summary": {
+            "diffs": []
+          },
+          "agent": "audako",
+          "model": {
+            "providerID": "openai",
+            "modelID": "gpt-5.3-codex"
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:24.213Z",
+    "category": "event",
+    "type": "session.updated",
+    "messageId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "ignored": true,
+    "reason": "unsupported-event-type",
+    "payload": {
+      "type": "session.updated",
+      "properties": {
+        "info": {
+          "id": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "slug": "curious-squid",
+          "version": "1.1.65",
+          "projectID": "d325400debe8147f64623b100d88135e422d7c5a",
+          "directory": "/home/jacob/Development/github/audako-mcp-gateway/packages/backend-bridge",
+          "title": "Chat 15.2.2026, 17:58:23",
+          "time": {
+            "created": 1771174703754,
+            "updated": 1771174704209
+          },
+          "summary": {
+            "additions": 0,
+            "deletions": 0,
+            "files": 0
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:24.213Z",
+    "category": "event",
+    "type": "session.diff",
+    "ignored": true,
+    "reason": "unsupported-event-type",
+    "payload": {
+      "type": "session.diff",
+      "properties": {
+        "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+        "diff": []
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:24.512Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "step-start",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d357e001zbQrP7kysWPY5g",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "step-start",
+          "snapshot": "8ad3cb8a7cb1f91ff729deb514e94fa41e0ded2f"
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:25.388Z",
+    "category": "event",
+    "type": "message.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32a2001RJhHlKjmhInIzh",
+    "role": "user",
+    "ignored": false,
+    "payload": {
+      "type": "message.updated",
+      "properties": {
+        "info": {
+          "id": "msg_c623d32a2001RJhHlKjmhInIzh",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "role": "user",
+          "time": {
+            "created": 1771174703778
+          },
+          "summary": {
+            "title": "Welche Gruppe bin ich gerade in?",
+            "diffs": []
+          },
+          "agent": "audako",
+          "model": {
+            "providerID": "openai",
+            "modelID": "gpt-5.3-codex"
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.035Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "reasoning",
+    "delta": "**Planning",
+    "text": "**Planning",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3738001hx9ivDnBAHLXO2",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "reasoning",
+          "text": "**Planning",
+          "metadata": {
+            "openai": {
+              "itemId": "rs_015043a23419e904016991fb30ef748191be350c8eb1e4d289"
+            }
+          },
+          "time": {
+            "start": 1771174704952
+          }
+        },
+        "delta": "**Planning"
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.038Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "reasoning",
+    "delta": " session",
+    "text": "**Planning session",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3738001hx9ivDnBAHLXO2",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "reasoning",
+          "text": "**Planning session",
+          "metadata": {
+            "openai": {
+              "itemId": "rs_015043a23419e904016991fb30ef748191be350c8eb1e4d289"
+            }
+          },
+          "time": {
+            "start": 1771174704952
+          }
+        },
+        "delta": " session"
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.039Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "reasoning",
+    "delta": " group",
+    "text": "**Planning session group",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3738001hx9ivDnBAHLXO2",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "reasoning",
+          "text": "**Planning session group",
+          "metadata": {
+            "openai": {
+              "itemId": "rs_015043a23419e904016991fb30ef748191be350c8eb1e4d289"
+            }
+          },
+          "time": {
+            "start": 1771174704952
+          }
+        },
+        "delta": " group"
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.041Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "reasoning",
+    "delta": " lookup",
+    "text": "**Planning session group lookup",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3738001hx9ivDnBAHLXO2",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "reasoning",
+          "text": "**Planning session group lookup",
+          "metadata": {
+            "openai": {
+              "itemId": "rs_015043a23419e904016991fb30ef748191be350c8eb1e4d289"
+            }
+          },
+          "time": {
+            "start": 1771174704952
+          }
+        },
+        "delta": " lookup"
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.051Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "reasoning",
+    "delta": "**",
+    "text": "**Planning session group lookup**",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3738001hx9ivDnBAHLXO2",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "reasoning",
+          "text": "**Planning session group lookup**",
+          "metadata": {
+            "openai": {
+              "itemId": "rs_015043a23419e904016991fb30ef748191be350c8eb1e4d289"
+            }
+          },
+          "time": {
+            "start": 1771174704952
+          }
+        },
+        "delta": "**"
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.077Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "reasoning",
+    "text": "**Planning session group lookup**",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3738001hx9ivDnBAHLXO2",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "reasoning",
+          "text": "**Planning session group lookup**",
+          "metadata": {
+            "openai": {
+              "itemId": "rs_015043a23419e904016991fb30ef748191be350c8eb1e4d289",
+              "reasoningEncryptedContent": "gAAAAABpkfszJupC73gHHKDYKxqExQDE4nZLRYvMFZhSqGeYz3RfnYgGEax6F5D-1H7ppD53dPyrgxiehU-QPMasK8xmAayTuVQW4bxSr47gBMTjzO2oz5e3Gh1FOXOAyN8hc5_oVz6yqfOWFyptavDqxl1Ud4eFbaMAcpTt2eZa3FL-WD_sPLzZugTOl_v05DrpN99X-G1weWsjrX6IFivLYq_l0DiLMzoSgVHP-eOKz-HUyMGPfZ4QyvnWZEj6ndxzNRWgreqcZDUTBa_IGIShRvO34FqLJKxa0tA5n2Yczr_NiNOvptt3_YgFyS_jC9GJUaKLDDkaggUnmslMnRxXnSbaOZIjqEto4pPbXh-k1sRdk_ad0DFH40a2JwK6AHkr_6t1v_daM2aJJTxYSJmh0YWnujF4HpZr21hmv7ZpGbBtrdo9lgJK9Zh7CTiQ4rYP-t7pCsIlFFCq_DXt8bIO5SsJordoKCz2GGqPhXzfUMThq4-8-nnWoMCaF_AaDsiMMHbcK6GPS8nQ0-EzJkuIk8wOWcHAYEHImdAYwNB3DCYexilpBDUuQK3mF1-f3kEmBnY665ZIZio9zPnwB6RyYf8xWMqSO3ULYcyX5GLWQV_WIXAcxhEmZL2C_FUouaU4zO3ZqzXHUp4upMGGZfwzHWJubDo9V00rSHx1Xo1H6ckX8J_SKIaqJVRXRd8R8Easn1w7y7GF6c4m9zc9jemdbHD7nLJzqnRA7QWTXkoHDhiBQXfOx9w1OcdlQslS-RaiGmiLaLt49vOuhPPx__I9bfUPtkDYjXv2Xm7nhtwgkLfc7gKJWJn08mXJ1HCIHZHSojsguOu_KZMVWhvHkG_a0go5KqTd5wCwhtMOTbf26284CKPw__k15_nJiDLnt-Iu-mKRwklHBR3PdkaLQW7ECp-7aWc9HRdZwjS9LCBGL2OWHqdNYXMc4k81xSvRXhqOob69GH9q3Rh3rL0Fq40Daskl9uKEtQiLNirwsId00FJcWID66HB7OXj3iBlxf4C2YMXdUiE_GaI9YufKPUC_X65ntRvvnR6Lzy8boob2H15d1dt0BukAniMXMbBDkP0gfJZxf5qFBD2fOqDTl95LGLQpNjSoHz7B163Itz-q6dK5IriQcr-C566KRP3DlWn4RGIspfjhzXUo96NOFf4a0I5sKZPBBRVXp25TZVIcZfggC64BMeUXEH4IM2Ozwm68fZHhgscysECbhOwTEqGu99RMZ1tj0tShJlG_aual9jDy3VRP172HCtd4pMv79AjN0r8PD2l3T_-4fsr9uHBCsXj0Gv0vm407Wt_4_zLFjGakJyJcdF95xx_4MtNICsfnekKwIlv9cQ1m9bW9hmtqm_AkIQhzacRlIkdmVz24D-pX13hSQTtomBs48y6SjPxgwKUXncWJdrmn91432mzVtfX3-7_9Siyd1ubyVcBEsW_z64MRqCEhZEwHYPmrj8Gh4XFp6OZh8QlwPd7A5hYhlJRsga8aIfO0sLKSV0FDHz6dsIoaGjM="
+            }
+          },
+          "time": {
+            "start": 1771174704952,
+            "end": 1771174707075
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.086Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "tool",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3f8a0014DoT84R9jbWFVq",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "tool",
+          "callID": "call_MN6mxfGZLLXIZpmaRVueIIjt",
+          "tool": "audako-mcp_get-session-info",
+          "state": {
+            "status": "pending",
+            "input": {},
+            "raw": ""
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.116Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "tool",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3f8a0014DoT84R9jbWFVq",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "tool",
+          "callID": "call_MN6mxfGZLLXIZpmaRVueIIjt",
+          "tool": "audako-mcp_get-session-info",
+          "state": {
+            "status": "running",
+            "input": {},
+            "time": {
+              "start": 1771174707112
+            }
+          },
+          "metadata": {
+            "openai": {
+              "itemId": "fc_015043a23419e904016991fb3308d4819191dad8b5158535e4"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.146Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "tool",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3f8a0014DoT84R9jbWFVq",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "tool",
+          "callID": "call_MN6mxfGZLLXIZpmaRVueIIjt",
+          "tool": "audako-mcp_get-session-info",
+          "state": {
+            "status": "completed",
+            "input": {},
+            "output": "{\n  \"sessionId\": \"9700c158-f207-4a9b-b1ec-71897e4a08a6\",\n  \"tenantId\": \"60485cdc91597299a35b25ea\",\n  \"groupId\": \"698dcbe48f43736ec7843375\",\n  \"app\": \"Configuration\",\n  \"updatedAt\": \"2026-02-15T16:58:15.823Z\"\n}",
+            "title": "",
+            "metadata": {
+              "truncated": false
+            },
+            "time": {
+              "start": 1771174707112,
+              "end": 1771174707136
+            },
+            "attachments": []
+          },
+          "metadata": {
+            "openai": {
+              "itemId": "fc_015043a23419e904016991fb3308d4819191dad8b5158535e4"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.160Z",
+    "category": "event",
+    "type": "message.part.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "partType": "step-finish",
+    "ignored": false,
+    "payload": {
+      "type": "message.part.updated",
+      "properties": {
+        "part": {
+          "id": "prt_c623d3fc70019lGUimKawxwOOD",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "messageID": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "type": "step-finish",
+          "reason": "tool-calls",
+          "snapshot": "8ad3cb8a7cb1f91ff729deb514e94fa41e0ded2f",
+          "cost": 0,
+          "tokens": {
+            "total": 4387,
+            "input": 4264,
+            "output": 123,
+            "reasoning": 101,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.161Z",
+    "category": "event",
+    "type": "message.updated",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "role": "assistant",
+    "ignored": false,
+    "payload": {
+      "type": "message.updated",
+      "properties": {
+        "info": {
+          "id": "msg_c623d32d6001qI7tztAJkVZJ9M",
+          "sessionID": "ses_39dc2cd75ffeshME3SrAFb59su",
+          "role": "assistant",
+          "time": {
+            "created": 1771174703830
+          },
+          "parentID": "msg_c623d32a2001RJhHlKjmhInIzh",
+          "modelID": "gpt-5.3-codex",
+          "providerID": "openai",
+          "mode": "audako",
+          "agent": "audako",
+          "path": {
+            "cwd": "/home/jacob/Development/github/audako-mcp-gateway/packages/backend-bridge",
+            "root": "/home/jacob/Development/github/audako-mcp-gateway"
+          },
+          "cost": 0,
+          "tokens": {
+            "total": 4387,
+            "input": 4264,
+            "output": 123,
+            "reasoning": 101,
+            "cache": {
+              "read": 0,
+              "write": 0
+            }
+          },
+          "finish": "tool-calls"
+        }
+      }
+    }
+  },
+  {
+    "at": "2026-02-15T16:58:27.161Z",
+    "category": "state",
+    "type": "sendMessage.finished",
+    "sessionId": "ses_39dc2cd75ffeshME3SrAFb59su",
+    "messageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+    "reason": "completed",
+    "payload": {
+      "userMessageId": "msg_c623d32a2001RJhHlKjmhInIzh",
+      "assistantMessageId": "msg_c623d32d6001qI7tztAJkVZJ9M",
+      "textLength": 0,
+      "reasoningLength": 33
+    }
+  }
+]

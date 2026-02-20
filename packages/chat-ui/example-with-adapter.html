@@ -141,7 +141,7 @@
 
       <div class="info">
         <p>
-          <strong>Mock Adapter:</strong> Uses simulated responses for testing.<br>
+          <strong>Mock Adapter:</strong> Uses simulated responses for testing (asks a question on the 2nd prompt).<br>
           <strong>OpenAI Adapter:</strong> Connects to OpenAI or compatible endpoints.
         </p>
       </div>
@@ -161,13 +161,72 @@
       MockAdapter,
       OpenAIAdapter 
     } from './dist/audako-chat.js';
+
+    function createMockAdapterWithSecondPromptQuestion() {
+      const baseAdapter = new MockAdapter();
+      let promptCount = 0;
+
+      return {
+        async init() {
+          if (typeof baseAdapter.init === 'function') {
+            await baseAdapter.init();
+          }
+        },
+        cancel() {
+          if (typeof baseAdapter.cancel === 'function') {
+            baseAdapter.cancel();
+          }
+        },
+        async sendMessage(request, callbacks) {
+          promptCount += 1;
+          let selectedStyles = [];
+
+          if (promptCount === 2 && callbacks.onQuestion) {
+            const answers = await callbacks.onQuestion({
+              text: 'Before I answer your second prompt, choose one or more response styles:',
+              allowMultiple: true,
+              options: [
+                {
+                  label: 'Concise',
+                  value: 'concise',
+                  description: 'Keep the response short'
+                },
+                {
+                  label: 'Detailed',
+                  value: 'detailed',
+                  description: 'Add extra explanation'
+                },
+                {
+                  label: 'Bulleted',
+                  value: 'bulleted',
+                  description: 'Format as bullet points'
+                }
+              ]
+            });
+
+            selectedStyles = answers;
+          }
+
+          if (selectedStyles.length === 0) {
+            return baseAdapter.sendMessage(request, callbacks);
+          }
+
+          const prefix = `Style preferences: ${selectedStyles.join(', ')}. `;
+
+          return baseAdapter.sendMessage(request, {
+            ...callbacks,
+            onChunk: (chunk) => callbacks.onChunk(prefix + chunk)
+          });
+        }
+      };
+    }
     
     // Initially register with mock adapter
-    const mockAdapter = new MockAdapter();
+    const mockAdapter = createMockAdapterWithSecondPromptQuestion();
     registerChatWidget({
       adapter: mockAdapter,
       title: 'Audako Assistant (Mock)',
-      initialMessage: 'Welcome! I\'m using the mock adapter for demonstration.',
+      initialMessage: 'Welcome! I\'m using the mock adapter. On your second prompt I\'ll ask you to choose a response style.',
       placeholder: 'Type a message...'
     });
 
@@ -192,11 +251,11 @@
       let config;
 
       if (adapterType === 'mock') {
-        adapter = new MockAdapter();
+        adapter = createMockAdapterWithSecondPromptQuestion();
         config = {
           adapter,
           title: 'Audako Assistant (Mock)',
-          initialMessage: 'Welcome! I\'m using the mock adapter.',
+          initialMessage: 'Welcome! I\'m using the mock adapter. On your second prompt I\'ll ask you to choose a response style.',
           placeholder: 'Type a message...'
         };
       } else if (adapterType === 'openai') {

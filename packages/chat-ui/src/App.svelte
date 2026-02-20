@@ -1,18 +1,75 @@
 <script lang="ts">
-  import { ChatWidget, MockAdapter, type ChatWidgetConfig } from './lib';
+import { ChatWidget, MockAdapter, type ChatAdapter, type ChatWidgetConfig } from './lib';
 
-  const adapter = new MockAdapter({ showThinking: true });
+function createMockAdapterWithSecondPromptQuestion(): ChatAdapter {
+  const baseAdapter = new MockAdapter({ showThinking: true });
+  let promptCount = 0;
 
-  let config: ChatWidgetConfig = {
-    adapter,
-    title: 'Audako Assistant',
-    initialMessage: 'Welcome to Audako MCP Chat. I can show you my thinking process!',
-    placeholder: 'Type a message'
+  return {
+    async init() {
+      if (typeof baseAdapter.init === 'function') {
+        await baseAdapter.init();
+      }
+    },
+    cancel() {
+      if (typeof baseAdapter.cancel === 'function') {
+        baseAdapter.cancel();
+      }
+    },
+    async sendMessage(request, callbacks) {
+      promptCount += 1;
+      let selectedStyles: string[] = [];
+
+      if (promptCount === 2 && callbacks.onQuestion) {
+        selectedStyles = await callbacks.onQuestion({
+          text: 'Before I answer your second prompt, choose one or more response styles:',
+          allowMultiple: true,
+          options: [
+            {
+              label: 'Concise',
+              value: 'concise',
+              description: 'Keep the response short',
+            },
+            {
+              label: 'Detailed',
+              value: 'detailed',
+              description: 'Add extra explanation',
+            },
+            {
+              label: 'Bulleted',
+              value: 'bulleted',
+              description: 'Format as bullet points',
+            },
+          ],
+        });
+      }
+
+      if (selectedStyles.length === 0) {
+        return baseAdapter.sendMessage(request, callbacks);
+      }
+
+      const prefix = `Style preferences: ${selectedStyles.join(', ')}. `;
+      return baseAdapter.sendMessage(request, {
+        ...callbacks,
+        onChunk: (chunk: string) => callbacks.onChunk(prefix + chunk),
+      });
+    },
   };
+}
 
-  let primary = '#0057B8';
-  let secondary = '#146C5B';
-  let darkMode = false;
+const adapter = createMockAdapterWithSecondPromptQuestion();
+
+let config: ChatWidgetConfig = {
+  adapter,
+  title: 'Audako Assistant',
+  initialMessage:
+    'Welcome to Audako MCP Chat. I can show thinking and will ask a multi-select question on your second prompt.',
+  placeholder: 'Type a message',
+};
+
+let primary = '#0057B8';
+let secondary = '#146C5B';
+let darkMode = false;
 </script>
 
 {#snippet widgetHeader(title: string)}
@@ -33,7 +90,7 @@
           <ChatWidget {config} header={widgetHeader} {primary} {secondary} {darkMode} />
         </div>
         <div class="space-y-3 text-sm text-slate-600">
-          <p>Import the component directly in your Svelte app (including Chrome extensions).</p>
+          <p>Import the component directly in your Svelte app. This preview asks a question on prompt #2.</p>
           <label class="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" bind:checked={darkMode} />
             Dark mode
