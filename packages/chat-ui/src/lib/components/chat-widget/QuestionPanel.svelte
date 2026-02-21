@@ -1,6 +1,6 @@
 <script lang="ts">
-import type { ChatQuestion } from '../../types';
 import { getQuestionOptionValue } from '../../chat/utils/message';
+import type { QuestionRequest } from '../../types';
 
 let {
   question,
@@ -8,17 +8,21 @@ let {
   autoFocusFirst = false,
   onToggleAnswer,
   onSubmitAnswers,
+  onSubmitCustomAnswer,
   onAutoFocusHandled,
 }: {
-  question: ChatQuestion;
+  question: QuestionRequest;
   selectedAnswers: string[];
   autoFocusFirst?: boolean;
   onToggleAnswer: (optionValue: string) => void;
   onSubmitAnswers: () => void;
+  onSubmitCustomAnswer: (value: string) => void;
   onAutoFocusHandled?: () => void;
 } = $props();
 
 let optionButtons = $state<(HTMLButtonElement | undefined)[]>([]);
+let customValue = $state('');
+let customInputEl = $state<HTMLInputElement | undefined>();
 
 const focusOptionByIndex = (index: number) => {
   if (question.options.length === 0) {
@@ -65,9 +69,31 @@ const handleOptionKeydown = (event: KeyboardEvent, optionValue: string, index: n
   }
 };
 
+const submitCustom = () => {
+  const trimmed = customValue.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  onSubmitCustomAnswer(trimmed);
+  customValue = '';
+};
+
+const handleCustomKeydown = (event: KeyboardEvent) => {
+  if (event.isComposing) {
+    return;
+  }
+
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitCustom();
+  }
+};
+
 $effect(() => {
   question;
   optionButtons = [];
+  customValue = '';
 });
 
 $effect(() => {
@@ -84,7 +110,7 @@ $effect(() => {
   <p class="chat-widget__question-text">{question.text}</p>
 
   <div class="chat-widget__question-options">
-    {#each question.options as option, index (`${option.value ?? option.label}-${index}`)}
+    {#each question.options as option, index (`${option.label}-${index}`)}
       {@const optionValue = getQuestionOptionValue(option)}
       <button
         bind:this={optionButtons[index]}
@@ -95,11 +121,31 @@ $effect(() => {
         onkeydown={(event) => handleOptionKeydown(event, optionValue, index)}
       >
         <span class="chat-widget__question-option-label">{option.label}</span>
-        {#if option.description}
-          <span class="chat-widget__question-option-description">{option.description}</span>
-        {/if}
+        <span class="chat-widget__question-option-description">{option.description}</span>
       </button>
     {/each}
+
+    <div class="chat-widget__question-option chat-widget__question-option--custom">
+      <span class="chat-widget__question-option-label">Type your own answer</span>
+      <div class="chat-widget__custom-input-row">
+        <input
+          bind:this={customInputEl}
+          bind:value={customValue}
+          type="text"
+          class="chat-widget__custom-input"
+          placeholder="Your answer..."
+          onkeydown={handleCustomKeydown}
+        />
+        <button
+          type="button"
+          class="chat-widget__custom-submit"
+          disabled={!customValue.trim()}
+          onclick={submitCustom}
+        >
+          Send
+        </button>
+      </div>
+    </div>
   </div>
 
   {#if question.allowMultiple}
@@ -170,6 +216,67 @@ $effect(() => {
     color: var(--md-on-surface-variant);
     font-size: 0.75rem;
     line-height: 1.35;
+  }
+
+  .chat-widget__question-option--custom {
+    cursor: default;
+  }
+
+  .chat-widget__question-option--custom:hover {
+    background: color-mix(in srgb, var(--md-surface) 94%, white);
+    border-color: color-mix(in srgb, var(--md-outline) 40%, transparent);
+  }
+
+  .chat-widget__custom-input-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .chat-widget__custom-input {
+    background: var(--md-surface-bright);
+    border: 1px solid color-mix(in srgb, var(--md-outline) 40%, transparent);
+    border-radius: 8px;
+    color: var(--md-on-surface);
+    flex: 1;
+    font-family: inherit;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    padding: 5px 8px;
+    outline: none;
+    transition: border-color 0.18s ease;
+  }
+
+  .chat-widget__custom-input:focus {
+    border-color: color-mix(in srgb, var(--md-primary) 60%, transparent);
+  }
+
+  .chat-widget__custom-input::placeholder {
+    color: var(--md-on-surface-variant);
+    opacity: 0.6;
+  }
+
+  .chat-widget__custom-submit {
+    background: var(--md-primary-container);
+    border: 1px solid color-mix(in srgb, var(--md-primary) 45%, transparent);
+    border-radius: 8px;
+    color: var(--md-on-primary-container);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 5px 10px;
+    transition: border-color 0.18s ease, opacity 0.18s ease;
+    white-space: nowrap;
+  }
+
+  .chat-widget__custom-submit:hover:enabled {
+    border-color: color-mix(in srgb, var(--md-primary) 66%, transparent);
+  }
+
+  .chat-widget__custom-submit:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
   }
 
   .chat-widget__question-submit {

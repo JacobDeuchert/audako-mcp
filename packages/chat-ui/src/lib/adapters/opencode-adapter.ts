@@ -1,5 +1,12 @@
-import type { ChatAdapter, ChatRequest, StreamCallbacks } from '../types';
 import { createOpencodeClient, type OpencodeClient } from '@opencode-ai/sdk/client';
+import type {
+  ChatAdapter,
+  ChatRequest,
+  PublicQuestionHandler,
+  PublicQuestionOptions,
+  QuestionRequest,
+  StreamCallbacks,
+} from '../types';
 
 export interface OpenCodeAdapterConfig {
   sessionId?: string;
@@ -56,6 +63,7 @@ export class OpenCodeAdapter implements ChatAdapter {
   private activeMessageLog: OpenCodeCombinedLogEntry[] = [];
   private lastMessageLog: OpenCodeCombinedLogEntry[] = [];
   private combinedMessageLog: OpenCodeCombinedLogEntry[] = [];
+  private publicQuestionHandler: PublicQuestionHandler | null = null;
 
   constructor(config: OpenCodeAdapterConfig = {}) {
     this.sessionId = config.sessionId || null;
@@ -597,6 +605,23 @@ export class OpenCodeAdapter implements ChatAdapter {
       this.abortController.abort();
     }
     this.clearCurrentMessage('cancelled');
+  }
+
+  setPublicQuestionHandler(handler: PublicQuestionHandler | null): void {
+    this.publicQuestionHandler = handler;
+  }
+
+  async showQuestion(
+    question: QuestionRequest,
+    options?: PublicQuestionOptions,
+  ): Promise<string[]> {
+    if (!this.publicQuestionHandler) {
+      throw new Error(
+        'No question handler is registered. Mount ChatWidget with this adapter first.',
+      );
+    }
+
+    return this.publicQuestionHandler(question, options);
   }
 
   /**

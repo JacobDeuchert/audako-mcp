@@ -1,4 +1,4 @@
-import { ChatAdapter, ChatRequest, StreamCallbacks } from '../types';
+import { ChatAdapter, ChatRequest, PublicQuestionHandler, PublicQuestionOptions, QuestionRequest, StreamCallbacks } from '../types';
 /**
  * Mock adapter for testing and development
  * Simulates streaming responses with random delays and optional thinking
@@ -6,7 +6,8 @@ import { ChatAdapter, ChatRequest, StreamCallbacks } from '../types';
 export declare class MockAdapter implements ChatAdapter {
     private abortController;
     private showThinking;
-    private showQuestion;
+    private showQuestionPrompt;
+    private publicQuestionHandler;
     constructor(options?: {
         showThinking?: boolean;
         showQuestion?: boolean;
@@ -16,6 +17,8 @@ export declare class MockAdapter implements ChatAdapter {
      * For MockAdapter, this is a no-op since there's no real connection to set up
      */
     init(): Promise<void>;
+    setPublicQuestionHandler(handler: PublicQuestionHandler | null): void;
+    showQuestion(question: QuestionRequest, options?: PublicQuestionOptions): Promise<string[]>;
     sendMessage(_request: ChatRequest, callbacks: StreamCallbacks): Promise<void>;
     cancel(): void;
 }

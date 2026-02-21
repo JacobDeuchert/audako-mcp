@@ -1,6 +1,7 @@
-import { ChatQuestionOption, Message } from '../../types';
+import { Message, QuestionOption } from '../../types';
 export declare const DEFAULT_INITIAL_MESSAGE = "Welcome to Audako MCP Chat. How can I assist you today?";
-export interface ComposerPayload {
+export declare const DEFAULT_TITLE = "Audako Assistant";
+interface ComposerPayload {
     text: string;
     attachments: [];
 }
@@ -9,4 +10,5 @@ export declare const createMessageId: (offset?: number) => string;
 export declare const createSystemMessage: (text: string, id?: string) => Message;
 export declare const createUserMessage: (text: string) => Message;
 export declare const createAssistantStreamingMessage: (id: string) => Message;
-export declare const getQuestionOptionValue: (option: ChatQuestionOption) => string;
+export declare const getQuestionOptionValue: (option: QuestionOption) => string;
+export {};

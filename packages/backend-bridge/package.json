@@ -13,22 +13,25 @@
     "format": "prettier --write 'src/**/*.ts'"
   },
   "dependencies": {
-    "@opencode-ai/sdk": "^1.1.53",
-    "fastify": "^4.25.0",
+    "@audako/contracts": "^0.1.0",
     "@fastify/cors": "^8.4.0",
     "@fastify/websocket": "^8.3.1",
+    "@opencode-ai/sdk": "^1.1.53",
+    "audako-core": "github:JacobDeuchert/audako-core",
+    "axios": "^1.13.5",
     "dotenv": "^16.3.1",
+    "fastify": "^4.25.0",
     "pino": "^8.16.0",
     "pino-pretty": "^10.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "tsx": "^4.7.0",
-    "vitest": "^1.0.0",
-    "eslint": "^8.54.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
-    "prettier": "^3.1.0"
+    "eslint": "^8.54.0",
+    "prettier": "^3.1.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
   }
 }

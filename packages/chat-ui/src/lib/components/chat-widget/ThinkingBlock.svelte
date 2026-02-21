@@ -28,9 +28,6 @@ let {
   <div class="chat-widget__thinking-content">
     <p class="chat-widget__thinking-text">
       {thinking.content}
-      {#if thinking.isStreaming}
-        <span class="chat-widget__stream-caret chat-widget__stream-caret--secondary"></span>
-      {/if}
     </p>
   </div>
 </details>
@@ -117,30 +114,4 @@ let {
     white-space: pre-wrap;
   }
 
-  .chat-widget__stream-caret {
-    animation: chat-widget-pulse 1.1s ease-in-out infinite;
-    background: currentColor;
-    border-radius: 999px;
-    display: inline-block;
-    height: 13px;
-    margin-left: 4px;
-    opacity: 0.9;
-    vertical-align: text-bottom;
-    width: 2px;
-  }
-
-  .chat-widget__stream-caret--secondary {
-    color: var(--md-on-secondary-container);
-  }
-
-  @keyframes chat-widget-pulse {
-    0%,
-    100% {
-      opacity: 0.45;
-    }
-
-    50% {
-      opacity: 1;
-    }
-  }
 </style>

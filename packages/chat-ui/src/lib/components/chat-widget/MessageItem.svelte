@@ -1,7 +1,7 @@
 <script lang="ts">
-import type { Message } from '../../types';
-import { formatTime } from '../../chat/utils/time';
 import { renderMessageMarkdown } from '../../chat/utils/markdown';
+import { formatTime } from '../../chat/utils/time';
+import type { Message } from '../../types';
 import ThinkingBlock from './ThinkingBlock.svelte';
 
 let {
@@ -21,9 +21,6 @@ let {
 >
   <div
     class="chat-widget__message"
-    class:chat-widget__message--user={message.from === 'user'}
-    class:chat-widget__message--assistant={message.from === 'assistant'}
-    class:chat-widget__message--system={message.from === 'system'}
   >
     {#if showThinking && message.thinking && message.from === 'assistant'}
       <ThinkingBlock thinking={message.thinking} />
@@ -37,16 +34,11 @@ let {
     >
       <div class="chat-widget__bubble-content">
         {@html renderMessageMarkdown(message.text)}
-        {#if message.isStreaming && !(showThinking && message.thinking?.isStreaming)}
-          <span class="chat-widget__stream-caret"></span>
-        {/if}
       </div>
     </div>
     <span
       class="chat-widget__timestamp"
       class:chat-widget__timestamp--user={message.from === 'user'}
-      class:chat-widget__timestamp--assistant={message.from === 'assistant'}
-      class:chat-widget__timestamp--system={message.from === 'system'}
     >
       {formatTime(message.timestamp)}
     </span>
@@ -135,18 +127,6 @@ let {
     margin-top: 0.22em;
   }
 
-  .chat-widget__stream-caret {
-    animation: chat-widget-pulse 1.1s ease-in-out infinite;
-    background: currentColor;
-    border-radius: 999px;
-    display: inline-block;
-    height: 13px;
-    margin-left: 4px;
-    opacity: 0.9;
-    vertical-align: text-bottom;
-    width: 2px;
-  }
-
   .chat-widget__timestamp {
     color: var(--md-on-surface-variant);
     font-size: 0.68rem;
@@ -161,17 +141,6 @@ let {
   @media (max-width: 640px) {
     .chat-widget__message {
       max-width: 92%;
-    }
-  }
-
-  @keyframes chat-widget-pulse {
-    0%,
-    100% {
-      opacity: 0.45;
-    }
-
-    50% {
-      opacity: 1;
     }
   }
 </style>

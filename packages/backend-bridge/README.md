@@ -78,7 +78,7 @@ Response:
 Open session-scoped WebSocket connection.
 
 - Sends `session.snapshot` immediately on connect.
-- Emits pushed events (`session.info.updated`, `session.event`, `session.closed`).
+- Emits pushed events (`session.info.updated`, `session.closed`, domain events, `hub.request`).
 - Supports heartbeat (`ping`/`pong`) and stale socket cleanup.
 
 ### PUT `/api/session/:sessionId/info`
@@ -226,33 +226,44 @@ Common event types:
 
 - `session.snapshot`
 - `session.info.updated`
-- `session.event`
 - `session.closed`
-
-Domain events emitted by the MCP server are delivered through `session.event` and exposed as `payload.type` values. Current domain event types:
-
 - `entity.created`
 - `entity.updated`
 - `hub.request` (bridge-generated request/response prompt event)
+
+All events are top-level — each event type has its own `type` field directly in the envelope. There is no `session.event` wrapper.
 
 Example websocket message for an entity domain event:
 
 ```json
 {
-  "type": "session.event",
+  "type": "entity.updated",
   "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
   "timestamp": "2026-02-15T10:30:00.000Z",
   "payload": {
-    "type": "entity.updated",
-    "payload": {
-      "entityType": "Signal",
-      "entityId": "signal-123",
-      "tenantId": "tenant-123",
-      "groupId": "group-456",
-      "changedFields": ["name", "description"],
-      "sourceTool": "update-entity",
-      "timestamp": "2026-02-15T10:30:00.000Z"
-    }
+    "entityType": "Signal",
+    "entityId": "signal-123",
+    "tenantId": "tenant-123",
+    "groupId": "group-456",
+    "changedFields": ["name", "description"],
+    "sourceTool": "update-entity",
+    "timestamp": "2026-02-15T10:30:00.000Z"
+  }
+}
+```
+
+Example websocket message for a hub request event:
+
+```json
+{
+  "type": "hub.request",
+  "sessionId": "0f25459a-4f7f-4f0f-b4f2-12d2c73c6a4f",
+  "timestamp": "2026-02-15T10:30:00.000Z",
+  "payload": {
+    "requestId": "req-abc-123",
+    "requestType": "question.ask",
+    "payload": { "text": "Which option?", "header": "Choose", "options": [] },
+    "expiresAt": "2026-02-15T10:33:00.000Z"
   }
 }
 ```

@@ -3,10 +3,18 @@ import { createLogger } from '../config/index.js';
 
 const logger = createLogger('session-request-hub');
 
+/** How long a resolved response is retained for polling retrieval. */
+const RESOLVED_RETENTION_MS = 300000; // 5 minutes
+
 export interface SessionRequestResolution {
   response: unknown;
   respondedAt: string;
 }
+
+export type SessionRequestStatus =
+  | { status: 'pending'; expiresAt: string }
+  | { status: 'resolved'; expiresAt: string; response: unknown; respondedAt: string }
+  | { status: 'expired' };
 
 interface PendingSessionRequest {
   requestId: string;
@@ -15,6 +23,15 @@ interface PendingSessionRequest {
   timeoutHandle: NodeJS.Timeout;
   resolve: (resolution: SessionRequestResolution) => void;
   reject: (error: Error) => void;
+}
+
+interface ResolvedSessionRequest {
+  requestId: string;
+  sessionId: string;
+  expiresAt: string;
+  response: unknown;
+  respondedAt: string;
+  retentionHandle: NodeJS.Timeout;
 }
 
 export class SessionRequestTimeoutError extends Error {
@@ -47,6 +64,7 @@ export class SessionRequestCancelledError extends Error {
 
 export class SessionRequestHub {
   private readonly pendingBySession = new Map<string, Map<string, PendingSessionRequest>>();
+  private readonly resolvedBySession = new Map<string, Map<string, ResolvedSessionRequest>>();
 
   create(
     sessionId: string,
@@ -68,7 +86,7 @@ export class SessionRequestHub {
     });
 
     const timeoutHandle = setTimeout(() => {
-      const entry = this.remove(sessionId, requestId);
+      const entry = this.removePending(sessionId, requestId);
       if (!entry) {
         return;
       }
@@ -104,7 +122,7 @@ export class SessionRequestHub {
     requestId: string,
     response: unknown,
   ): { resolved: true; respondedAt: string } | { resolved: false } {
-    const entry = this.remove(sessionId, requestId);
+    const entry = this.removePending(sessionId, requestId);
     if (!entry) {
       return { resolved: false };
     }
@@ -112,14 +130,50 @@ export class SessionRequestHub {
     const respondedAt = new Date().toISOString();
     entry.resolve({ response, respondedAt });
 
+    // Cache the resolution for polling retrieval.
+    this.storeResolved(sessionId, {
+      requestId,
+      sessionId,
+      expiresAt: entry.expiresAt,
+      response,
+      respondedAt,
+    });
+
     return {
       resolved: true,
       respondedAt,
     };
   }
 
+  /**
+   * Returns the current status of a request for polling consumers.
+   * - `pending`  – still waiting for user response
+   * - `resolved` – user responded (includes the answer)
+   * - `expired`  – not found (either timed out, cancelled, or never existed)
+   */
+  getStatus(sessionId: string, requestId: string): SessionRequestStatus {
+    // Check pending first.
+    const pending = this.pendingBySession.get(sessionId)?.get(requestId);
+    if (pending) {
+      return { status: 'pending', expiresAt: pending.expiresAt };
+    }
+
+    // Check resolved cache.
+    const resolved = this.resolvedBySession.get(sessionId)?.get(requestId);
+    if (resolved) {
+      return {
+        status: 'resolved',
+        expiresAt: resolved.expiresAt,
+        response: resolved.response,
+        respondedAt: resolved.respondedAt,
+      };
+    }
+
+    return { status: 'expired' };
+  }
+
   private cancel(sessionId: string, requestId: string, reason: string): boolean {
-    const entry = this.remove(sessionId, requestId);
+    const entry = this.removePending(sessionId, requestId);
     if (!entry) {
       return false;
     }
@@ -129,7 +183,7 @@ export class SessionRequestHub {
   }
 
   discard(sessionId: string, requestId: string): boolean {
-    const entry = this.remove(sessionId, requestId);
+    const entry = this.removePending(sessionId, requestId);
     return Boolean(entry);
   }
 
@@ -152,7 +206,7 @@ export class SessionRequestHub {
     }
   }
 
-  private remove(sessionId: string, requestId: string): PendingSessionRequest | undefined {
+  private removePending(sessionId: string, requestId: string): PendingSessionRequest | undefined {
     const pendingForSession = this.pendingBySession.get(sessionId);
     if (!pendingForSession) {
       return undefined;
@@ -170,5 +224,40 @@ export class SessionRequestHub {
     }
 
     return entry;
+  }
+
+  private storeResolved(
+    sessionId: string,
+    resolved: Omit<ResolvedSessionRequest, 'retentionHandle'>,
+  ): void {
+    const retentionHandle = setTimeout(() => {
+      this.removeResolved(sessionId, resolved.requestId);
+    }, RESOLVED_RETENTION_MS);
+
+    const entry: ResolvedSessionRequest = { ...resolved, retentionHandle };
+
+    const resolvedForSession = this.resolvedBySession.get(sessionId);
+    if (resolvedForSession) {
+      resolvedForSession.set(resolved.requestId, entry);
+    } else {
+      this.resolvedBySession.set(sessionId, new Map([[resolved.requestId, entry]]));
+    }
+  }
+
+  private removeResolved(sessionId: string, requestId: string): void {
+    const resolvedForSession = this.resolvedBySession.get(sessionId);
+    if (!resolvedForSession) {
+      return;
+    }
+
+    const entry = resolvedForSession.get(requestId);
+    if (entry) {
+      clearTimeout(entry.retentionHandle);
+      resolvedForSession.delete(requestId);
+    }
+
+    if (resolvedForSession.size === 0) {
+      this.resolvedBySession.delete(sessionId);
+    }
   }
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { ChatWidget, MockAdapter, type ChatAdapter, type ChatWidgetConfig } from './lib';
+import { DEFAULT_TITLE, type ChatAdapter, ChatWidget, type ChatWidgetConfig, MockAdapter } from './lib';
 
 function createMockAdapterWithSecondPromptQuestion(): ChatAdapter {
   const baseAdapter = new MockAdapter({ showThinking: true });
@@ -23,21 +23,19 @@ function createMockAdapterWithSecondPromptQuestion(): ChatAdapter {
       if (promptCount === 2 && callbacks.onQuestion) {
         selectedStyles = await callbacks.onQuestion({
           text: 'Before I answer your second prompt, choose one or more response styles:',
+          header: 'Response style',
           allowMultiple: true,
           options: [
             {
               label: 'Concise',
-              value: 'concise',
               description: 'Keep the response short',
             },
             {
               label: 'Detailed',
-              value: 'detailed',
               description: 'Add extra explanation',
             },
             {
               label: 'Bulleted',
-              value: 'bulleted',
               description: 'Format as bullet points',
             },
           ],
@@ -61,7 +59,7 @@ const adapter = createMockAdapterWithSecondPromptQuestion();
 
 let config: ChatWidgetConfig = {
   adapter,
-  title: 'Audako Assistant',
+  title: DEFAULT_TITLE,
   initialMessage:
     'Welcome to Audako MCP Chat. I can show thinking and will ask a multi-select question on your second prompt.',
   placeholder: 'Type a message',

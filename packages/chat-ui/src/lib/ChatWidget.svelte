@@ -1,16 +1,18 @@
 <script lang="ts">
 import type { Snippet } from 'svelte';
-import type { ChatWidgetConfig } from './types';
+import type { ChatWidgetConfig, ChatWidgetThemeProps } from './types';
+import './style.css';
+import { DEFAULT_INITIAL_MESSAGE, DEFAULT_TITLE } from './chat/utils/message';
 import { useChatController } from './chat/useChatController.svelte';
 import ChatHeader from './components/chat-widget/ChatHeader.svelte';
+import Composer from './components/chat-widget/Composer.svelte';
 import MessageList from './components/chat-widget/MessageList.svelte';
 import QuestionPanel from './components/chat-widget/QuestionPanel.svelte';
-import Composer from './components/chat-widget/Composer.svelte';
 
 const DEFAULT_CONFIG: ChatWidgetConfig = {
-  title: 'Audako Assistant',
+  title: DEFAULT_TITLE,
   placeholder: 'Type a message',
-  initialMessage: 'Welcome to Audako MCP Chat. How can I assist you today?',
+  initialMessage: DEFAULT_INITIAL_MESSAGE,
   showThinking: true,
   adapter: undefined as any,
 };
@@ -24,12 +26,9 @@ let {
 }: {
   config?: ChatWidgetConfig;
   header?: Snippet<[string]>;
-  primary?: string;
-  secondary?: string;
-  darkMode?: boolean;
-} = $props();
+} & ChatWidgetThemeProps = $props();
 const resolvedConfig = $derived(config ?? DEFAULT_CONFIG);
-const headerTitle = $derived(resolvedConfig?.title || 'Audako Assistant');
+const headerTitle = $derived(resolvedConfig?.title || DEFAULT_TITLE);
 const themeStyle = $derived(`--chat-primary: ${primary}; --chat-secondary: ${secondary};`);
 const showThinking = $derived(resolvedConfig?.showThinking ?? true);
 const composerPlaceholder = $derived(resolvedConfig?.placeholder || 'Type a message');
@@ -75,7 +74,7 @@ $effect(() => {
     <MessageList
       messages={controller.state.messages}
       {showThinking}
-      isTyping={controller.state.isTyping}
+      isTyping={composerDisabled}
     />
   </div>
 
@@ -87,6 +86,7 @@ $effect(() => {
         autoFocusFirst={controller.state.shouldFocusQuestion}
         onToggleAnswer={controller.toggleQuestionAnswer}
         onSubmitAnswers={controller.submitQuestionAnswers}
+        onSubmitCustomAnswer={controller.submitCustomAnswer}
         onAutoFocusHandled={controller.clearQuestionFocusRequest}
       />
     {:else}

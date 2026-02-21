@@ -1,4 +1,4 @@
-import { ChatAdapter, ChatRequest, StreamCallbacks } from '../types';
+import { ChatAdapter, ChatRequest, PublicQuestionHandler, PublicQuestionOptions, QuestionRequest, StreamCallbacks } from '../types';
 export interface OpenCodeAdapterConfig {
     sessionId?: string;
     baseUrl?: string;
@@ -50,6 +50,7 @@ export declare class OpenCodeAdapter implements ChatAdapter {
     private activeMessageLog;
     private lastMessageLog;
     private combinedMessageLog;
+    private publicQuestionHandler;
     constructor(config?: OpenCodeAdapterConfig);
     private ensureClient;
     /**
@@ -83,6 +84,8 @@ export declare class OpenCodeAdapter implements ChatAdapter {
     private ensureSession;
     sendMessage(request: ChatRequest, callbacks: StreamCallbacks): Promise<void>;
     cancel(): void;
+    setPublicQuestionHandler(handler: PublicQuestionHandler | null): void;
+    showQuestion(question: QuestionRequest, options?: PublicQuestionOptions): Promise<string[]>;
     /**
      * Returns the most recent per-request combined log.
      */

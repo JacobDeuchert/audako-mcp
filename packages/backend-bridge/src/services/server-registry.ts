@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { appConfig, createLogger } from '../config/index.js';
 import type {
   OpencodeRuntime,
@@ -34,7 +34,10 @@ export class ServerRegistry {
   private idleTimeout: number; // in milliseconds
   private cleanupInterval?: NodeJS.Timeout;
   private readonly serverRemovedListeners: Set<ServerRemovedListener>;
-  private readonly inflight: Map<string, Promise<{ entry: ServerRegistryEntry; isNew: boolean }>>;
+  private readonly inflight: Map<
+    string,
+    Promise<{ entry: ServerRegistryEntry; isNew: boolean; bridgeSessionToken: string }>
+  >;
 
   constructor(
     portAllocator: PortAllocator,
@@ -103,10 +106,37 @@ export class ServerRegistry {
   }
 
   /**
-   * Hashes an access token for storage
+   * Hashes a token for storage
    */
-  private hashToken(accessToken: string): string {
-    return createHash('sha256').update(accessToken).digest('hex');
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  /**
+   * Generates a high-entropy opaque session token (64 hex characters).
+   */
+  private generateSessionToken(): string {
+    return randomBytes(32).toString('hex');
+  }
+
+  /**
+   * Verifies a bridge session token for a given session ID.
+   * Uses constant-time comparison on the hash to mitigate timing attacks.
+   */
+  verifySessionToken(sessionId: string, token: string): boolean {
+    const entry = this.getEntryBySessionId(sessionId);
+    if (!entry) {
+      return false;
+    }
+
+    const candidateHash = Buffer.from(this.hashToken(token), 'hex');
+    const storedHash = Buffer.from(entry.bridgeSessionTokenHash, 'hex');
+
+    if (candidateHash.length !== storedHash.length) {
+      return false;
+    }
+
+    return timingSafeEqual(candidateHash, storedHash);
   }
 
   /**
@@ -120,12 +150,20 @@ export class ServerRegistry {
    * Gets or creates a server for the given credentials.
    * Concurrent requests with the same credentials are coalesced
    * so only one server is ever created per credential pair.
+   *
+   * Returns the plaintext `bridgeSessionToken` so the caller can
+   * return it once (bootstrap response) and inject it into MCP env.
+   * The registry only stores its hash.
    */
   async getOrCreateServer(
     scadaUrl: string,
     accessToken: string,
-    createServerFn: (port: number, sessionId: string) => Promise<OpencodeRuntime>,
-  ): Promise<{ entry: ServerRegistryEntry; isNew: boolean }> {
+    createServerFn: (
+      port: number,
+      sessionId: string,
+      bridgeSessionToken: string,
+    ) => Promise<OpencodeRuntime>,
+  ): Promise<{ entry: ServerRegistryEntry; isNew: boolean; bridgeSessionToken: string }> {
     const key = this.generateKey(scadaUrl, accessToken);
 
     // Coalesce concurrent requests for the same credentials.
@@ -148,13 +186,18 @@ export class ServerRegistry {
     key: string,
     scadaUrl: string,
     accessToken: string,
-    createServerFn: (port: number, sessionId: string) => Promise<OpencodeRuntime>,
-  ): Promise<{ entry: ServerRegistryEntry; isNew: boolean }> {
-    // Check if server already exists
+    createServerFn: (
+      port: number,
+      sessionId: string,
+      bridgeSessionToken: string,
+    ) => Promise<OpencodeRuntime>,
+  ): Promise<{ entry: ServerRegistryEntry; isNew: boolean; bridgeSessionToken: string }> {
+    // Check if server already exists.
     const existingEntry = this.sessionRuntimes.get(key);
     if (existingEntry) {
       existingEntry.lastAccessedAt = new Date();
       this.sessionToServerKey.set(existingEntry.sessionId, key);
+
       logger.info(
         {
           scadaUrl,
@@ -164,7 +207,11 @@ export class ServerRegistry {
         },
         'Reusing existing OpenCode runtime',
       );
-      return { entry: existingEntry, isNew: false };
+      return {
+        entry: existingEntry,
+        isNew: false,
+        bridgeSessionToken: existingEntry.bridgeSessionToken,
+      };
     }
 
     // Check capacity
@@ -184,13 +231,16 @@ export class ServerRegistry {
       const sessionId = randomUUID();
 
       try {
-        const opencodeServer = await createServerFn(port, sessionId);
+        const bridgeSessionToken = this.generateSessionToken();
+        const opencodeServer = await createServerFn(port, sessionId, bridgeSessionToken);
 
         const entry: ServerRegistryEntry = {
           sessionId,
           scadaUrl,
           accessToken,
           accessTokenHash: this.hashToken(accessToken),
+          bridgeSessionToken,
+          bridgeSessionTokenHash: this.hashToken(bridgeSessionToken),
           opencodeServer,
           opencodeUrl: `${appConfig.opencode.protocol}://${appConfig.opencode.host}:${port}`,
           port,
@@ -211,7 +261,7 @@ export class ServerRegistry {
           'OpenCode runtime created and registered',
         );
 
-        return { entry, isNew: true };
+        return { entry, isNew: true, bridgeSessionToken };
       } catch (error) {
         if (isAddressInUseError(error)) {
           lastAddressInUseError = error;

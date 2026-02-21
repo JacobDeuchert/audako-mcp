@@ -25,6 +25,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@audako/contracts": "^0.1.0",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "audako-core": "github:JacobDeuchert/audako-core",
     "dotenv": "^17.2.3",

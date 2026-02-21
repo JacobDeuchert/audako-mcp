@@ -1,4 +1,11 @@
-import type { ChatAdapter, ChatRequest, StreamCallbacks } from '../types';
+import type {
+  ChatAdapter,
+  ChatRequest,
+  PublicQuestionHandler,
+  PublicQuestionOptions,
+  QuestionRequest,
+  StreamCallbacks,
+} from '../types';
 
 /**
  * Mock adapter for testing and development
@@ -7,11 +14,12 @@ import type { ChatAdapter, ChatRequest, StreamCallbacks } from '../types';
 export class MockAdapter implements ChatAdapter {
   private abortController: AbortController | null = null;
   private showThinking: boolean;
-  private showQuestion: boolean;
+  private showQuestionPrompt: boolean;
+  private publicQuestionHandler: PublicQuestionHandler | null = null;
 
   constructor(options?: { showThinking?: boolean; showQuestion?: boolean }) {
     this.showThinking = options?.showThinking ?? false;
-    this.showQuestion = options?.showQuestion ?? false;
+    this.showQuestionPrompt = options?.showQuestion ?? false;
   }
 
   /**
@@ -20,6 +28,23 @@ export class MockAdapter implements ChatAdapter {
    */
   async init(): Promise<void> {
     // Nothing to initialize for mock adapter
+  }
+
+  setPublicQuestionHandler(handler: PublicQuestionHandler | null): void {
+    this.publicQuestionHandler = handler;
+  }
+
+  async showQuestion(
+    question: QuestionRequest,
+    options?: PublicQuestionOptions,
+  ): Promise<string[]> {
+    if (!this.publicQuestionHandler) {
+      throw new Error(
+        'No question handler is registered. Mount ChatWidget with this adapter first.',
+      );
+    }
+
+    return this.publicQuestionHandler(question, options);
   }
 
   async sendMessage(_request: ChatRequest, callbacks: StreamCallbacks): Promise<void> {
@@ -66,26 +91,25 @@ export class MockAdapter implements ChatAdapter {
 
       // Optional question phase to demonstrate interactive callbacks
       let answerPrefix = '';
-      if (this.showQuestion && callbacks.onQuestion) {
+      if (this.showQuestionPrompt && callbacks.onQuestion) {
         const answers = await callbacks.onQuestion({
           text: 'Which response style should I use?',
+          header: 'Response style',
           options: [
             {
               label: 'Concise',
-              value: 'concise',
               description: 'Short and direct response',
             },
             {
               label: 'Detailed',
-              value: 'detailed',
               description: 'More context and explanation',
             },
           ],
         });
 
-        const selectedStyle = answers[0] || 'concise';
+        const selectedStyle = answers[0] || 'Concise';
         answerPrefix =
-          selectedStyle === 'detailed'
+          selectedStyle === 'Detailed'
             ? 'Great, I will provide a detailed answer. '
             : 'Great, I will keep it concise. ';
       }

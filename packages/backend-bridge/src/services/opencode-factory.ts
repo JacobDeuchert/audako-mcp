@@ -19,6 +19,7 @@ export class OpencodeFactory {
     accessToken: string,
     port: number,
     sessionId: string,
+    bridgeSessionToken: string,
     corsOrigins?: string[],
   ): Promise<OpencodeRuntime> {
     const mcpServerPath = path.resolve(__dirname, '../../../mcp-server/dist/index.js');
@@ -73,6 +74,7 @@ export class OpencodeFactory {
                 AUDAKO_TOKEN: accessToken,
                 AUDAKO_SESSION_ID: sessionId,
                 AUDAKO_BRIDGE_URL: bridgeUrl,
+                AUDAKO_BRIDGE_SESSION_TOKEN: bridgeSessionToken,
                 AUDAKO_MUTATION_DELAY_MS: process.env.AUDAKO_MUTATION_DELAY_MS ?? '150',
               },
             },

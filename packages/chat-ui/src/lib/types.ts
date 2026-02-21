@@ -1,3 +1,6 @@
+export type QuestionOption = import('@audako/contracts').QuestionOption;
+export type QuestionRequest = import('@audako/contracts').QuestionRequest;
+
 export interface ThinkingBlock {
   content: string;
   isStreaming?: boolean;
@@ -12,22 +15,14 @@ export interface Message {
   thinking?: ThinkingBlock; // Optional thinking/reasoning content
 }
 
-export interface StreamChunk {
-  content: string;
-  done?: boolean;
+export interface PublicQuestionOptions {
+  autoFocus?: boolean;
 }
 
-export interface ChatQuestionOption {
-  label: string;
-  value?: string;
-  description?: string;
-}
-
-export interface ChatQuestion {
-  text: string;
-  options: ChatQuestionOption[];
-  allowMultiple?: boolean;
-}
+export type PublicQuestionHandler = (
+  question: QuestionRequest,
+  options?: PublicQuestionOptions,
+) => Promise<string[]>;
 
 export interface ChatRequest {
   message: string;
@@ -51,7 +46,7 @@ export interface StreamCallbacks {
    * Called when the adapter needs user input via explicit options.
    * The UI should present the question and return selected answer values.
    */
-  onQuestion?: (question: ChatQuestion) => Promise<string[]>;
+  onQuestion?: (question: QuestionRequest) => Promise<string[]>;
 
   /**
    * Called when streaming is complete
@@ -78,6 +73,13 @@ export interface ChatAdapter {
    * @param callbacks - Callbacks for handling the streaming response
    */
   sendMessage(request: ChatRequest, callbacks: StreamCallbacks): Promise<void>;
+
+  /**
+   * Register a public question handler provided by the widget.
+   * Adapters can expose a public API (for host apps) that forwards question
+   * prompts into this handler to display the widget question UI.
+   */
+  setPublicQuestionHandler?(handler: PublicQuestionHandler | null): void;
 
   /**
    * Cancel an ongoing request (optional)

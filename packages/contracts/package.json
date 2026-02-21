@@ -1,0 +1,47 @@
+{
+  "name": "@audako/contracts",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Shared TypeScript contracts for Audako services and clients",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./backend-bridge": {
+      "types": "./src/backend-bridge.ts",
+      "import": "./dist/backend-bridge.js",
+      "default": "./dist/backend-bridge.js"
+    },
+    "./backend-bridge/ws-events": {
+      "types": "./src/backend-bridge-ws-events.ts",
+      "import": "./dist/backend-bridge-ws-events.js",
+      "default": "./dist/backend-bridge-ws-events.js"
+    },
+    "./question": {
+      "types": "./src/question.ts",
+      "import": "./dist/question.js",
+      "default": "./dist/question.js"
+    },
+    "./common": {
+      "types": "./src/common.ts",
+      "import": "./dist/common.js",
+      "default": "./dist/common.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

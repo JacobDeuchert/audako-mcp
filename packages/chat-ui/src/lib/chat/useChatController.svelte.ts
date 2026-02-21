@@ -1,11 +1,11 @@
-import type { ChatQuestion, ChatWidgetConfig, Message } from '../types';
+import type { ChatWidgetConfig, Message, PublicQuestionHandler, QuestionRequest } from '../types';
 import {
   createAssistantStreamingMessage,
   createComposerPayload,
+  createMessageId,
   createSystemMessage,
   createUserMessage,
   DEFAULT_INITIAL_MESSAGE,
-  createMessageId,
 } from './utils/message';
 
 interface ChatControllerOptions {
@@ -26,13 +26,14 @@ export const useChatController = ({
     draft: '',
     isTyping: false,
     streamingMessageId: null as string | null,
-    pendingQuestion: null as ChatQuestion | null,
+    pendingQuestion: null as QuestionRequest | null,
     selectedQuestionAnswers: [] as string[],
     shouldFocusQuestion: false,
   });
 
   let pendingQuestionResolver: ((answers: string[]) => void) | null = null;
   let initializedAdapter: ChatWidgetConfig['adapter'] | null = null;
+  let questionBoundAdapter: ChatWidgetConfig['adapter'] | null = null;
   let hasSeededInitialMessage = false;
 
   const debug = (...args: unknown[]) => {
@@ -52,7 +53,10 @@ export const useChatController = ({
     resolver?.(answers);
   };
 
-  const askQuestion = (question: ChatQuestion, shouldFocusQuestion = false): Promise<string[]> => {
+  const askQuestion = (
+    question: QuestionRequest,
+    shouldFocusQuestion = false,
+  ): Promise<string[]> => {
     if (pendingQuestionResolver) {
       pendingQuestionResolver([]);
     }
@@ -78,6 +82,7 @@ export const useChatController = ({
 
   const syncConfig = () => {
     const resolvedConfig = getConfig();
+    const adapter = resolvedConfig?.adapter;
 
     debug('config resolved', {
       title: resolvedConfig?.title,
@@ -86,14 +91,22 @@ export const useChatController = ({
       hasInitialMessage: !!resolvedConfig?.initialMessage,
     });
 
-    if (
-      resolvedConfig?.adapter &&
-      typeof resolvedConfig.adapter.init === 'function' &&
-      resolvedConfig.adapter !== initializedAdapter
-    ) {
-      initializedAdapter = resolvedConfig.adapter;
+    if (questionBoundAdapter && questionBoundAdapter !== adapter) {
+      questionBoundAdapter.setPublicQuestionHandler?.(null);
+      questionBoundAdapter = null;
+    }
+
+    if (adapter && questionBoundAdapter !== adapter) {
+      const handler: PublicQuestionHandler = (question, options) =>
+        askQuestion(question, options?.autoFocus ?? false);
+      adapter.setPublicQuestionHandler?.(handler);
+      questionBoundAdapter = adapter;
+    }
+
+    if (adapter && typeof adapter.init === 'function' && adapter !== initializedAdapter) {
+      initializedAdapter = adapter;
       debug('initializing adapter');
-      resolvedConfig.adapter.init().catch(error => {
+      adapter.init().catch(error => {
         console.error('Failed to initialize adapter:', error);
       });
     }
@@ -135,6 +148,14 @@ export const useChatController = ({
     }
 
     resolveQuestion(state.selectedQuestionAnswers);
+  };
+
+  const submitCustomAnswer = (value: string) => {
+    if (!state.pendingQuestion || !value) {
+      return;
+    }
+
+    resolveQuestion([value]);
   };
 
   const clearQuestionFocusRequest = () => {
@@ -229,7 +250,7 @@ export const useChatController = ({
             }));
             scrollToBottom();
           },
-          onQuestion: async (question: ChatQuestion) => {
+          onQuestion: async (question: QuestionRequest) => {
             debug('adapter question received', {
               optionCount: question.options?.length ?? 0,
               allowMultiple: !!question.allowMultiple,
@@ -304,6 +325,7 @@ export const useChatController = ({
     sendMessage,
     toggleQuestionAnswer,
     submitQuestionAnswers,
+    submitCustomAnswer,
     clearQuestionFocusRequest,
   };
 };

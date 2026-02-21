@@ -1,0 +1,12 @@
+/* ─── Shared keyframes ────────────────────────────────────────────────────── */
+
+@keyframes chat-widget-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}

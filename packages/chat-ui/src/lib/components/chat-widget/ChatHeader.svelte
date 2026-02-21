@@ -11,7 +11,7 @@ let {
 </script>
 
 <header class="chat-widget__header">
-  <div class="chat-widget__header-content">
+  <div>
     {#if header}
       {@render header(title)}
     {:else}
