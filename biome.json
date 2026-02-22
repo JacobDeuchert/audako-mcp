@@ -4,6 +4,7 @@
     "ignoreUnknown": true,
     "includes": [
       "**",
+      "!**/*.svelte",
       "!**/node_modules",
       "!**/dist",
       "!**/.svelte-kit",
