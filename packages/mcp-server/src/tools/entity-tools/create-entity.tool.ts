@@ -1,15 +1,28 @@
-import type { TenantView } from 'audako-core';
 import { z } from 'zod';
 import {
   getSupportedEntityTypeNames,
   resolveEntityTypeContract,
 } from '../../entity-type-definitions/index.js';
 import { audakoServices } from '../../services/audako-services.js';
-import { resolveTenantFromSessionInfo } from '../../services/context-resolvers.js';
 import { toErrorLogDetails } from '../../services/error-details.js';
+import {
+  buildGroupPermissionContext,
+  normalizePermissionMode,
+  type PermissionResultMetadata,
+  resolveOutOfContextPermission,
+} from '../../services/inline-mutation-permissions.js';
 import { logger } from '../../services/logger.js';
+import { evaluateMutationScope } from '../../services/mutation-scope-guard.js';
 import { publishEntityCreatedEvent } from '../../services/session-events.js';
-import { getRecordStringValue, isRecord, toErrorResponse, toTextResponse } from '../helpers.js';
+import { getContext } from '../../services/session-context.js';
+import {
+  getRecordStringValue,
+  isRecord,
+  normalizeOptionalString,
+  toErrorResponse,
+  toStructuredErrorResponse,
+  toTextResponse,
+} from '../helpers.js';
 import { defineTool } from '../registry.js';
 
 export const toolDefinitions = [
@@ -23,23 +36,40 @@ export const toolDefinitions = [
         payload: z
           .record(z.unknown())
           .describe('REQUIRED: Entity payload. Use get-entity-definition before creating'),
+        permissionMode: z
+          .enum(['interactive', 'fail_fast'])
+          .optional()
+          .describe(
+            'Permission handling mode for out-of-context mutations. interactive prompts the user inline; fail_fast returns an out-of-context error without prompting.',
+          ),
       },
     },
-    handler: async ({ entityType, payload }) => {
+    handler: async ({ entityType, payload, permissionMode }) => {
       await logger.trace('create-entity', 'started', { entityType });
 
-      let tenant: TenantView;
-      try {
-        tenant = await resolveTenantFromSessionInfo();
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+      const normalizedPermissionMode = normalizePermissionMode(permissionMode);
+      const toolName = 'create-entity';
+      let permission: PermissionResultMetadata | undefined;
 
-        await logger.warn('create-entity: failed to resolve tenant from session', {
-          entityType,
-          error: errorMessage,
-        });
+      let contextGroupId: string | undefined;
+      let tenantId: string;
+      const context = await getContext();
+      contextGroupId = normalizeOptionalString(context.groupId);
 
-        return toErrorResponse(`Could not resolve tenant from session info: ${errorMessage}`);
+      const resolvedTenantId = normalizeOptionalString(context.tenantId);
+      if (!resolvedTenantId) {
+        return toErrorResponse('Could not resolve tenant from session info: No tenantId found.');
+      }
+
+      tenantId = resolvedTenantId;
+
+      if (!context.tenantView) {
+        return toErrorResponse('Session context not yet resolved — tenantView unavailable');
+      }
+
+      const tenant = context.tenantView;
+      if (!tenant.Root) {
+        return toErrorResponse(`Tenant '${tenantId}' has no root group.`);
       }
 
       const contract = resolveEntityTypeContract(entityType);
@@ -72,6 +102,47 @@ export const toolDefinitions = [
         });
       }
 
+      const tenantRootGroupId = typeof tenant.Root === 'string' ? tenant.Root.trim() : undefined;
+      const targetGroupId = getRecordStringValue(payload, 'groupId') || tenantRootGroupId;
+
+      const scopeResult = await evaluateMutationScope({
+        contextGroupId,
+        targetGroupId,
+      });
+
+      if (!scopeResult.allowed) {
+        const expectedTargetGroupId = scopeResult.targetGroupId ?? targetGroupId ?? '';
+        if (!expectedTargetGroupId) {
+          return toErrorResponse(
+            'Could not resolve target group for this mutation. Include a valid groupId and retry.',
+          );
+        }
+
+        const permissionContext = buildGroupPermissionContext(expectedTargetGroupId);
+
+        try {
+          const permissionResult = await resolveOutOfContextPermission({
+            toolName,
+            mode: normalizedPermissionMode,
+            reason: scopeResult.reason,
+            context: permissionContext,
+            entityType: contract.key,
+            entityName: getRecordStringValue(payload, 'name'),
+            targetGroupId: expectedTargetGroupId,
+            targetGroupLabel: scopeResult.targetGroupLabel,
+          });
+
+          if (!permissionResult.allowed) {
+            return toStructuredErrorResponse(permissionResult.payload);
+          }
+
+          permission = permissionResult.permission;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return toErrorResponse(`Failed to request mutation permission: ${errorMessage}`);
+        }
+      }
+
       try {
         const entity = contract.fromPayload(payload, {
           tenantRootGroupId: tenant.Root,
@@ -89,7 +160,6 @@ export const toolDefinitions = [
         });
 
         const createdPayload = contract.toPayload(createdEntity);
-        const tenantRootGroupId = typeof tenant.Root === 'string' ? tenant.Root.trim() : undefined;
         const groupId =
           getRecordStringValue(createdPayload, 'groupId') ||
           getRecordStringValue(payload, 'groupId') ||
@@ -116,6 +186,7 @@ export const toolDefinitions = [
           message: `${contract.key} created successfully.`,
           entityType: contract.key,
           entity: createdPayload,
+          ...(permission ? { permission } : {}),
         });
       } catch (error) {
         const errorDetails = toErrorLogDetails(error);

@@ -36,6 +36,7 @@ export class OpencodeFactory {
       const opencode = await createOpencode({
         port,
         config: {
+          // plugin: ['inject-env'],
           default_agent: 'audako',
           agent: {
             audako: {

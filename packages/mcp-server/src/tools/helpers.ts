@@ -39,11 +39,15 @@ export function toErrorResponse(message: string, details?: unknown): ToolTextRes
   };
 }
 
+export function toStructuredErrorResponse(payload: unknown): ToolTextResponse {
+  return toErrorResponse(JSON.stringify(payload, null, 2));
+}
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-export function toOptionalTrimmedString(value: unknown): string | undefined {
+export function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
   }
@@ -52,9 +56,18 @@ export function toOptionalTrimmedString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+export function normalizeRequiredString(value: string, fieldName: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error(`'${fieldName}' must be a non-empty string.`);
+  }
+
+  return trimmed;
+}
+
 export function getRecordStringValue(
   record: Record<string, unknown>,
   key: string,
 ): string | undefined {
-  return toOptionalTrimmedString(record[key]);
+  return normalizeOptionalString(record[key]);
 }

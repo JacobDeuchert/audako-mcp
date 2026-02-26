@@ -2,10 +2,14 @@ export type {
   BridgeSessionWebSocketEvent,
   EntityCreatedEventPayload,
   EntityCreatedSessionEvent,
+  EntityMovedEventPayload,
+  EntityMovedSessionEvent,
   EntityUpdatedEventPayload,
   EntityUpdatedSessionEvent,
   HubRequestPayload,
   HubRequestSessionEvent,
+  HubResponsePayload,
+  HubResponseSessionEvent,
   KnownBridgeSessionWebSocketEvent,
   McpPublishedSessionEvent,
   PushSessionEventRequest,
@@ -30,5 +34,38 @@ export type {
   SessionSnapshotEvent,
   SessionSnapshotPayload,
 } from './backend-bridge.js';
+export {
+  isRequestSessionEventPendingResponse,
+  isRequestSessionEventResponse,
+  isRequestSessionEventStatusResponse,
+  isHubResponseSessionEvent,
+  isSessionInfoResponse,
+  PushSessionEventRequestSchema,
+  PushSessionEventResponseSchema,
+  RequestSessionEventPendingResponseSchema,
+  RequestSessionEventRequestSchema,
+  RequestSessionEventResponseSchema,
+  RequestSessionEventStatusResponseSchema,
+  ResolveSessionEventResponseRequestSchema,
+  ResolveSessionEventResponseSchema,
+  SessionBootstrapRequestSchema,
+  SessionBootstrapResponseSchema,
+  SessionInfoFieldsSchema,
+  SessionInfoResponseSchema,
+  SessionInfoSnapshotSchema,
+} from './backend-bridge.js';
+export {
+  createHubRequestPayloadSchema,
+  createSessionEventEnvelopeSchema,
+  EntityCreatedEventPayloadSchema,
+  EntityMovedEventPayloadSchema,
+  HubResponsePayloadSchema,
+  EntityUpdatedEventPayloadSchema,
+  QuestionAskHubRequestPayloadSchema,
+  SessionClosedEventPayloadSchema,
+  SessionSnapshotPayloadSchema,
+} from './backend-bridge-ws-events.js';
 export type { ErrorResponse } from './common.js';
+export { ErrorResponseSchema, isErrorResponse } from './common.js';
 export type { QuestionOption, QuestionRequest } from './question.js';
+export { QuestionOptionSchema, QuestionRequestSchema } from './question.js';

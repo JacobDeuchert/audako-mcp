@@ -1,5 +1,6 @@
 import { logger } from '../services/logger.js';
-import { fetchSessionInfo, getSessionInfoEndpoint } from '../services/session-info.js';
+import { getContext } from '../services/session-context.js';
+import { resolveSessionId } from '../services/session-id.js';
 import { toErrorResponse, toTextResponse } from './helpers.js';
 import { defineTool } from './registry.js';
 
@@ -12,7 +13,7 @@ export const toolDefinitions = [
       inputSchema: {},
     },
     handler: async () => {
-      const sessionId = process.env.AUDAKO_SESSION_ID;
+      const sessionId = resolveSessionId();
 
       if (!sessionId) {
         await logger.warn('get-session-info: AUDAKO_SESSION_ID is not set');
@@ -21,36 +22,25 @@ export const toolDefinitions = [
         );
       }
 
-      const endpoint = getSessionInfoEndpoint(sessionId);
+      await logger.trace('get-session-info', 'fetching session context', { sessionId });
 
-      try {
-        await logger.trace('get-session-info', 'fetching session info', {
-          sessionId,
-          endpoint,
-        });
+      const context = await getContext();
 
-        const payload = await fetchSessionInfo();
+      await logger.debug('get-session-info: session context retrieved', {
+        sessionId,
+        tenantId: context.tenantId,
+        groupId: context.groupId,
+        entityType: context.entityType,
+        app: context.app,
+      });
 
-        await logger.debug('get-session-info: session info retrieved', {
-          sessionId,
-          tenantId: payload.tenantId,
-          groupId: payload.groupId,
-          entityType: payload.entityType,
-          app: payload.app,
-        });
-
-        return toTextResponse(payload);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        await logger.error('get-session-info: failed to fetch session info', {
-          sessionId,
-          endpoint,
-          error: errorMessage,
-        });
-
-        return toErrorResponse(`Failed to get session info: ${errorMessage}`);
-      }
+      return toTextResponse({
+        tenantId: context.tenantId,
+        groupId: context.groupId,
+        entityType: context.entityType,
+        app: context.app,
+        updatedAt: context.updatedAt,
+      });
     },
   }),
 ];

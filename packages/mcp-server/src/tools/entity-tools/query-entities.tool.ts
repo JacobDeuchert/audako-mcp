@@ -5,7 +5,7 @@ import {
 } from '../../entity-type-definitions/index.js';
 import { audakoServices } from '../../services/audako-services.js';
 import { logger } from '../../services/logger.js';
-import { fetchSessionInfo } from '../../services/session-info.js';
+import { getContext } from '../../services/session-context.js';
 import { defineTool } from '../registry.js';
 import { isRecord, toErrorResponse, toTextResponse } from '../helpers.js';
 
@@ -68,21 +68,8 @@ export const toolDefinitions = [
         if (hasNonEmptyScopeId(scopeId)) {
           resolvedScopeId = scopeId.trim();
         } else {
-          try {
-            const sessionInfo = await fetchSessionInfo();
-            resolvedScopeId = scope === 'tenant' ? sessionInfo.tenantId : sessionInfo.groupId;
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-
-            await logger.warn('query-entities: failed to resolve scope from session', {
-              scope,
-              error: errorMessage,
-            });
-
-            return toErrorResponse(
-              `Could not resolve '${scope}' scope ID from session info: ${errorMessage}`,
-            );
-          }
+          const context = await getContext();
+          resolvedScopeId = scope === 'tenant' ? context.tenantId : context.groupId;
         }
 
         if (!resolvedScopeId) {

@@ -716,6 +716,8 @@ export async function sessionRoutes(
       });
     }
 
+    eventHub.publish(sessionId, buildSessionEvent('hub.response', sessionId, { requestId, response: body.response, respondedAt: result.respondedAt }));
+
     return reply.send({
       sessionId,
       requestId,

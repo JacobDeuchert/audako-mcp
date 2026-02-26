@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { logger } from '../services/logger.js';
 
-const MUTATING_TOOL_NAMES = new Set(['create-entity', 'update-entity']);
+const MUTATING_TOOL_NAMES = new Set(['create-entity', 'update-entity', 'move-entity']);
 const DEFAULT_MUTATION_DELAY_MS = 150;
 
 let mutationQueue: Promise<void> = Promise.resolve();

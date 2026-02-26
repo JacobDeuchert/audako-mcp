@@ -4,10 +4,13 @@ import 'dotenv/config';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { LoggingMessageNotificationParamsSchema } from '@modelcontextprotocol/sdk/types.js';
+import { initializeServices } from './services/audako-services.js';
+import { bridgeWsClient } from './services/bridge-ws-client.js';
+import { logger } from './services/logger.js';
+import { initializeContext } from './services/session-context.js';
 import { autoRegisterTools } from './tools/auto-register.js';
 import { registerDocsResources } from './tools/docs-resources.js';
-import { initializeServices } from './services/audako-services.js';
-import { logger } from './services/logger.js';
 
 const systemUrl = process.env.AUDAKO_SYSTEM_URL ?? 'not configured';
 
@@ -38,8 +41,17 @@ async function main() {
     await autoRegisterTools(server);
     await logger.info('Tools registered', { source: 'auto-discovery' });
 
+    await logger.info('Environment variables', process.env.AUDAKO_ID);
+
     await initializeServices();
     await logger.info('Services initialized successfully');
+
+    // Initialize context cache (cold-start HTTP fetch + WS handler registration)
+    await initializeContext();
+    await logger.info('Session context initialized');
+
+    // Start WebSocket connection for live context updates (fire-and-forget)
+    bridgeWsClient.connect();
 
     const transport = new StdioServerTransport();
     await server.connect(transport);

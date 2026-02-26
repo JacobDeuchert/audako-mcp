@@ -1,15 +1,28 @@
-import type { TenantView } from 'audako-core';
 import { z } from 'zod';
 import {
   getSupportedEntityTypeNames,
   resolveEntityTypeContract,
 } from '../../entity-type-definitions/index.js';
 import { audakoServices } from '../../services/audako-services.js';
-import { resolveTenantFromSessionInfo } from '../../services/context-resolvers.js';
 import { toErrorLogDetails } from '../../services/error-details.js';
+import {
+  buildGroupPermissionContext,
+  normalizePermissionMode,
+  type PermissionResultMetadata,
+  resolveOutOfContextPermission,
+} from '../../services/inline-mutation-permissions.js';
 import { logger } from '../../services/logger.js';
+import { evaluateMutationScope } from '../../services/mutation-scope-guard.js';
 import { publishEntityUpdatedEvent } from '../../services/session-events.js';
-import { getRecordStringValue, isRecord, toErrorResponse, toTextResponse } from '../helpers.js';
+import { getContext } from '../../services/session-context.js';
+import {
+  getRecordStringValue,
+  isRecord,
+  normalizeOptionalString,
+  toErrorResponse,
+  toStructuredErrorResponse,
+  toTextResponse,
+} from '../helpers.js';
 import { defineTool } from '../registry.js';
 
 export const toolDefinitions = [
@@ -24,24 +37,40 @@ export const toolDefinitions = [
         changes: z
           .record(z.unknown())
           .describe('Partial field updates. Use get-entity-definition first.'),
+        permissionMode: z
+          .enum(['interactive', 'fail_fast'])
+          .optional()
+          .describe(
+            'Permission handling mode for out-of-context mutations. interactive prompts the user inline; fail_fast returns an out-of-context error without prompting.',
+          ),
       },
     },
-    handler: async ({ entityType, entityId, changes }) => {
+    handler: async ({ entityType, entityId, changes, permissionMode }) => {
       await logger.trace('update-entity', 'started', { entityType, entityId });
 
-      let tenant: TenantView;
-      try {
-        tenant = await resolveTenantFromSessionInfo();
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+      const normalizedPermissionMode = normalizePermissionMode(permissionMode);
+      const toolName = 'update-entity';
+      let permission: PermissionResultMetadata | undefined;
 
-        await logger.warn('update-entity: failed to resolve tenant from session', {
-          entityType,
-          entityId,
-          error: errorMessage,
-        });
+      let contextGroupId: string | undefined;
+      let tenantId: string;
+      const context = await getContext();
+      contextGroupId = normalizeOptionalString(context.groupId);
 
-        return toErrorResponse(`Could not resolve tenant from session info: ${errorMessage}`);
+      const resolvedTenantId = normalizeOptionalString(context.tenantId);
+      if (!resolvedTenantId) {
+        return toErrorResponse('Could not resolve tenant from session info: No tenantId found.');
+      }
+
+      tenantId = resolvedTenantId;
+
+      if (!context.tenantView) {
+        return toErrorResponse('Session context not yet resolved — tenantView unavailable');
+      }
+
+      const tenant = context.tenantView;
+      if (!tenant.Root) {
+        return toErrorResponse(`Tenant '${tenantId}' has no root group.`);
       }
 
       const contract = resolveEntityTypeContract(entityType);
@@ -75,12 +104,75 @@ export const toolDefinitions = [
         });
       }
 
+      const tenantRootGroupId = typeof tenant.Root === 'string' ? tenant.Root.trim() : undefined;
+
+      let existingEntity: any;
+      let previousPayload: Record<string, unknown>;
+      let targetGroupId: string | undefined;
+
       try {
-        const existingEntity = await audakoServices.entityService.getEntityById(
+        existingEntity = await audakoServices.entityService.getEntityById(
           contract.entityType,
           entityId,
         );
+        previousPayload = contract.toPayload(existingEntity);
 
+        targetGroupId =
+          getRecordStringValue(changes, 'groupId') ||
+          getRecordStringValue(previousPayload, 'groupId') ||
+          tenantRootGroupId;
+      } catch (error) {
+        const errorDetails = toErrorLogDetails(error);
+
+        await logger.error('update-entity: failed to resolve existing entity', {
+          entityType: contract.key,
+          entityId,
+          ...errorDetails,
+        });
+
+        return toErrorResponse(`Failed to update entity: ${errorDetails.error}`);
+      }
+
+      const scopeResult = await evaluateMutationScope({
+        contextGroupId,
+        targetGroupId,
+      });
+
+      if (!scopeResult.allowed) {
+        const expectedTargetGroupId = scopeResult.targetGroupId ?? targetGroupId ?? '';
+        if (!expectedTargetGroupId) {
+          return toErrorResponse(
+            'Could not resolve target group for this mutation. Include a valid groupId and retry.',
+          );
+        }
+
+        const permissionContext = buildGroupPermissionContext(expectedTargetGroupId);
+
+        try {
+          const permissionResult = await resolveOutOfContextPermission({
+            toolName,
+            mode: normalizedPermissionMode,
+            reason: scopeResult.reason,
+            context: permissionContext,
+            entityType: contract.key,
+            entityId,
+            entityName: getRecordStringValue(previousPayload, 'name'),
+            targetGroupId: expectedTargetGroupId,
+            targetGroupLabel: scopeResult.targetGroupLabel,
+          });
+
+          if (!permissionResult.allowed) {
+            return toStructuredErrorResponse(permissionResult.payload);
+          }
+
+          permission = permissionResult.permission;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return toErrorResponse(`Failed to request mutation permission: ${errorMessage}`);
+        }
+      }
+
+      try {
         const updatedEntityInput = contract.applyUpdate(existingEntity, changes, {
           tenantRootGroupId: tenant.Root,
         });
@@ -99,8 +191,6 @@ export const toolDefinitions = [
         });
 
         const updatedPayload = contract.toPayload(updatedEntity);
-        const previousPayload = contract.toPayload(existingEntity);
-        const tenantRootGroupId = typeof tenant.Root === 'string' ? tenant.Root.trim() : undefined;
         const groupId =
           getRecordStringValue(updatedPayload, 'groupId') ||
           getRecordStringValue(changes, 'groupId') ||
@@ -129,6 +219,7 @@ export const toolDefinitions = [
           message: `${contract.key} updated successfully.`,
           entityType: contract.key,
           entity: updatedPayload,
+          ...(permission ? { permission } : {}),
         });
       } catch (error) {
         const errorDetails = toErrorLogDetails(error);
