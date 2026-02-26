@@ -26,22 +26,24 @@ let {
       <ThinkingBlock thinking={message.thinking} />
     {/if}
 
-    <div
-      class="chat-widget__bubble"
-      class:chat-widget__bubble--user={message.from === 'user'}
-      class:chat-widget__bubble--assistant={message.from === 'assistant'}
-      class:chat-widget__bubble--system={message.from === 'system'}
-    >
-      <div class="chat-widget__bubble-content">
-        {@html renderMessageMarkdown(message.text)}
+    {#if message.text}
+      <div
+        class="chat-widget__bubble"
+        class:chat-widget__bubble--user={message.from === 'user'}
+        class:chat-widget__bubble--assistant={message.from === 'assistant'}
+        class:chat-widget__bubble--system={message.from === 'system'}
+      >
+        <div class="chat-widget__bubble-content">
+          {@html renderMessageMarkdown(message.text)}
+        </div>
       </div>
-    </div>
-    <span
-      class="chat-widget__timestamp"
-      class:chat-widget__timestamp--user={message.from === 'user'}
-    >
-      {formatTime(message.timestamp)}
-    </span>
+      <span
+        class="chat-widget__timestamp"
+        class:chat-widget__timestamp--user={message.from === 'user'}
+      >
+        {formatTime(message.timestamp)}
+      </span>
+    {/if}
   </div>
 </div>
 
