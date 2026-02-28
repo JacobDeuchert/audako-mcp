@@ -12,12 +12,11 @@ import type {
   SessionInfoResponse,
 } from '@audako/contracts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createSessionAgent } from '../agent/agent-factory.js';
 import { createWsEventBridge } from '../agent/ws-event-bridge.js';
-import { appConfig, createLogger } from '../config/index.js';
+import { appConfig, createLogger, loadSystemPrompt } from '../config/index.js';
 import { createAudakoServices } from '../services/audako-services.js';
 import { UpstreamAuthError, validateUpstreamToken } from '../services/auth-validator.js';
 import { verifyWebSocketAuth } from '../services/session-auth.js';
@@ -58,14 +57,13 @@ export async function sessionRoutes(
   requestHub: SessionRequestHub,
 ) {
   // Load system prompt once at startup
-  const systemPromptPath = path.resolve(__dirname, '../../.opencode/prompts/scada-agent.md');
   let systemPrompt = '';
   try {
-    systemPrompt = await fs.readFile(systemPromptPath, 'utf-8');
-    logger.info({ path: systemPromptPath }, 'System prompt loaded');
+    systemPrompt = await loadSystemPrompt();
+    logger.info('System prompt loaded');
   } catch (error) {
-    logger.error({ path: systemPromptPath, error }, 'Failed to load system prompt');
-    throw new Error(`Failed to load system prompt from ${systemPromptPath}`);
+    logger.error({ error }, 'Failed to load system prompt');
+    throw error;
   }
 
   // ── Route map ────────────────────────────────────────────────────────

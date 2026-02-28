@@ -16,6 +16,13 @@ export function createLogger(name) {
 export const appConfig = {
     port,
     host: process.env.HOST || '0.0.0.0',
+    // CORS Configuration
+    cors: {
+        origins: (process.env.CORS_ORIGINS || '*')
+            .split(',')
+            .map(origin => origin.trim())
+            .filter(Boolean),
+    },
     // Session Configuration
     session: {
         idleTimeout: parseInt(process.env.SESSION_IDLE_TIMEOUT || '1800000', 10), // 30 minutes default
@@ -25,7 +32,32 @@ export const appConfig = {
         provider: process.env.LLM_PROVIDER || 'anthropic',
         modelName: process.env.LLM_MODEL_NAME || 'anthropic/claude-sonnet-4-20250514',
     },
+    // Mutation Configuration
+    mutation: {
+        delayMs: parseInt(process.env.MUTATION_DELAY_MS || '150', 10),
+    },
+    // Request Configuration
+    request: {
+        timeoutMs: parseInt(process.env.QUESTION_TIMEOUT_MS || '120000', 10), // 2 minutes default
+    },
     // Logging
     logLevel,
 };
+/**
+ * Load the system prompt for the OpenCode agent from .opencode/prompts/scada-agent.md
+ * @returns Promise resolving to the system prompt text
+ * @throws Error if the file cannot be read
+ */
+export async function loadSystemPrompt() {
+    try {
+        const { readFile } = await import('fs/promises');
+        const systemPromptPath = path.resolve(__dirname, '../../.opencode/prompts/scada-agent.md');
+        const content = await readFile(systemPromptPath, 'utf-8');
+        return content;
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to load system prompt: ${message}`);
+    }
+}
 //# sourceMappingURL=index.js.map
