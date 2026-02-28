@@ -1,3 +1,6 @@
+export type { ErrorResponse } from './common.js';
+export { ErrorResponseSchema, isErrorResponse } from './common.js';
+
 export type {
   BridgeSessionWebSocketEvent,
   EntityCreatedEventPayload,
@@ -33,12 +36,29 @@ export type {
   SessionInfoUpdatedEvent,
   SessionSnapshotEvent,
   SessionSnapshotPayload,
-} from './backend-bridge.js';
+} from './copilot.js';
+
+export type {
+  AgentTextDeltaSessionEvent,
+  AgentTextDeltaPayload,
+  AgentToolStartSessionEvent,
+  AgentToolStartPayload,
+  AgentToolEndSessionEvent,
+  AgentToolEndPayload,
+  AgentTurnStartSessionEvent,
+  AgentTurnStartPayload,
+  AgentTurnEndSessionEvent,
+  AgentTurnEndPayload,
+  AgentErrorSessionEvent,
+  AgentErrorPayload,
+  AgentSessionEvent,
+} from './copilot-ws-events.js';
+
 export {
+  isHubResponseSessionEvent,
   isRequestSessionEventPendingResponse,
   isRequestSessionEventResponse,
   isRequestSessionEventStatusResponse,
-  isHubResponseSessionEvent,
   isSessionInfoResponse,
   PushSessionEventRequestSchema,
   PushSessionEventResponseSchema,
@@ -53,19 +73,25 @@ export {
   SessionInfoFieldsSchema,
   SessionInfoResponseSchema,
   SessionInfoSnapshotSchema,
-} from './backend-bridge.js';
+} from './copilot.js';
+
 export {
+  AgentErrorPayloadSchema,
+  AgentTextDeltaPayloadSchema,
+  AgentToolEndPayloadSchema,
+  AgentToolStartPayloadSchema,
+  AgentTurnEndPayloadSchema,
+  AgentTurnStartPayloadSchema,
   createHubRequestPayloadSchema,
   createSessionEventEnvelopeSchema,
   EntityCreatedEventPayloadSchema,
   EntityMovedEventPayloadSchema,
-  HubResponsePayloadSchema,
   EntityUpdatedEventPayloadSchema,
+  HubResponsePayloadSchema,
   QuestionAskHubRequestPayloadSchema,
   SessionClosedEventPayloadSchema,
   SessionSnapshotPayloadSchema,
-} from './backend-bridge-ws-events.js';
-export type { ErrorResponse } from './common.js';
-export { ErrorResponseSchema, isErrorResponse } from './common.js';
+} from './copilot-ws-events.js';
+
 export type { QuestionOption, QuestionRequest } from './question.js';
 export { QuestionOptionSchema, QuestionRequestSchema } from './question.js';

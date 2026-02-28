@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { HubResponseSessionEvent } from './backend-bridge-ws-events.js';
+import type { HubResponseSessionEvent } from './copilot-ws-events.js';
 
 export const SessionInfoFieldsSchema = z.object({
   tenantId: z.string().optional(),
@@ -33,7 +33,6 @@ export const SessionBootstrapRequestSchema = z
 export type SessionBootstrapRequest = z.infer<typeof SessionBootstrapRequestSchema>;
 
 export const SessionBootstrapResponseSchema = z.object({
-  opencodeUrl: z.string(),
   websocketUrl: z.string(),
   sessionId: z.string(),
   bridgeSessionToken: z.string(),
@@ -86,7 +85,9 @@ export const ResolveSessionEventResponseRequestSchema = z
   })
   .strict();
 
-export type ResolveSessionEventResponseRequest = z.infer<typeof ResolveSessionEventResponseRequestSchema>;
+export type ResolveSessionEventResponseRequest = z.infer<
+  typeof ResolveSessionEventResponseRequestSchema
+>;
 
 export const RequestSessionEventPendingResponseSchema = z.object({
   sessionId: z.string(),
@@ -95,7 +96,9 @@ export const RequestSessionEventPendingResponseSchema = z.object({
   expiresAt: z.string(),
 });
 
-export type RequestSessionEventPendingResponse = z.infer<typeof RequestSessionEventPendingResponseSchema>;
+export type RequestSessionEventPendingResponse = z.infer<
+  typeof RequestSessionEventPendingResponseSchema
+>;
 
 export const RequestSessionEventStatusResponseSchema = z.object({
   sessionId: z.string(),
@@ -106,7 +109,9 @@ export const RequestSessionEventStatusResponseSchema = z.object({
   respondedAt: z.string().optional(),
 });
 
-export type RequestSessionEventStatusResponse = z.infer<typeof RequestSessionEventStatusResponseSchema>;
+export type RequestSessionEventStatusResponse = z.infer<
+  typeof RequestSessionEventStatusResponseSchema
+>;
 
 export const ResolveSessionEventResponseSchema = z.object({
   sessionId: z.string(),
@@ -138,9 +143,7 @@ export function isRequestSessionEventStatusResponse(
   return RequestSessionEventStatusResponseSchema.safeParse(value).success;
 }
 
-export function isHubResponseSessionEvent(
-  value: unknown,
-): value is HubResponseSessionEvent {
+export function isHubResponseSessionEvent(value: unknown): value is HubResponseSessionEvent {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -179,4 +182,4 @@ export type {
   SessionInfoUpdatedEvent,
   SessionSnapshotEvent,
   SessionSnapshotPayload,
-} from './backend-bridge-ws-events.js';
+} from './copilot-ws-events.js';

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { type SessionInfoResponse, SessionInfoSnapshotSchema } from './backend-bridge.js';
+import { type SessionInfoResponse, SessionInfoSnapshotSchema } from './copilot.js';
 import { QuestionRequestSchema } from './question.js';
 
 export function createSessionEventEnvelopeSchema<T extends z.ZodTypeAny>(payloadSchema: T) {
@@ -52,7 +52,6 @@ export type HubResponseSessionEvent = SessionEventEnvelope<HubResponsePayload> &
 export const SessionSnapshotPayloadSchema = z.object({
   sessionId: z.string(),
   scadaUrl: z.string(),
-  opencodeUrl: z.string(),
   sessionInfo: SessionInfoSnapshotSchema,
   isActive: z.boolean(),
 });
@@ -102,6 +101,68 @@ export const QuestionAskHubRequestPayloadSchema = createHubRequestPayloadSchema(
 });
 export type QuestionAskHubRequestPayload = z.infer<typeof QuestionAskHubRequestPayloadSchema>;
 
+// Agent event types for pi-mono agent
+export const AgentTextDeltaPayloadSchema = z.object({
+  index: z.number(),
+  delta: z.string(),
+});
+export type AgentTextDeltaPayload = z.infer<typeof AgentTextDeltaPayloadSchema>;
+
+export type AgentTextDeltaSessionEvent = SessionEventEnvelope<AgentTextDeltaPayload> & {
+  type: 'agent.text_delta';
+};
+
+export const AgentToolStartPayloadSchema = z.object({
+  toolName: z.string(),
+  toolInput: z.unknown(),
+});
+export type AgentToolStartPayload = z.infer<typeof AgentToolStartPayloadSchema>;
+
+export type AgentToolStartSessionEvent = SessionEventEnvelope<AgentToolStartPayload> & {
+  type: 'agent.tool_start';
+};
+
+export const AgentToolEndPayloadSchema = z.object({
+  toolName: z.string(),
+  toolOutput: z.unknown(),
+});
+export type AgentToolEndPayload = z.infer<typeof AgentToolEndPayloadSchema>;
+
+export type AgentToolEndSessionEvent = SessionEventEnvelope<AgentToolEndPayload> & {
+  type: 'agent.tool_end';
+};
+
+export const AgentTurnStartPayloadSchema = z.object({
+  turnId: z.string(),
+  userMessage: z.string().optional(),
+});
+export type AgentTurnStartPayload = z.infer<typeof AgentTurnStartPayloadSchema>;
+
+export type AgentTurnStartSessionEvent = SessionEventEnvelope<AgentTurnStartPayload> & {
+  type: 'agent.turn_start';
+};
+
+export const AgentTurnEndPayloadSchema = z.object({
+  turnId: z.string(),
+  finalMessage: z.string().optional(),
+});
+export type AgentTurnEndPayload = z.infer<typeof AgentTurnEndPayloadSchema>;
+
+export type AgentTurnEndSessionEvent = SessionEventEnvelope<AgentTurnEndPayload> & {
+  type: 'agent.turn_end';
+};
+
+export const AgentErrorPayloadSchema = z.object({
+  errorMessage: z.string(),
+  errorCode: z.string().optional(),
+  context: z.unknown().optional(),
+});
+export type AgentErrorPayload = z.infer<typeof AgentErrorPayloadSchema>;
+
+export type AgentErrorSessionEvent = SessionEventEnvelope<AgentErrorPayload> & {
+  type: 'agent.error';
+};
+
 export type SessionSnapshotEvent = SessionEventEnvelope<SessionSnapshotPayload> & {
   type: 'session.snapshot';
 };
@@ -135,12 +196,21 @@ export type McpPublishedSessionEvent =
   | EntityUpdatedSessionEvent
   | EntityMovedSessionEvent;
 
+export type AgentSessionEvent =
+  | AgentTextDeltaSessionEvent
+  | AgentToolStartSessionEvent
+  | AgentToolEndSessionEvent
+  | AgentTurnStartSessionEvent
+  | AgentTurnEndSessionEvent
+  | AgentErrorSessionEvent;
+
 export type KnownBridgeSessionWebSocketEvent =
   | SessionSnapshotEvent
   | SessionInfoUpdatedEvent
   | SessionClosedEvent
   | HubRequestSessionEvent
   | HubResponseSessionEvent
-  | McpPublishedSessionEvent;
+  | McpPublishedSessionEvent
+  | AgentSessionEvent;
 
 export type BridgeSessionWebSocketEvent = KnownBridgeSessionWebSocketEvent | SessionEventEnvelope;

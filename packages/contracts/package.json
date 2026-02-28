@@ -12,15 +12,25 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./copilot": {
+      "types": "./src/copilot.ts",
+      "import": "./dist/copilot.js",
+      "default": "./dist/copilot.js"
+    },
+    "./copilot/ws-events": {
+      "types": "./src/copilot-ws-events.ts",
+      "import": "./dist/copilot-ws-events.js",
+      "default": "./dist/copilot-ws-events.js"
+    },
     "./backend-bridge": {
-      "types": "./src/backend-bridge.ts",
-      "import": "./dist/backend-bridge.js",
-      "default": "./dist/backend-bridge.js"
+      "types": "./src/copilot.ts",
+      "import": "./dist/copilot.js",
+      "default": "./dist/copilot.js"
     },
     "./backend-bridge/ws-events": {
-      "types": "./src/backend-bridge-ws-events.ts",
-      "import": "./dist/backend-bridge-ws-events.js",
-      "default": "./dist/backend-bridge-ws-events.js"
+      "types": "./src/copilot-ws-events.ts",
+      "import": "./dist/copilot-ws-events.js",
+      "default": "./dist/copilot-ws-events.js"
     },
     "./question": {
       "types": "./src/question.ts",

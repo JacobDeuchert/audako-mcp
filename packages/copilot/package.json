@@ -1,0 +1,30 @@
+{
+  "name": "@audako/copilot",
+  "version": "0.0.1",
+  "private": true,
+  "description": "PI-Agent based copilot system for Audako",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mariozechner/pi-agent-core": "^0.55.3",
+    "@mariozechner/pi-ai": "^0.55.3",
+    "@sinclair/typebox": "^0.32.0",
+    "@fastify/cors": "^8.4.0",
+    "@fastify/websocket": "^8.3.1",
+    "@audako/contracts": "^0.1.0",
+    "audako-core": "github:JacobDeuchert/audako-core",
+    "fastify": "^4.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "tsx": "^4.7.0"
+  }
+}
