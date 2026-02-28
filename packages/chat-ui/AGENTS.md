@@ -11,7 +11,7 @@ Prefer clean solutions; avoid conservative patches that preserve bad structure.
 
 - Ships an embeddable Svelte 5 chat widget (`ChatWidget`).
 - Adapter-based backend integration — swap adapters without changing widget code.
-- Can run independently from `backend-bridge` and `mcp-server` (use `MockAdapter`).
+- Can run independently from the copilot backend (use `MockAdapter`).
 
 ## Source Structure
 
@@ -23,9 +23,9 @@ src/lib/
   style.css             — Widget stylesheet (also exported as @audako/chat-ui/style.css)
   ChatWidget.svelte     — Root widget component; accepts ChatWidgetConfig + theme props
   adapters/
-    opencode-adapter.ts — OpenCodeAdapter: connects to OpenCode server via @opencode-ai/sdk/client.
-                          Handles SSE event stream, session management, streaming text + thinking.
-    mock-adapter.ts     — MockAdapter: local/demo usage, no network required
+    websocket-adapter.ts — WebSocketAdapter: connects to copilot server via WebSocket.
+                          Handles real-time event streaming, text deltas, and tool reasoning.
+    mock-adapter.ts      — MockAdapter: local/demo usage, no network required
   chat/                 — Internal chat state and message management
   components/           — Internal UI components (message bubbles, composer, thinking block, etc.)
 ```
@@ -67,50 +67,50 @@ interface ChatAdapter {
 - `onThinking?(text: string)` — optional; combined reasoning + tool call log
 - `onQuestion?(question: QuestionRequest): Promise<string[]>` — optional
 
-## OpenCodeAdapter Setup
-
-Typical usage with bridge-provisioned session:
-
-```ts
-import { OpenCodeAdapter } from '@audako/chat-ui';
-
-const adapter = new OpenCodeAdapter({
-  baseUrl: bootstrapResponse.opencodeUrl,  // from POST /api/session/bootstrap
-  sessionId: bootstrapResponse.sessionId,  // skip auto session creation
-  createSession: false,                    // bridge manages sessions
-  agent: 'audako',                         // target the audako agent
-  logCombinedEvents: false,                // disable verbose event logging in prod
+## WebSocketAdapter Setup
+const adapter = new WebSocketAdapter({
+  websocketUrl: bootstrapResponse.websocketUrl,       // ws://host/api/session/:id/ws
+  sessionToken: bootstrapResponse.bridgeSessionToken, // from bootstrap response
+  sessionId: bootstrapResponse.sessionId,             // session identifier
 });
+await adapter.init(); // Connect WebSocket
 ```
 
-Key `OpenCodeAdapterConfig` options:
+Key `WebSocketAdapterConfig` options:
 
 | Option | Default | Purpose |
 |---|---|---|
-| `baseUrl` | `http://localhost:4096` | OpenCode server URL |
-| `sessionId` | `null` | Pre-existing session; skip creation if set |
-| `createSession` | `true` | Auto-create OpenCode session if no sessionId |
-| `agent` | `undefined` | Target a named agent |
-| `model` | `undefined` | Override model (`{ providerID, modelID }`) |
-| `logCombinedEvents` | `true` | Log full per-message event log to console |
+| `websocketUrl` | required | Copilot WebSocket endpoint |
+| `sessionToken` | required | Bridge session token for authentication |
+| `sessionId` | required | Session identifier |
+| `bridgeUrl` | auto-inferred | Base HTTP URL for resolving requests (inferred from websocketUrl) |
+| `reconnectAttempts` | `5` | Maximum number of reconnection attempts |
+| `heartbeatIntervalMs`| `30000` | WebSocket heartbeat interval |
 
 Runtime methods:
-- `adapter.setSessionId(id)` — update session (e.g. after bootstrap)
-- `adapter.getSessionId()` — current session
-- `adapter.clearSession()` — force new session on next message
+- `adapter.init()` — establish WebSocket connection
+- `adapter.sendMessage(request, callbacks)` — send user message and register stream callbacks
+- `adapter.cancel()` — signal agent to stop current turn
 - `adapter.setPublicQuestionHandler(fn)` — wire up question prompts; called by ChatWidget automatically
 - `adapter.showQuestion(question, opts)` — programmatic question from outside the widget
-- `adapter.getLastCombinedLog()` / `getCombinedLog()` — debug event log
+- `adapter.disconnect()` — close connection and clean up resources
 
 ## Event Handling
+## Event Handling
+`WebSocketAdapter` subscribes to standardized copilot events:
+- `agent.text_delta` — streams incremental text chunks
+- `agent.turn_start` — signals beginning of assistant response
+- `agent.turn_end` — signals end of response turn
+- `agent.tool_start` / `agent.tool_end` — tracks tool invocation and reasoning state
+- `hub.request` — handles interactive questions via `onQuestion` callback
 
-`OpenCodeAdapter` subscribes to OpenCode SSE events:
-- `message.updated` — tracks message IDs, detects completion (`finish: 'stop'`)
-- `message.part.updated` — streams text (`part.type === 'text'`), reasoning (`reasoning`/`thinking`), and tool call state (`tool`)
+The adapter accumulates text and reasoning content and emits via `onChunk(fullText)` and `onThinking(combined)`. Full accumulated text is always sent to the widget (not deltas).
 
-The adapter accumulates full text (not deltas) and emits via `onChunk(fullText)`.
-Thinking content merges model reasoning + tool call summaries and emits via `onThinking(combined)`.
+Typical usage with copilot-provisioned session:
 
+```ts
+import { WebSocketAdapter } from '@audako/chat-ui';
+```
 ## CSS Hooks (for host app overrides)
 
 ```
@@ -153,5 +153,5 @@ Thinking content merges model reasoning + tool call summaries and emits via `onT
 ## Public API Surface
 
 - Exports from `src/lib/index.ts` are the public API.
-- `ChatWidget`, `OpenCodeAdapter`, `MockAdapter`, core types.
+- `ChatWidget`, `WebSocketAdapter`, `MockAdapter`, core types.
 - Removing or renaming exports is a breaking change for host apps — do it deliberately.
