@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 export class SessionRequestTimeoutError extends Error {
     requestId;
     sessionId;
@@ -12,26 +11,33 @@ export class SessionRequestTimeoutError extends Error {
 }
 export class SessionRequestCancelledError extends Error {
     requestId;
+    sessionId;
     reason;
-    constructor(requestId, reason) {
-        super(`Pending request ${requestId} was cancelled (${reason})`);
+    constructor(sessionId, requestId, reason) {
+        super(`Pending request ${requestId} for session ${sessionId} was cancelled (${reason})`);
         this.name = 'SessionRequestCancelledError';
         this.requestId = requestId;
+        this.sessionId = sessionId;
         this.reason = reason;
     }
 }
+/**
+ * SessionRequestHub manages request/response events for interactive agent flows.
+ *
+ * Pattern:
+ * 1. Routes call create(sessionId, timeoutMs) to get { requestId, expiresAt, waitForResponse }
+ * 2. Routes publish hub.request event with requestId
+ * 3. UI responds via resolve endpoint
+ * 4. waitForResponse resolves with { response, respondedAt }
+ *
+ * This matches backend-bridge SessionRequestHub pattern exactly.
+ */
 export class SessionRequestHub {
-    pending = new Map();
-    statuses = new Map();
-    eventHub;
-    timeoutMs;
-    constructor(options) {
-        this.eventHub = options.eventHub;
-        this.timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
-    }
-    create(sessionId, request) {
+    pendingBySession = new Map();
+    resolvedBySession = new Map();
+    create(sessionId, timeoutMs) {
         const requestId = randomUUID();
-        const expiresAt = new Date(Date.now() + this.timeoutMs).toISOString();
+        const expiresAt = new Date(Date.now() + timeoutMs).toISOString();
         let resolvePending;
         let rejectPending;
         const waitForResponse = new Promise((resolve, reject) => {
@@ -39,85 +45,111 @@ export class SessionRequestHub {
             rejectPending = reject;
         });
         const timeoutHandle = setTimeout(() => {
-            const entry = this.pending.get(requestId);
+            const entry = this.removePending(sessionId, requestId);
             if (!entry) {
                 return;
             }
-            this.pending.delete(requestId);
-            this.statuses.set(requestId, {
-                status: 'cancelled',
-                cancelledAt: new Date().toISOString(),
-                reason: 'timeout',
-            });
-            entry.reject(new SessionRequestTimeoutError(sessionId, requestId, this.timeoutMs));
-        }, this.timeoutMs);
-        this.pending.set(requestId, {
+            entry.reject(new SessionRequestTimeoutError(sessionId, requestId, timeoutMs));
+        }, timeoutMs);
+        const entry = {
             sessionId,
             requestId,
+            expiresAt,
             timeoutHandle,
             resolve: resolvePending,
             reject: rejectPending,
-        });
-        this.statuses.set(requestId, { status: 'pending', expiresAt });
-        const event = {
-            type: 'hub.request',
-            sessionId,
-            timestamp: new Date().toISOString(),
-            payload: {
-                requestId,
-                requestType: 'question.ask',
-                payload: request,
-                expiresAt,
-            },
         };
-        try {
-            this.eventHub.publish(sessionId, event);
+        const pendingForSession = this.pendingBySession.get(sessionId);
+        if (pendingForSession) {
+            pendingForSession.set(requestId, entry);
         }
-        catch (error) {
-            this.pending.delete(requestId);
-            clearTimeout(timeoutHandle);
-            const reason = error instanceof Error ? error.message : String(error);
-            this.statuses.set(requestId, {
-                status: 'cancelled',
-                cancelledAt: new Date().toISOString(),
-                reason: `publish_failed:${reason}`,
-            });
-            rejectPending(new SessionRequestCancelledError(requestId, `publish_failed:${reason}`));
+        else {
+            this.pendingBySession.set(sessionId, new Map([[requestId, entry]]));
         }
-        return waitForResponse;
+        return {
+            requestId,
+            expiresAt,
+            waitForResponse,
+        };
     }
-    resolve(requestId, response) {
-        const entry = this.pending.get(requestId);
+    resolve(sessionId, requestId, response) {
+        const entry = this.removePending(sessionId, requestId);
         if (!entry) {
-            return false;
+            return { resolved: false };
         }
-        this.pending.delete(requestId);
-        clearTimeout(entry.timeoutHandle);
-        this.statuses.set(requestId, {
-            status: 'resolved',
+        const respondedAt = new Date().toISOString();
+        entry.resolve({ response, respondedAt });
+        // Cache the resolution for polling retrieval
+        this.storeResolved(sessionId, {
+            sessionId,
+            requestId,
+            expiresAt: entry.expiresAt,
             response,
-            respondedAt: new Date().toISOString(),
+            respondedAt,
         });
-        entry.resolve(response);
-        return true;
+        return {
+            resolved: true,
+            respondedAt,
+        };
     }
-    cancel(requestId) {
-        const entry = this.pending.get(requestId);
-        if (!entry) {
-            return false;
+    getStatus(sessionId, requestId) {
+        // Check pending first
+        const pending = this.pendingBySession.get(sessionId)?.get(requestId);
+        if (pending) {
+            return { status: 'pending', expiresAt: pending.expiresAt };
         }
-        this.pending.delete(requestId);
-        clearTimeout(entry.timeoutHandle);
-        this.statuses.set(requestId, {
-            status: 'cancelled',
-            cancelledAt: new Date().toISOString(),
-            reason: 'cancelled',
-        });
-        entry.reject(new SessionRequestCancelledError(requestId, 'cancelled'));
-        return true;
+        // Check resolved cache
+        const resolved = this.resolvedBySession.get(sessionId)?.get(requestId);
+        if (resolved) {
+            return {
+                status: 'resolved',
+                expiresAt: resolved.expiresAt,
+                response: resolved.response,
+                respondedAt: resolved.respondedAt,
+            };
+        }
+        return { status: 'expired' };
     }
-    getStatus(requestId) {
-        return this.statuses.get(requestId);
+    /**
+     * Cancel all pending requests for a session.
+     * Used during session cleanup.
+     */
+    cancelSession(sessionId) {
+        const pendingMap = this.pendingBySession.get(sessionId);
+        if (!pendingMap) {
+            return;
+        }
+        for (const [requestId, entry] of pendingMap.entries()) {
+            clearTimeout(entry.timeoutHandle);
+            entry.reject(new SessionRequestCancelledError(sessionId, requestId, 'session_closed'));
+        }
+        this.pendingBySession.delete(sessionId);
+        this.resolvedBySession.delete(sessionId);
+    }
+    removePending(sessionId, requestId) {
+        const pendingMap = this.pendingBySession.get(sessionId);
+        if (!pendingMap) {
+            return undefined;
+        }
+        const entry = pendingMap.get(requestId);
+        if (!entry) {
+            return undefined;
+        }
+        clearTimeout(entry.timeoutHandle);
+        pendingMap.delete(requestId);
+        if (pendingMap.size === 0) {
+            this.pendingBySession.delete(sessionId);
+        }
+        return entry;
+    }
+    storeResolved(sessionId, resolved) {
+        const resolvedMap = this.resolvedBySession.get(sessionId);
+        if (resolvedMap) {
+            resolvedMap.set(resolved.requestId, resolved);
+        }
+        else {
+            this.resolvedBySession.set(sessionId, new Map([[resolved.requestId, resolved]]));
+        }
     }
 }
 //# sourceMappingURL=session-request-hub.js.map

@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SessionEventHub } from '../../services/session-event-hub.js';
 import { SessionRequestHub } from '../../services/session-request-hub.js';
+import { ToolRequestHub } from '../../services/tool-request-hub.js';
 import { createSessionAgent } from '../agent-factory.js';
 
 function createFixture() {
   const eventHub = new SessionEventHub();
-  const requestHub = new SessionRequestHub({ eventHub, timeoutMs: 1000 });
+  const requestHub = new SessionRequestHub();
+  const toolRequestHub = new ToolRequestHub(requestHub, eventHub);
 
   const sessionContext = {
     getSessionId: () => 'session-1',
@@ -35,7 +37,7 @@ function createFixture() {
 
   return {
     eventHub,
-    requestHub,
+    requestHub: toolRequestHub,
     sessionContext,
     audakoServices,
   };

@@ -1,12 +1,14 @@
-import type { HubRequestSessionEvent, QuestionRequest } from '@audako/contracts';
 import { randomUUID } from 'crypto';
 
-const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
+export interface SessionRequestResolution {
+  response: unknown;
+  respondedAt: string;
+}
 
 export type SessionRequestStatus =
   | { status: 'pending'; expiresAt: string }
-  | { status: 'resolved'; response: unknown; respondedAt: string }
-  | { status: 'cancelled'; cancelledAt: string; reason: string };
+  | { status: 'resolved'; response: unknown; respondedAt: string; expiresAt: string }
+  | { status: 'expired' };
 
 export class SessionRequestTimeoutError extends Error {
   readonly requestId: string;
@@ -24,12 +26,14 @@ export class SessionRequestTimeoutError extends Error {
 
 export class SessionRequestCancelledError extends Error {
   readonly requestId: string;
+  readonly sessionId: string;
   readonly reason: string;
 
-  constructor(requestId: string, reason: string) {
-    super(`Pending request ${requestId} was cancelled (${reason})`);
+  constructor(sessionId: string, requestId: string, reason: string) {
+    super(`Pending request ${requestId} for session ${sessionId} was cancelled (${reason})`);
     this.name = 'SessionRequestCancelledError';
     this.requestId = requestId;
+    this.sessionId = sessionId;
     this.reason = reason;
   }
 }
@@ -37,137 +41,181 @@ export class SessionRequestCancelledError extends Error {
 interface PendingRequest {
   sessionId: string;
   requestId: string;
+  expiresAt: string;
   timeoutHandle: NodeJS.Timeout;
-  resolve: (response: unknown) => void;
+  resolve: (resolution: SessionRequestResolution) => void;
   reject: (error: Error) => void;
 }
 
-export interface SessionRequestHubEventPublisher {
-  publish(sessionId: string, event: HubRequestSessionEvent<QuestionRequest>): unknown;
+interface ResolvedRequest {
+  sessionId: string;
+  requestId: string;
+  expiresAt: string;
+  response: unknown;
+  respondedAt: string;
 }
 
-export interface SessionRequestHubOptions {
-  eventHub: SessionRequestHubEventPublisher;
-  timeoutMs?: number;
-}
-
+/**
+ * SessionRequestHub manages request/response events for interactive agent flows.
+ *
+ * Pattern:
+ * 1. Routes call create(sessionId, timeoutMs) to get { requestId, expiresAt, waitForResponse }
+ * 2. Routes publish hub.request event with requestId
+ * 3. UI responds via resolve endpoint
+ * 4. waitForResponse resolves with { response, respondedAt }
+ *
+ * This matches backend-bridge SessionRequestHub pattern exactly.
+ */
 export class SessionRequestHub {
-  private readonly pending = new Map<string, PendingRequest>();
-  private readonly statuses = new Map<string, SessionRequestStatus>();
-  private readonly eventHub: SessionRequestHubEventPublisher;
-  private readonly timeoutMs: number;
+  private readonly pendingBySession = new Map<string, Map<string, PendingRequest>>();
+  private readonly resolvedBySession = new Map<string, Map<string, ResolvedRequest>>();
 
-  constructor(options: SessionRequestHubOptions) {
-    this.eventHub = options.eventHub;
-    this.timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
-  }
-
-  create(sessionId: string, request: QuestionRequest): Promise<unknown> {
+  create(
+    sessionId: string,
+    timeoutMs: number,
+  ): {
+    requestId: string;
+    expiresAt: string;
+    waitForResponse: Promise<SessionRequestResolution>;
+  } {
     const requestId = randomUUID();
-    const expiresAt = new Date(Date.now() + this.timeoutMs).toISOString();
+    const expiresAt = new Date(Date.now() + timeoutMs).toISOString();
 
-    let resolvePending!: (response: unknown) => void;
+    let resolvePending!: (resolution: SessionRequestResolution) => void;
     let rejectPending!: (error: Error) => void;
 
-    const waitForResponse = new Promise<unknown>((resolve, reject) => {
+    const waitForResponse = new Promise<SessionRequestResolution>((resolve, reject) => {
       resolvePending = resolve;
       rejectPending = reject;
     });
 
     const timeoutHandle = setTimeout(() => {
-      const entry = this.pending.get(requestId);
+      const entry = this.removePending(sessionId, requestId);
       if (!entry) {
         return;
       }
 
-      this.pending.delete(requestId);
-      this.statuses.set(requestId, {
-        status: 'cancelled',
-        cancelledAt: new Date().toISOString(),
-        reason: 'timeout',
-      });
-      entry.reject(new SessionRequestTimeoutError(sessionId, requestId, this.timeoutMs));
-    }, this.timeoutMs);
+      entry.reject(new SessionRequestTimeoutError(sessionId, requestId, timeoutMs));
+    }, timeoutMs);
 
-    this.pending.set(requestId, {
+    const entry: PendingRequest = {
       sessionId,
       requestId,
+      expiresAt,
       timeoutHandle,
       resolve: resolvePending,
       reject: rejectPending,
-    });
-    this.statuses.set(requestId, { status: 'pending', expiresAt });
-
-    const event: HubRequestSessionEvent<QuestionRequest> = {
-      type: 'hub.request',
-      sessionId,
-      timestamp: new Date().toISOString(),
-      payload: {
-        requestId,
-        requestType: 'question.ask',
-        payload: request,
-        expiresAt,
-      },
     };
 
-    try {
-      this.eventHub.publish(sessionId, event);
-    } catch (error) {
-      this.pending.delete(requestId);
-      clearTimeout(timeoutHandle);
-
-      const reason = error instanceof Error ? error.message : String(error);
-      this.statuses.set(requestId, {
-        status: 'cancelled',
-        cancelledAt: new Date().toISOString(),
-        reason: `publish_failed:${reason}`,
-      });
-
-      rejectPending(new SessionRequestCancelledError(requestId, `publish_failed:${reason}`));
+    const pendingForSession = this.pendingBySession.get(sessionId);
+    if (pendingForSession) {
+      pendingForSession.set(requestId, entry);
+    } else {
+      this.pendingBySession.set(sessionId, new Map([[requestId, entry]]));
     }
 
-    return waitForResponse;
+    return {
+      requestId,
+      expiresAt,
+      waitForResponse,
+    };
   }
 
-  resolve(requestId: string, response: unknown): boolean {
-    const entry = this.pending.get(requestId);
+  resolve(
+    sessionId: string,
+    requestId: string,
+    response: unknown,
+  ): { resolved: true; respondedAt: string } | { resolved: false } {
+    const entry = this.removePending(sessionId, requestId);
     if (!entry) {
-      return false;
+      return { resolved: false };
     }
 
-    this.pending.delete(requestId);
-    clearTimeout(entry.timeoutHandle);
+    const respondedAt = new Date().toISOString();
+    entry.resolve({ response, respondedAt });
 
-    this.statuses.set(requestId, {
-      status: 'resolved',
+    // Cache the resolution for polling retrieval
+    this.storeResolved(sessionId, {
+      sessionId,
+      requestId,
+      expiresAt: entry.expiresAt,
       response,
-      respondedAt: new Date().toISOString(),
+      respondedAt,
     });
 
-    entry.resolve(response);
-    return true;
+    return {
+      resolved: true,
+      respondedAt,
+    };
   }
 
-  cancel(requestId: string): boolean {
-    const entry = this.pending.get(requestId);
-    if (!entry) {
-      return false;
+  getStatus(sessionId: string, requestId: string): SessionRequestStatus {
+    // Check pending first
+    const pending = this.pendingBySession.get(sessionId)?.get(requestId);
+    if (pending) {
+      return { status: 'pending', expiresAt: pending.expiresAt };
     }
 
-    this.pending.delete(requestId);
-    clearTimeout(entry.timeoutHandle);
+    // Check resolved cache
+    const resolved = this.resolvedBySession.get(sessionId)?.get(requestId);
+    if (resolved) {
+      return {
+        status: 'resolved',
+        expiresAt: resolved.expiresAt,
+        response: resolved.response,
+        respondedAt: resolved.respondedAt,
+      };
+    }
 
-    this.statuses.set(requestId, {
-      status: 'cancelled',
-      cancelledAt: new Date().toISOString(),
-      reason: 'cancelled',
-    });
-
-    entry.reject(new SessionRequestCancelledError(requestId, 'cancelled'));
-    return true;
+    return { status: 'expired' };
   }
 
-  getStatus(requestId: string): SessionRequestStatus | undefined {
-    return this.statuses.get(requestId);
+  /**
+   * Cancel all pending requests for a session.
+   * Used during session cleanup.
+   */
+  cancelSession(sessionId: string): void {
+    const pendingMap = this.pendingBySession.get(sessionId);
+    if (!pendingMap) {
+      return;
+    }
+
+    for (const [requestId, entry] of pendingMap.entries()) {
+      clearTimeout(entry.timeoutHandle);
+      entry.reject(new SessionRequestCancelledError(sessionId, requestId, 'session_closed'));
+    }
+
+    this.pendingBySession.delete(sessionId);
+    this.resolvedBySession.delete(sessionId);
+  }
+
+  private removePending(sessionId: string, requestId: string): PendingRequest | undefined {
+    const pendingMap = this.pendingBySession.get(sessionId);
+    if (!pendingMap) {
+      return undefined;
+    }
+
+    const entry = pendingMap.get(requestId);
+    if (!entry) {
+      return undefined;
+    }
+
+    clearTimeout(entry.timeoutHandle);
+    pendingMap.delete(requestId);
+
+    if (pendingMap.size === 0) {
+      this.pendingBySession.delete(sessionId);
+    }
+
+    return entry;
+  }
+
+  private storeResolved(sessionId: string, resolved: ResolvedRequest): void {
+    const resolvedMap = this.resolvedBySession.get(sessionId);
+    if (resolvedMap) {
+      resolvedMap.set(resolved.requestId, resolved);
+    } else {
+      this.resolvedBySession.set(sessionId, new Map([[resolved.requestId, resolved]]));
+    }
   }
 }

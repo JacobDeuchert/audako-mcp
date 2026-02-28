@@ -5,6 +5,7 @@
  * copilot holds context in-memory and updates it directly when UI pushes location changes.
  */
 export class SessionContext {
+    sessionId;
     tenantId;
     groupId;
     entityType;
@@ -12,6 +13,7 @@ export class SessionContext {
     scadaUrl;
     accessToken;
     constructor(fields) {
+        this.sessionId = fields.sessionId;
         this.tenantId = fields.tenantId;
         this.groupId = fields.groupId;
         this.entityType = fields.entityType;
@@ -43,6 +45,9 @@ export class SessionContext {
             this.accessToken = fields.accessToken;
         }
     }
+    getSessionId() {
+        return this.sessionId;
+    }
     getTenantId() {
         return this.tenantId;
     }
@@ -66,6 +71,7 @@ export class SessionContext {
      */
     getSnapshot() {
         return {
+            sessionId: this.sessionId,
             tenantId: this.tenantId,
             groupId: this.groupId,
             entityType: this.entityType,

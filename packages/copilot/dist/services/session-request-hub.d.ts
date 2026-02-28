@@ -1,4 +1,7 @@
-import type { HubRequestSessionEvent, QuestionRequest } from '@audako/contracts';
+export interface SessionRequestResolution {
+    response: unknown;
+    respondedAt: string;
+}
 export type SessionRequestStatus = {
     status: 'pending';
     expiresAt: string;
@@ -6,10 +9,9 @@ export type SessionRequestStatus = {
     status: 'resolved';
     response: unknown;
     respondedAt: string;
+    expiresAt: string;
 } | {
-    status: 'cancelled';
-    cancelledAt: string;
-    reason: string;
+    status: 'expired';
 };
 export declare class SessionRequestTimeoutError extends Error {
     readonly requestId: string;
@@ -18,25 +20,42 @@ export declare class SessionRequestTimeoutError extends Error {
 }
 export declare class SessionRequestCancelledError extends Error {
     readonly requestId: string;
+    readonly sessionId: string;
     readonly reason: string;
-    constructor(requestId: string, reason: string);
+    constructor(sessionId: string, requestId: string, reason: string);
 }
-export interface SessionRequestHubEventPublisher {
-    publish(sessionId: string, event: HubRequestSessionEvent<QuestionRequest>): unknown;
-}
-export interface SessionRequestHubOptions {
-    eventHub: SessionRequestHubEventPublisher;
-    timeoutMs?: number;
-}
+/**
+ * SessionRequestHub manages request/response events for interactive agent flows.
+ *
+ * Pattern:
+ * 1. Routes call create(sessionId, timeoutMs) to get { requestId, expiresAt, waitForResponse }
+ * 2. Routes publish hub.request event with requestId
+ * 3. UI responds via resolve endpoint
+ * 4. waitForResponse resolves with { response, respondedAt }
+ *
+ * This matches backend-bridge SessionRequestHub pattern exactly.
+ */
 export declare class SessionRequestHub {
-    private readonly pending;
-    private readonly statuses;
-    private readonly eventHub;
-    private readonly timeoutMs;
-    constructor(options: SessionRequestHubOptions);
-    create(sessionId: string, request: QuestionRequest): Promise<unknown>;
-    resolve(requestId: string, response: unknown): boolean;
-    cancel(requestId: string): boolean;
-    getStatus(requestId: string): SessionRequestStatus | undefined;
+    private readonly pendingBySession;
+    private readonly resolvedBySession;
+    create(sessionId: string, timeoutMs: number): {
+        requestId: string;
+        expiresAt: string;
+        waitForResponse: Promise<SessionRequestResolution>;
+    };
+    resolve(sessionId: string, requestId: string, response: unknown): {
+        resolved: true;
+        respondedAt: string;
+    } | {
+        resolved: false;
+    };
+    getStatus(sessionId: string, requestId: string): SessionRequestStatus;
+    /**
+     * Cancel all pending requests for a session.
+     * Used during session cleanup.
+     */
+    cancelSession(sessionId: string): void;
+    private removePending;
+    private storeResolved;
 }
 //# sourceMappingURL=session-request-hub.d.ts.map

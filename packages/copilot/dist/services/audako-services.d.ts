@@ -4,6 +4,13 @@ export interface AudakoServices {
     accessToken: string;
     tenantService: TenantHttpService;
     entityService: EntityHttpService;
+    entityData: DataSourceHttpService;
+    group: {
+        moveEntity(entityType: string, entityId: string, targetGroupId: string): Promise<{
+            fromGroupId?: string;
+            toGroupId?: string;
+        }>;
+    };
     dataSourceService: DataSourceHttpService;
 }
 /**

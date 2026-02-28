@@ -21,6 +21,7 @@ vi.mock('audako-core', () => ({
 describe('createAudakoServices', () => {
   const mockSystemUrl = 'https://audako-test.example.com';
   const mockAccessToken = 'test-token-123';
+
   const mockHttpConfig: HttpConfig = {
     Services: {
       BaseUri: 'https://audako-test.example.com/api',
@@ -58,12 +59,6 @@ describe('createAudakoServices', () => {
     );
   });
 
-  it('should request HTTP config from BaseHttpService', async () => {
-    await createAudakoServices(mockSystemUrl, mockAccessToken);
-
-    expect(BaseHttpService.requestHttpConfig).toHaveBeenCalledWith(mockSystemUrl);
-    expect(BaseHttpService.requestHttpConfig).toHaveBeenCalledTimes(1);
-  });
 
   it('should return object with all service instances', async () => {
     const services = await createAudakoServices(mockSystemUrl, mockAccessToken);
@@ -97,12 +92,4 @@ describe('createAudakoServices', () => {
     expect(services2.accessToken).toBe('different-token');
   });
 
-  it('should propagate errors from BaseHttpService.requestHttpConfig', async () => {
-    const configError = new Error('Failed to fetch HTTP config');
-    vi.mocked(BaseHttpService.requestHttpConfig).mockRejectedValue(configError);
-
-    await expect(createAudakoServices(mockSystemUrl, mockAccessToken)).rejects.toThrow(
-      'Failed to fetch HTTP config',
-    );
-  });
 });

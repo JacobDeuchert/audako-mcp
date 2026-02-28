@@ -1,30 +1,9 @@
-import type { HubRequestSessionEvent, QuestionRequest } from '@audako/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SessionRequestCancelledError,
   SessionRequestHub,
   SessionRequestTimeoutError,
 } from '../session-request-hub.js';
-
-const TEST_REQUEST: QuestionRequest = {
-  text: 'Choose one option',
-  header: 'Question',
-  options: [
-    { label: 'Option A', description: 'First option' },
-    { label: 'Option B', description: 'Second option' },
-  ],
-};
-
-function extractRequestId(
-  publishMock: ReturnType<typeof vi.fn<[string, HubRequestSessionEvent<QuestionRequest>], number>>,
-): string {
-  const event = publishMock.mock.calls[0]?.[1];
-  if (!event) {
-    throw new Error('Expected publish to be called');
-  }
-
-  return event.payload.requestId;
-}
 
 describe('SessionRequestHub', () => {
   beforeEach(() => {
@@ -36,120 +15,159 @@ describe('SessionRequestHub', () => {
     vi.useRealTimers();
   });
 
-  it('resolves create() promise when resolve() is called for matching requestId', async () => {
-    const publish = vi.fn<[string, HubRequestSessionEvent<QuestionRequest>], number>(() => 1);
-    const hub = new SessionRequestHub({ eventHub: { publish }, timeoutMs: 1000 });
+  it('resolves waitForResponse when resolve() is called with matching requestId', async () => {
+    const hub = new SessionRequestHub();
 
-    const responsePromise = hub.create('session-1', TEST_REQUEST);
-    const requestId = extractRequestId(publish);
+    const pendingRequest = hub.create('session-1', 1000);
+    const resolveResult = hub.resolve('session-1', pendingRequest.requestId, {
+      choice: 'Option A',
+    });
 
-    const resolved = hub.resolve(requestId, { choice: 'Option A' });
+    expect(resolveResult.resolved).toBe(true);
+    if (!resolveResult.resolved) throw new Error('Expected resolved');
+    expect(resolveResult.respondedAt).toBeDefined();
 
-    expect(resolved).toBe(true);
-    await expect(responsePromise).resolves.toEqual({ choice: 'Option A' });
+    await expect(pendingRequest.waitForResponse).resolves.toEqual({
+      response: { choice: 'Option A' },
+      respondedAt: resolveResult.respondedAt,
+    });
   });
 
   it('rejects with timeout error when no response arrives in time', async () => {
-    const publish = vi.fn<[string, HubRequestSessionEvent<QuestionRequest>], number>(() => 1);
-    const hub = new SessionRequestHub({ eventHub: { publish }, timeoutMs: 50 });
+    const hub = new SessionRequestHub();
 
-    const responsePromise = hub.create('session-timeout', TEST_REQUEST);
-    const requestId = extractRequestId(publish);
-    const timeoutRejection = expect(responsePromise).rejects.toBeInstanceOf(
+    const pendingRequest = hub.create('session-timeout', 50);
+    const timeoutRejection = expect(pendingRequest.waitForResponse).rejects.toBeInstanceOf(
       SessionRequestTimeoutError,
     );
 
     await vi.advanceTimersByTimeAsync(60);
     await timeoutRejection;
 
-    const status = hub.getStatus(requestId);
-    expect(status).toMatchObject({ status: 'cancelled', reason: 'timeout' });
+    const status = hub.getStatus('session-timeout', pendingRequest.requestId);
+    expect(status).toEqual({ status: 'expired' });
   });
 
-  it('cancel() rejects pending promise with cancellation error', async () => {
-    const publish = vi.fn<[string, HubRequestSessionEvent<QuestionRequest>], number>(() => 1);
-    const hub = new SessionRequestHub({ eventHub: { publish }, timeoutMs: 1000 });
+  it('cancelSession() rejects all pending promises for that session', async () => {
+    const hub = new SessionRequestHub();
 
-    const responsePromise = hub.create('session-cancel', TEST_REQUEST);
-    const requestId = extractRequestId(publish);
-    const cancellationRejection = expect(responsePromise).rejects.toBeInstanceOf(
+    const pendingRequest1 = hub.create('session-cancel', 1000);
+    const pendingRequest2 = hub.create('session-cancel', 1000);
+    const cancellationRejection1 = expect(pendingRequest1.waitForResponse).rejects.toBeInstanceOf(
+      SessionRequestCancelledError,
+    );
+    const cancellationRejection2 = expect(pendingRequest2.waitForResponse).rejects.toBeInstanceOf(
       SessionRequestCancelledError,
     );
 
-    const cancelled = hub.cancel(requestId);
+    hub.cancelSession('session-cancel');
 
-    expect(cancelled).toBe(true);
-    await cancellationRejection;
-    expect(hub.getStatus(requestId)).toMatchObject({ status: 'cancelled', reason: 'cancelled' });
+    await cancellationRejection1;
+    await cancellationRejection2;
+
+    expect(hub.getStatus('session-cancel', pendingRequest1.requestId)).toEqual({
+      status: 'expired',
+    });
+    expect(hub.getStatus('session-cancel', pendingRequest2.requestId)).toEqual({
+      status: 'expired',
+    });
   });
 
   it('getStatus() tracks pending then resolved lifecycle', async () => {
-    const publish = vi.fn<[string, HubRequestSessionEvent<QuestionRequest>], number>(() => 1);
-    const hub = new SessionRequestHub({ eventHub: { publish }, timeoutMs: 1000 });
+    const hub = new SessionRequestHub();
 
-    const responsePromise = hub.create('session-status', TEST_REQUEST);
-    const requestId = extractRequestId(publish);
+    const pendingRequest = hub.create('session-status', 1000);
 
-    const pendingStatus = hub.getStatus(requestId);
+    const pendingStatus = hub.getStatus('session-status', pendingRequest.requestId);
     expect(pendingStatus?.status).toBe('pending');
+    expect(pendingStatus).toHaveProperty('expiresAt');
 
-    hub.resolve(requestId, 'done');
-    await expect(responsePromise).resolves.toBe('done');
+    const resolveResult = hub.resolve('session-status', pendingRequest.requestId, 'done');
+    expect(resolveResult.resolved).toBe(true);
+    if (!resolveResult.resolved) throw new Error('Expected resolved');
 
-    const resolvedStatus = hub.getStatus(requestId);
-    expect(resolvedStatus).toMatchObject({ status: 'resolved', response: 'done' });
-  });
+    const resolution = await pendingRequest.waitForResponse;
+    expect(resolution.response).toBe('done');
 
-  it('handles concurrent requests without cross-resolution', async () => {
-    const publish = vi.fn<[string, HubRequestSessionEvent<QuestionRequest>], number>(() => 1);
-    const hub = new SessionRequestHub({ eventHub: { publish }, timeoutMs: 1000 });
-
-    const p1 = hub.create('session-1', TEST_REQUEST);
-    const id1 = extractRequestId(publish);
-
-    const p2 = hub.create('session-1', {
-      ...TEST_REQUEST,
-      text: 'Second question',
+    const resolvedStatus = hub.getStatus('session-status', pendingRequest.requestId);
+    expect(resolvedStatus).toMatchObject({
+      status: 'resolved',
+      response: 'done',
+      respondedAt: resolveResult.respondedAt,
     });
-    const id2 = publish.mock.calls[1]?.[1].payload.requestId;
-
-    expect(id2).toBeDefined();
-    expect(id2).not.toBe(id1);
-
-    hub.resolve(id2 as string, { answer: 2 });
-    hub.resolve(id1, { answer: 1 });
-
-    await expect(p1).resolves.toEqual({ answer: 1 });
-    await expect(p2).resolves.toEqual({ answer: 2 });
   });
 
-  it('publishes hub.request event on create()', () => {
-    const publish = vi.fn<[string, HubRequestSessionEvent<QuestionRequest>], number>(() => 1);
-    const hub = new SessionRequestHub({ eventHub: { publish }, timeoutMs: 1000 });
-
-    void hub.create('session-event', TEST_REQUEST);
-
-    expect(publish).toHaveBeenCalledTimes(1);
-    const [sessionId, event] = publish.mock.calls[0] as [
-      string,
-      HubRequestSessionEvent<QuestionRequest>,
-    ];
-
-    expect(sessionId).toBe('session-event');
-    expect(event.type).toBe('hub.request');
-    expect(event.sessionId).toBe('session-event');
-    expect(event.payload.requestType).toBe('question.ask');
-    expect(event.payload.payload).toEqual(TEST_REQUEST);
-    expect(typeof event.payload.requestId).toBe('string');
-    expect(typeof event.payload.expiresAt).toBe('string');
+  it('getStatus() returns expired for unknown requestId', () => {
+    const hub = new SessionRequestHub();
+    expect(hub.getStatus('session-unknown', 'request-unknown')).toEqual({ status: 'expired' });
   });
 
-  it('returns false when resolve() or cancel() is called for unknown request id', () => {
-    const publish = vi.fn<[string, HubRequestSessionEvent<QuestionRequest>], number>(() => 1);
-    const hub = new SessionRequestHub({ eventHub: { publish } });
+  it('resolve() returns { resolved: false } for unknown requestId', () => {
+    const hub = new SessionRequestHub();
+    const result = hub.resolve('session-unknown', 'request-unknown', 'irrelevant');
+    expect(result).toEqual({ resolved: false });
+  });
 
-    expect(hub.resolve('missing', 'ignored')).toBe(false);
-    expect(hub.cancel('missing')).toBe(false);
-    expect(hub.getStatus('missing')).toBeUndefined();
+  it('multiple sessions can have pending requests simultaneously', async () => {
+    const hub = new SessionRequestHub();
+
+    const pending1 = hub.create('session-A', 1000);
+    const pending2 = hub.create('session-B', 1000);
+
+    const result1 = hub.resolve('session-A', pending1.requestId, 'answer-A');
+    const result2 = hub.resolve('session-B', pending2.requestId, 'answer-B');
+
+    expect(result1.resolved).toBe(true);
+    expect(result2.resolved).toBe(true);
+
+    const resolution1 = await pending1.waitForResponse;
+    const resolution2 = await pending2.waitForResponse;
+
+    expect(resolution1.response).toBe('answer-A');
+    expect(resolution2.response).toBe('answer-B');
+  });
+
+  it('creates unique requestId for each call', () => {
+    const hub = new SessionRequestHub();
+
+    const pending1 = hub.create('session-1', 1000);
+    const pending2 = hub.create('session-1', 1000);
+
+    expect(pending1.requestId).not.toBe(pending2.requestId);
+  });
+
+  it('includes expiresAt timestamp in return value', () => {
+    const hub = new SessionRequestHub();
+    const before = Date.now();
+    const pending = hub.create('session-1', 1000);
+    const after = Date.now() + 1000;
+
+    const expiresMs = new Date(pending.expiresAt).getTime();
+    expect(expiresMs).toBeGreaterThanOrEqual(before + 1000);
+    expect(expiresMs).toBeLessThanOrEqual(after + 100); // allow 100ms tolerance
+  });
+
+  it('cancelSession() does not affect other sessions', async () => {
+    const hub = new SessionRequestHub();
+
+    const pendingA = hub.create('session-A', 1000);
+    const pendingB = hub.create('session-B', 1000);
+
+    const cancellationA = expect(pendingA.waitForResponse).rejects.toBeInstanceOf(
+      SessionRequestCancelledError,
+    );
+
+    hub.cancelSession('session-A');
+
+    await cancellationA;
+
+    // Session B should still be pending
+    const statusB = hub.getStatus('session-B', pendingB.requestId);
+    expect(statusB?.status).toBe('pending');
+
+    // And can still be resolved
+    const resolveResult = hub.resolve('session-B', pendingB.requestId, 'B-response');
+    expect(resolveResult.resolved).toBe(true);
+    await expect(pendingB.waitForResponse).resolves.toMatchObject({ response: 'B-response' });
   });
 });

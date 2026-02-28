@@ -1,0 +1,1 @@
+{"version":3,"file":"get-entity-definition.d.ts","sourceRoot":"","sources":["../../src/tools/get-entity-definition.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,6BAA6B,CAAC;AAM7D,OAAO,EAAE,yBAAyB,EAAE,MAAM,cAAc,CAAC;AAEzD,KAAK,WAAW,CAAC,CAAC,IAAI,CAAC,GAAG,GAAG,CAAC;AAE9B,eAAO,MAAM,uBAAuB,EAAE,SAAS,CAAC,WAAW,CAAC,OAAO,yBAAyB,CAAC,CAiB5F,CAAC"}

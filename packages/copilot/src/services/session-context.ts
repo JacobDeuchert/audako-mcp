@@ -6,6 +6,7 @@
  */
 
 export interface SessionContextFields {
+  sessionId: string;
   tenantId?: string;
   groupId?: string;
   entityType?: string;
@@ -15,6 +16,7 @@ export interface SessionContextFields {
 }
 
 export class SessionContext {
+  private sessionId: string;
   private tenantId?: string;
   private groupId?: string;
   private entityType?: string;
@@ -23,6 +25,7 @@ export class SessionContext {
   private accessToken: string;
 
   constructor(fields: SessionContextFields) {
+    this.sessionId = fields.sessionId;
     this.tenantId = fields.tenantId;
     this.groupId = fields.groupId;
     this.entityType = fields.entityType;
@@ -56,6 +59,11 @@ export class SessionContext {
     }
   }
 
+
+  public getSessionId(): string {
+    return this.sessionId;
+  }
+
   public getTenantId(): string | undefined {
     return this.tenantId;
   }
@@ -85,6 +93,7 @@ export class SessionContext {
    */
   public getSnapshot(): SessionContextFields {
     return {
+      sessionId: this.sessionId,
       tenantId: this.tenantId,
       groupId: this.groupId,
       entityType: this.entityType,

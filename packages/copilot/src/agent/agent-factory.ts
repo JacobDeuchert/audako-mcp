@@ -4,6 +4,7 @@ import { MutationPermissions } from '../services/mutation-permissions.js';
 import { createMutationThrottle } from '../services/mutation-throttle.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
 import type { SessionRequestHub } from '../services/session-request-hub.js';
+import type { ToolRequestHub } from '../services/tool-request-hub.js';
 import { createAskQuestionTool } from '../tools/ask-question.js';
 import { createMutationTools } from '../tools/mutation-tools.js';
 import { createReadOnlyTools } from '../tools/read-only-tools.js';
@@ -55,7 +56,7 @@ export interface CreateSessionAgentConfig {
   sessionContext: SessionContextLike;
   audakoServices: AudakoServicesLike;
   eventHub: SessionEventHub;
-  requestHub: SessionRequestHub;
+  requestHub: ToolRequestHub;
   systemPrompt: string;
   modelConfig: ModelConfig;
 }

@@ -12,19 +12,21 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@audako/contracts": "^0.1.0",
+    "@fastify/cors": "^8.4.0",
+    "@fastify/websocket": "^8.3.1",
     "@mariozechner/pi-agent-core": "^0.55.3",
     "@mariozechner/pi-ai": "^0.55.3",
     "@sinclair/typebox": "^0.32.0",
-    "@fastify/cors": "^8.4.0",
-    "@fastify/websocket": "^8.3.1",
-    "@audako/contracts": "^0.1.0",
     "audako-core": "github:JacobDeuchert/audako-core",
-    "fastify": "^4.25.0"
+    "dotenv": "^17.3.1",
+    "fastify": "^4.25.0",
+    "pino": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.0.0",
-    "vitest": "^1.0.0",
-    "tsx": "^4.7.0"
+    "vitest": "^1.0.0"
   }
 }

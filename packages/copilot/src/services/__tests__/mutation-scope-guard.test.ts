@@ -5,10 +5,11 @@ import { SessionContext } from '../session-context.js';
 describe('evaluateMutationScope', () => {
   it('allows mutations when target group is inside session context group', async () => {
     const sessionContext = new SessionContext({
-      groupId: 'group-A',
-      scadaUrl: 'https://scada.example.com',
-      accessToken: 'token-1',
-    });
+        sessionId: 'test-session-id',
+        groupId: 'group-A',
+        scadaUrl: 'https://scada.example.com',
+        accessToken: 'token-1',
+      });
 
     const entityService: MutationScopeEntityService = {
       getPartialEntityById: vi.fn().mockResolvedValue({
@@ -35,10 +36,11 @@ describe('evaluateMutationScope', () => {
 
   it('rejects mutations when target group is outside session context group', async () => {
     const sessionContext = new SessionContext({
-      groupId: 'group-A',
-      scadaUrl: 'https://scada.example.com',
-      accessToken: 'token-2',
-    });
+        sessionId: 'test-session-id',
+        groupId: 'group-A',
+        scadaUrl: 'https://scada.example.com',
+        accessToken: 'token-2',
+      });
 
     const entityService: MutationScopeEntityService = {
       getPartialEntityById: vi.fn().mockResolvedValue({

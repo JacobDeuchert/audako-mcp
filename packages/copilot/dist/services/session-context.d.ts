@@ -5,6 +5,7 @@
  * copilot holds context in-memory and updates it directly when UI pushes location changes.
  */
 export interface SessionContextFields {
+    sessionId: string;
     tenantId?: string;
     groupId?: string;
     entityType?: string;
@@ -13,6 +14,7 @@ export interface SessionContextFields {
     accessToken: string;
 }
 export declare class SessionContext {
+    private sessionId;
     private tenantId?;
     private groupId?;
     private entityType?;
@@ -25,6 +27,7 @@ export declare class SessionContext {
      * Only provided fields are updated; others remain unchanged.
      */
     update(fields: Partial<SessionContextFields>): void;
+    getSessionId(): string;
     getTenantId(): string | undefined;
     getGroupId(): string | undefined;
     getEntityType(): string | undefined;

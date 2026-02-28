@@ -1,0 +1,1 @@
+{"version":3,"file":"read-only-tools.d.ts","sourceRoot":"","sources":["../../src/tools/read-only-tools.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,6BAA6B,CAAC;AAC7D,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,gCAAgC,CAAC;AACrE,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,gCAAgC,CAAC;AAQrE,wBAAgB,mBAAmB,CACjC,cAAc,EAAE,cAAc,EAC9B,cAAc,EAAE,cAAc,GAC7B,SAAS,CAAC,GAAG,CAAC,EAAE,CASlB"}

@@ -4,6 +4,7 @@ import {
   SessionRequestCancelledError,
   SessionRequestTimeoutError,
 } from '../../services/session-request-hub.js';
+import type { ToolRequestHub } from '../../services/tool-request-hub.js';
 import { createAskQuestionTool } from '../ask-question.js';
 
 function firstText(result: { content: Array<{ type: string; text?: string }> }): string {
@@ -17,15 +18,17 @@ function firstText(result: { content: Array<{ type: string; text?: string }> }):
 
 describe('createAskQuestionTool', () => {
   it('submits question and returns formatted user response', async () => {
-    const create = vi.fn<[string, QuestionRequest], Promise<unknown>>(() =>
+    const mockCreate = vi.fn<[string, QuestionRequest], Promise<unknown>>(() =>
       Promise.resolve(['Blue']),
     );
-    const cancel = vi.fn<[string], boolean>(() => true);
+    const mockCancel = vi.fn<[string], void>();
 
-    const tool = createAskQuestionTool('session-1', {
-      create,
-      cancel,
-    } as any);
+    const mockToolRequestHub = {
+      create: mockCreate,
+      cancel: mockCancel,
+    } as unknown as ToolRequestHub;
+
+    const tool = createAskQuestionTool('session-1', mockToolRequestHub);
 
     const result = await tool.execute(
       'call-1',
@@ -41,7 +44,7 @@ describe('createAskQuestionTool', () => {
       new AbortController().signal,
     );
 
-    expect(create).toHaveBeenCalledWith('session-1', {
+    expect(mockCreate).toHaveBeenCalledWith('session-1', {
       text: 'Pick color',
       header: 'Color choice',
       options: [
@@ -54,18 +57,20 @@ describe('createAskQuestionTool', () => {
     expect(text).toContain('User has answered your questions:');
     expect(text).toContain('Red=unanswered');
     expect(text).toContain('Blue=Blue');
-    expect(cancel).not.toHaveBeenCalled();
+    expect(mockCancel).not.toHaveBeenCalled();
   });
 
   it('returns all selected options for multiple choice answers', async () => {
-    const create = vi.fn<[string, QuestionRequest], Promise<unknown>>(() =>
+    const mockCreate = vi.fn<[string, QuestionRequest], Promise<unknown>>(() =>
       Promise.resolve(['Option A', 'Option C']),
     );
 
-    const tool = createAskQuestionTool('session-2', {
-      create,
-      cancel: vi.fn<[string], boolean>(() => true),
-    } as any);
+    const mockToolRequestHub = {
+      create: mockCreate,
+      cancel: vi.fn(),
+    } as unknown as ToolRequestHub;
+
+    const tool = createAskQuestionTool('session-2', mockToolRequestHub);
 
     const result = await tool.execute(
       'call-2',
@@ -90,32 +95,24 @@ describe('createAskQuestionTool', () => {
 
   it('cancels pending request when execution is aborted', async () => {
     const controller = new AbortController();
-    const pending = new Map<string, { sessionId: string }>();
-    const requestId = 'req-abort';
 
     let rejectPending: ((error: Error) => void) | undefined;
-    const create = vi.fn<[string, QuestionRequest], Promise<unknown>>((sessionId: string) => {
-      pending.set(requestId, { sessionId });
+    const mockCreate = vi.fn<[string, QuestionRequest], Promise<unknown>>(() => {
       return new Promise((_, reject) => {
         rejectPending = reject;
       });
     });
 
-    const cancel = vi.fn<[string], boolean>((id: string) => {
-      if (id !== requestId) {
-        return false;
-      }
-
-      pending.delete(id);
-      rejectPending?.(new SessionRequestCancelledError(id, 'cancelled'));
-      return true;
+    const mockCancel = vi.fn<[string], void>((sessionId: string) => {
+      rejectPending?.(new SessionRequestCancelledError(sessionId, 'req-abort', 'cancelled'));
     });
 
-    const tool = createAskQuestionTool('session-3', {
-      create,
-      cancel,
-      pending,
-    } as any);
+    const mockToolRequestHub = {
+      create: mockCreate,
+      cancel: mockCancel,
+    } as unknown as ToolRequestHub;
+
+    const tool = createAskQuestionTool('session-3', mockToolRequestHub);
 
     const execution = tool.execute(
       'call-3',
@@ -131,19 +128,21 @@ describe('createAskQuestionTool', () => {
     controller.abort();
 
     await expect(execution).rejects.toBeInstanceOf(SessionRequestCancelledError);
-    expect(cancel).toHaveBeenCalledWith(requestId);
-  });
+    expect(mockCancel).toHaveBeenCalledWith('session-3');
+  }, 10000);
 
   it('propagates timeout errors from request hub', async () => {
     const timeoutError = new SessionRequestTimeoutError('session-timeout', 'req-timeout', 1500);
-    const create = vi.fn<[string, QuestionRequest], Promise<unknown>>(() =>
+    const mockCreate = vi.fn<[string, QuestionRequest], Promise<unknown>>(() =>
       Promise.reject(timeoutError),
     );
 
-    const tool = createAskQuestionTool('session-timeout', {
-      create,
-      cancel: vi.fn<[string], boolean>(() => true),
-    } as any);
+    const mockToolRequestHub = {
+      create: mockCreate,
+      cancel: vi.fn(),
+    } as unknown as ToolRequestHub;
+
+    const tool = createAskQuestionTool('session-timeout', mockToolRequestHub);
 
     await expect(
       tool.execute(

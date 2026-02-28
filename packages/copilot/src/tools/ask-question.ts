@@ -1,6 +1,6 @@
 import type { QuestionOption, QuestionRequest } from '@audako/contracts';
 import type { AgentTool } from '@mariozechner/pi-agent-core';
-import type { SessionRequestHub } from '../services/session-request-hub.js';
+import type { ToolRequestHub } from '../services/tool-request-hub.js';
 import { toTextResponse } from './helpers.js';
 import { askQuestionSchema } from './schemas.js';
 
@@ -66,32 +66,10 @@ function toSelectedLabels(response: unknown): string[] {
   return selected;
 }
 
-function getPendingRequestId(
-  sessionRequestHub: SessionRequestHub,
-  previousPending: Set<string>,
-  sessionId: string,
-): string | undefined {
-  const pending = (sessionRequestHub as unknown as InternalSessionRequestHub).pending;
-  if (!pending) {
-    return undefined;
-  }
-
-  for (const [requestId, request] of pending.entries()) {
-    if (previousPending.has(requestId)) {
-      continue;
-    }
-
-    if (request.sessionId === sessionId) {
-      return requestId;
-    }
-  }
-
-  return undefined;
-}
 
 export function createAskQuestionTool(
   sessionId: string,
-  sessionRequestHub: SessionRequestHub,
+  sessionRequestHub: ToolRequestHub,
 ): AgentTool<AgentSchema<typeof askQuestionSchema>> {
   return {
     name: 'audako_mcp_ask_question',
@@ -119,18 +97,10 @@ export function createAskQuestionTool(
         allowMultiple,
       };
 
-      const previousPending = new Set(
-        ((sessionRequestHub as unknown as InternalSessionRequestHub).pending?.keys() ??
-          []) as Iterable<string>,
-      );
-
       const responsePromise = sessionRequestHub.create(sessionId, questionRequest);
-      const requestId = getPendingRequestId(sessionRequestHub, previousPending, sessionId);
 
       const abortHandler = () => {
-        if (requestId) {
-          sessionRequestHub.cancel(requestId);
-        }
+        sessionRequestHub.cancel(sessionId);
       };
 
       signal?.addEventListener('abort', abortHandler);

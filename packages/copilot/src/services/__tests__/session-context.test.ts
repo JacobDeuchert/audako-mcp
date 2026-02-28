@@ -5,13 +5,14 @@ describe('SessionContext', () => {
   describe('creation and field access', () => {
     it('should create a context with all fields and return them via getters', () => {
       const context = new SessionContext({
-        tenantId: 'tenant-123',
-        groupId: 'group-456',
-        entityType: 'Signal',
-        app: 'production-monitor',
-        scadaUrl: 'https://scada.example.com',
-        accessToken: 'token-abc-xyz',
-      });
+          sessionId: 'test-session-id',
+          tenantId: 'tenant-123',
+          groupId: 'group-456',
+          entityType: 'Signal',
+          app: 'production-monitor',
+          scadaUrl: 'https://scada.example.com',
+          accessToken: 'token-abc-xyz',
+        });
 
       expect(context.getTenantId()).toBe('tenant-123');
       expect(context.getGroupId()).toBe('group-456');
@@ -23,9 +24,10 @@ describe('SessionContext', () => {
 
     it('should create a context with only required fields (scadaUrl and accessToken)', () => {
       const context = new SessionContext({
-        scadaUrl: 'https://scada.example.com',
-        accessToken: 'token-123',
-      });
+          sessionId: 'test-session-id',
+          scadaUrl: 'https://scada.example.com',
+          accessToken: 'token-123',
+        });
 
       expect(context.getTenantId()).toBeUndefined();
       expect(context.getGroupId()).toBeUndefined();
@@ -37,15 +39,17 @@ describe('SessionContext', () => {
 
     it('should return a snapshot of all fields', () => {
       const context = new SessionContext({
-        tenantId: 'tenant-999',
-        groupId: 'group-111',
-        scadaUrl: 'https://api.scada.dev',
-        accessToken: 'secret-token',
-      });
+          sessionId: 'test-session-id',
+          tenantId: 'tenant-999',
+          groupId: 'group-111',
+          scadaUrl: 'https://api.scada.dev',
+          accessToken: 'secret-token',
+        });
 
       const snapshot = context.getSnapshot();
 
       expect(snapshot).toEqual({
+        sessionId: 'test-session-id',
         tenantId: 'tenant-999',
         groupId: 'group-111',
         entityType: undefined,
@@ -59,13 +63,14 @@ describe('SessionContext', () => {
   describe('update method', () => {
     it('should update specific fields while leaving others unchanged', () => {
       const context = new SessionContext({
-        tenantId: 'tenant-original',
-        groupId: 'group-original',
-        entityType: 'Signal',
-        app: 'old-app',
-        scadaUrl: 'https://scada.example.com',
-        accessToken: 'token-original',
-      });
+          sessionId: 'test-session-id',
+          tenantId: 'tenant-original',
+          groupId: 'group-original',
+          entityType: 'Signal',
+          app: 'old-app',
+          scadaUrl: 'https://scada.example.com',
+          accessToken: 'token-original',
+        });
 
       context.update({
         groupId: 'group-updated',
@@ -82,9 +87,10 @@ describe('SessionContext', () => {
 
     it('should handle multiple successive updates correctly', () => {
       const context = new SessionContext({
-        scadaUrl: 'https://scada.example.com',
-        accessToken: 'token-1',
-      });
+          sessionId: 'test-session-id',
+          scadaUrl: 'https://scada.example.com',
+          accessToken: 'token-1',
+        });
 
       context.update({ tenantId: 'tenant-first' });
       expect(context.getTenantId()).toBe('tenant-first');
@@ -101,10 +107,11 @@ describe('SessionContext', () => {
 
     it('should update scadaUrl and accessToken if provided', () => {
       const context = new SessionContext({
-        tenantId: 'tenant-123',
-        scadaUrl: 'https://old-url.com',
-        accessToken: 'old-token',
-      });
+          sessionId: 'test-session-id',
+          tenantId: 'tenant-123',
+          scadaUrl: 'https://old-url.com',
+          accessToken: 'old-token',
+        });
 
       context.update({
         scadaUrl: 'https://new-url.com',
@@ -118,11 +125,12 @@ describe('SessionContext', () => {
 
     it('should allow updating fields to undefined (clearing context)', () => {
       const context = new SessionContext({
-        tenantId: 'tenant-123',
-        groupId: 'group-456',
-        scadaUrl: 'https://scada.example.com',
-        accessToken: 'token-abc',
-      });
+          sessionId: 'test-session-id',
+          tenantId: 'tenant-123',
+          groupId: 'group-456',
+          scadaUrl: 'https://scada.example.com',
+          accessToken: 'token-abc',
+        });
 
       context.update({
         tenantId: undefined,
@@ -139,18 +147,20 @@ describe('SessionContext', () => {
   describe('instance isolation', () => {
     it('should maintain independent context per instance (no cross-contamination)', () => {
       const context1 = new SessionContext({
-        tenantId: 'tenant-A',
-        groupId: 'group-A',
-        scadaUrl: 'https://scada-a.example.com',
-        accessToken: 'token-A',
-      });
+          sessionId: 'test-session-id',
+          tenantId: 'tenant-A',
+          groupId: 'group-A',
+          scadaUrl: 'https://scada-a.example.com',
+          accessToken: 'token-A',
+        });
 
       const context2 = new SessionContext({
-        tenantId: 'tenant-B',
-        groupId: 'group-B',
-        scadaUrl: 'https://scada-b.example.com',
-        accessToken: 'token-B',
-      });
+          sessionId: 'test-session-id',
+          tenantId: 'tenant-B',
+          groupId: 'group-B',
+          scadaUrl: 'https://scada-b.example.com',
+          accessToken: 'token-B',
+        });
 
       context1.update({ groupId: 'group-A-updated' });
 
