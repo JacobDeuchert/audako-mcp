@@ -1,0 +1,27 @@
+{
+  "name": "@audako/test-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Test client for @audako/chat-ui with mock session data",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@audako/chat-ui": "^0.1.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@tsconfig/svelte": "^5.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.48",
+    "svelte": "^5.50.0",
+    "svelte-check": "^4.0.0",
+    "tailwindcss": "^3.4.13",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}
