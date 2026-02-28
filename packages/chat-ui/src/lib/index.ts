@@ -2,8 +2,6 @@
 
 // Export adapters for convenience
 export { MockAdapter } from './adapters/mock-adapter';
-export type { OpenCodeAdapterConfig, OpenCodeCombinedLogEntry } from './adapters/opencode-adapter';
-export { OpenCodeAdapter } from './adapters/opencode-adapter';
 export type { WebSocketAdapterConfig } from './adapters/websocket-adapter';
 export { WebSocketAdapter } from './adapters/websocket-adapter';
 export { default as ChatWidget } from './ChatWidget.svelte';

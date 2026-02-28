@@ -2,9 +2,10 @@
   import { onMount } from 'svelte';
   import {
     ChatWidget,
-    OpenCodeAdapter,
+    WebSocketAdapter,
     type ChatWidgetConfig,
     type ChatAdapter,
+    type WebSocketAdapterConfig,
     type StreamCallbacks,
     type ChatRequest,
   } from '@audako/chat-ui';
@@ -15,64 +16,49 @@
 
   const MAX_LOG_ENTRIES = 200;
 
-  let opencodeLogs = $state<LogEntry[]>([]);
-  let copilotWsLogs = $state<LogEntry[]>([]);
+  let logs = $state<LogEntry[]>([]);
   let autoScroll = $state(true);
-  let activeLogTab = $state<'opencode' | 'copilot-ws'>('opencode');
   let adapter = $state<ChatAdapter | null>(null);
   let isBootstrapping = $state(true);
   let bootstrapError = $state<string | null>(null);
   let activeSessionId = $state<string | null>(null);
-  let copilotSocket: WebSocket | null = null;
 
-  function appendLog(target: 'opencode' | 'copilot-ws', type: string, data: unknown) {
+  function appendLog(type: string, data: unknown) {
     const entry = {
       timestamp: new Date().toLocaleTimeString(),
       type,
       data,
     };
 
-    if (target === 'opencode') {
-      opencodeLogs = [...opencodeLogs, entry];
-      if (opencodeLogs.length > MAX_LOG_ENTRIES) {
-        opencodeLogs = opencodeLogs.slice(-MAX_LOG_ENTRIES);
-      }
-      return;
-    }
-
-    copilotWsLogs = [...copilotWsLogs, entry];
-    if (copilotWsLogs.length > MAX_LOG_ENTRIES) {
-      copilotWsLogs = copilotWsLogs.slice(-MAX_LOG_ENTRIES);
+    logs = [...logs, entry];
+    if (logs.length > MAX_LOG_ENTRIES) {
+      logs = logs.slice(-MAX_LOG_ENTRIES);
     }
   }
 
-  function addOpencodeLog(type: string, data: unknown) {
-    appendLog('opencode', type, data);
-  }
-
-  function addCopilotWsLog(type: string, data: unknown) {
-    appendLog('copilot-ws', type, data);
+  function addLog(type: string, data: unknown) {
+    appendLog(type, data);
   }
 
   // Create a logging wrapper around the adapter
   function createLoggingAdapter(baseAdapter: ChatAdapter): ChatAdapter {
     return {
       async init() {
-        addOpencodeLog('adapter.init', { adapter: baseAdapter.constructor.name });
+        addLog('adapter.init', { adapter: baseAdapter.constructor.name });
         if (baseAdapter.init) {
           await baseAdapter.init();
         }
       },
       
       cancel() {
-        addOpencodeLog('adapter.cancel', {});
+        addLog('adapter.cancel', {});
         if (baseAdapter.cancel) {
           baseAdapter.cancel();
         }
       },
       
       async sendMessage(request: ChatRequest, callbacks: StreamCallbacks) {
-        addOpencodeLog('adapter.sendMessage', {
+        addLog('adapter.sendMessage', {
           message: request.message,
           historyLength: request.conversationHistory?.length,
         });
@@ -80,28 +66,28 @@
         // Wrap callbacks to log events
         const wrappedCallbacks: StreamCallbacks = {
           onChunk: (text: string) => {
-            addOpencodeLog('stream.chunk', { textLength: text.length, preview: text.slice(0, 50) });
+            addLog('stream.chunk', { textLength: text.length, preview: text.slice(0, 50) });
             callbacks.onChunk(text);
           },
           onComplete: () => {
-            addOpencodeLog('stream.complete', {});
+            addLog('stream.complete', {});
             callbacks.onComplete();
           },
           onError: (error: Error) => {
-            addOpencodeLog('stream.error', { error: error.message });
+            addLog('stream.error', { error: error.message });
             callbacks.onError(error);
           },
           onThinking: callbacks.onThinking ? (text: string) => {
-            addOpencodeLog('stream.thinking', { textLength: text.length });
+            addLog('stream.thinking', { textLength: text.length });
             callbacks.onThinking!(text);
           } : undefined,
           onQuestion: callbacks.onQuestion ? async (question) => {
-            addOpencodeLog('stream.question', {
+            addLog('stream.question', {
               text: question.text,
               optionsCount: question.options?.length,
             });
             const result = await callbacks.onQuestion!(question);
-            addOpencodeLog('stream.question.response', { result });
+            addLog('stream.question.response', { result });
             return result;
           } : undefined,
         };
@@ -130,7 +116,7 @@
   // Session info for display
   const sessionInfo = config.sessionInfo;
 
-  const currentLogs = $derived(activeLogTab === 'opencode' ? opencodeLogs : copilotWsLogs);
+  const currentLogs = $derived(logs);
 
   async function bootstrapWithCopilot(): Promise<void> {
     isBootstrapping = true;
@@ -138,12 +124,7 @@
     adapter = null;
     activeSessionId = null;
 
-    if (copilotSocket) {
-      copilotSocket.close(1000, 'restart');
-      copilotSocket = null;
-    }
-
-    addCopilotWsLog('bootstrap.request', {
+    addLog('bootstrap.request', {
       url: `${config.appUrl}/api/session/bootstrap`,
       hasSessionInfo: Boolean(config.sessionInfo),
     });
@@ -162,62 +143,34 @@
 
     if (!response.ok) {
       const message = `Bootstrap failed: ${response.status} ${response.statusText}`;
-      addCopilotWsLog('bootstrap.error', { message });
+      addLog('bootstrap.error', { message });
       throw new Error(message);
     }
 
     const payload = (await response.json()) as {
       sessionId: string;
-      opencodeUrl: string;
       websocketUrl: string;
+      bridgeSessionToken: string;
     };
 
     activeSessionId = payload.sessionId;
 
-    addCopilotWsLog('bootstrap.success', {
+    addLog('bootstrap.success', {
       sessionId: payload.sessionId,
-      opencodeUrl: payload.opencodeUrl,
       websocketUrl: payload.websocketUrl,
     });
 
-    const baseAdapter = new OpenCodeAdapter({
-      baseUrl: payload.opencodeUrl,
+    const baseAdapter = new WebSocketAdapter({
+      websocketUrl: payload.websocketUrl,
+      sessionToken: payload.bridgeSessionToken,
       sessionId: payload.sessionId,
-      createSession: false,
-      agent: 'audako',
-      logCombinedEvents: false,
-    });
+    } as WebSocketAdapterConfig);
 
     adapter = createLoggingAdapter(baseAdapter);
+    addLog('adapter.created', { type: 'WebSocketAdapter' });
 
-    addCopilotWsLog('websocket.connecting', { url: payload.websocketUrl });
-    copilotSocket = new WebSocket(payload.websocketUrl);
-
-    copilotSocket.addEventListener('open', () => {
-      addCopilotWsLog('websocket.open', { url: payload.websocketUrl });
-    });
-
-    copilotSocket.addEventListener('close', event => {
-      addCopilotWsLog('websocket.close', {
-        url: payload.websocketUrl,
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean,
-      });
-    });
-
-    copilotSocket.addEventListener('error', () => {
-      addCopilotWsLog('websocket.error', { url: payload.websocketUrl });
-    });
-
-    copilotSocket.addEventListener('message', event => {
-      const messageData = typeof event.data === 'string' ? event.data : '[binary message]';
-      addCopilotWsLog('websocket.message', {
-        url: payload.websocketUrl,
-        preview: messageData.slice(0, 120),
-        length: messageData.length,
-      });
-    });
+    // Connect the WebSocket
+    await baseAdapter.init();
   }
 
   async function retryBootstrap() {
@@ -236,19 +189,12 @@
     });
 
     return () => {
-      if (copilotSocket) {
-        copilotSocket.close(1000, 'unmount');
-        copilotSocket = null;
-      }
+      adapter?.cancel?.();
     };
   });
 
   function clearLogs() {
-    if (activeLogTab === 'opencode') {
-      opencodeLogs = [];
-      return;
-    }
-    copilotWsLogs = [];
+    logs = [];
   }
 
   function toggleAutoScroll() {
@@ -288,31 +234,10 @@
       <!-- Left: Event Log -->
       <div class="w-full lg:basis-[60%] lg:max-w-[60%] bg-slate-900 rounded-xl overflow-hidden flex flex-col min-h-0">
         <!-- Log Header -->
-        <div class="bg-slate-800 px-4 py-2 flex items-center justify-between border-b border-slate-700 shrink-0">
           <div class="flex items-center gap-3">
             <div class="flex items-center gap-2">
               <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
               <span class="text-sm font-medium text-slate-200">Logs</span>
-            </div>
-            <div class="flex items-center gap-1 rounded-md bg-slate-700 p-1">
-              <button
-                class="text-xs px-2 py-1 rounded transition-colors"
-                class:bg-slate-200={activeLogTab === 'opencode'}
-                class:text-slate-900={activeLogTab === 'opencode'}
-                class:text-slate-300={activeLogTab !== 'opencode'}
-                onclick={() => (activeLogTab = 'opencode')}
-              >
-                OpenCode
-              </button>
-              <button
-                class="text-xs px-2 py-1 rounded transition-colors"
-                class:bg-slate-200={activeLogTab === 'copilot-ws'}
-                class:text-slate-900={activeLogTab === 'copilot-ws'}
-                class:text-slate-300={activeLogTab !== 'copilot-ws'}
-                onclick={() => (activeLogTab = 'copilot-ws')}
-              >
-                Copilot WebSocket
-              </button>
             </div>
             <span class="text-xs text-slate-400">({currentLogs.length} events)</span>
           </div>
@@ -330,17 +255,12 @@
               🗑 Clear
             </button>
           </div>
-        </div>
 
         <!-- Log Content -->
         <div class="flex-1 overflow-auto p-2 font-mono text-xs space-y-1 min-h-0">
           {#if currentLogs.length === 0}
             <div class="text-slate-500 text-center py-8">
-              {#if activeLogTab === 'opencode'}
-                No OpenCode events yet. Send a message to see logs.
-              {:else}
-                No Copilot WebSocket events yet.
-              {/if}
+              No events yet. Send a message to see logs.
             </div>
           {:else}
             {#each currentLogs as log, i (i)}

@@ -22,16 +22,6 @@
       "import": "./dist/copilot-ws-events.js",
       "default": "./dist/copilot-ws-events.js"
     },
-    "./backend-bridge": {
-      "types": "./src/copilot.ts",
-      "import": "./dist/copilot.js",
-      "default": "./dist/copilot.js"
-    },
-    "./backend-bridge/ws-events": {
-      "types": "./src/copilot-ws-events.ts",
-      "import": "./dist/copilot-ws-events.js",
-      "default": "./dist/copilot-ws-events.js"
-    },
     "./question": {
       "types": "./src/question.ts",
       "import": "./dist/question.js",

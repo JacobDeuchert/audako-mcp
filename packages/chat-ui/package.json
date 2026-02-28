@@ -45,7 +45,6 @@
   },
   "dependencies": {
     "@audako/contracts": "^0.1.0",
-    "@opencode-ai/sdk": "^1.1.53",
     "markdown-it": "^14.1.1"
   }
 }

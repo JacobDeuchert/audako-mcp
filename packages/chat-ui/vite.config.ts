@@ -26,7 +26,7 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      external: id => /^svelte($|\/)/.test(id) || id === '@opencode-ai/sdk/client',
+      external: id => /^svelte($|\/)/.test(id),
       output: {
         globals: {
           svelte: 'Svelte',
