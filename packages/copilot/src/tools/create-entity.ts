@@ -1,159 +1,121 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
-import { resolveEntityTypeContract } from '../entity-type-definitions/index.js';
-import type { InlineMutationPermissionRequestHub } from '../services/inline-mutation-permissions.js';
-import { ensureInlineMutationPermission } from '../services/inline-mutation-permissions.js';
-import type { MutationPermissionsStore } from '../services/mutation-permissions.js';
-import { createEntitySchema } from './schemas.js';
+import { Type } from '@mariozechner/pi-ai';
+import { resolveEntityTypeContract } from '../entity-type-definitions/entity-type-registry.js';
+import type { AudakoServices } from '../services/audako-services.js';
+import type { MutationThrottle } from '../services/mutation-throttle.js';
+import { normalizePermissionMode, type PermissionService } from '../services/permission-service.js';
+import type { SessionContext } from '../services/session-context.js';
+import type { SessionEventHub } from '../services/session-event-hub.js';
 
-type AgentSchema<T> = T & any;
-type PermissionMode = 'interactive' | 'fail_fast';
-
-type CreateEntityResult = {
-  id?: string;
-  Id?: string;
-  [key: string]: unknown;
-};
-
-interface SessionContextLike {
-  getSessionId(): string;
-  getGroupId(): string | undefined;
-}
-
-interface MutationThrottleLike {
-  execute?(handler: () => Promise<unknown> | unknown): Promise<unknown>;
-  run?(handler: () => Promise<unknown> | unknown): Promise<unknown>;
-}
-
-interface ScopeGuardLike {
-  validate(groupId: string | undefined, entityType: string): Promise<void> | void;
-}
-
-interface EventHubLike {
-  publish(
-    sessionId: string,
-    event: {
-      type: 'entity.created';
-      timestamp: string;
-      payload: {
-        entityType: string;
-        entityId: string;
-        data: Record<string, unknown>;
-      };
-    },
-  ): unknown;
-}
-
-interface AudakoServicesLike {
-  entityData: {
-    create(entityType: string, payload: Record<string, unknown>): Promise<CreateEntityResult>;
-  };
-}
+const createEntitySchema = Type.Object({
+  entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
+  name: Type.String({ description: 'Name of the entity.' }),
+  groupId: Type.String({
+    description:
+      'Parent group ID. Pass a real group ID or the literal "context" to use the tenant root group from session context.',
+  }),
+  description: Type.Optional(Type.String({ description: 'Description of the entity.' })),
+  settings: Type.Optional(
+    Type.Object(
+      {},
+      {
+        additionalProperties: true,
+        description:
+          'Entity-type-specific settings. Use get_entity_definition to discover available fields for each entity type.',
+      },
+    ),
+  ),
+  permissionMode: Type.Optional(
+    Type.Union([Type.Literal('interactive'), Type.Literal('fail_fast')], {
+      description:
+        'Permission handling mode for out-of-context mutations. interactive prompts the user inline; fail_fast returns an out-of-context error without prompting.',
+    }),
+  ),
+});
 
 export interface CreateEntityToolDependencies {
-  sessionContext: SessionContextLike;
-  audakoServices: AudakoServicesLike;
-  mutationThrottle: MutationThrottleLike;
-  scopeGuard: ScopeGuardLike;
-  permissions: MutationPermissionsStore;
-  eventHub: EventHubLike;
-  requestHub: InlineMutationPermissionRequestHub;
-}
-
-function normalizePermissionMode(mode: unknown): PermissionMode {
-  return mode === 'fail_fast' ? 'fail_fast' : 'interactive';
-}
-
-async function runInMutationThrottle<T>(
-  mutationThrottle: MutationThrottleLike,
-  handler: () => Promise<T> | T,
-): Promise<T> {
-  if (typeof mutationThrottle.execute === 'function') {
-    return mutationThrottle.execute(handler) as Promise<T>;
-  }
-
-  if (typeof mutationThrottle.run === 'function') {
-    return mutationThrottle.run(handler) as Promise<T>;
-  }
-
-  return handler();
-}
-
-async function ensureMutationPermission(input: {
   sessionId: string;
-  entityType: string;
-  permissionMode: PermissionMode;
-  permissionStore: MutationPermissionsStore;
-  sessionRequestHub: InlineMutationPermissionRequestHub;
-}): Promise<void> {
-  if (input.permissionMode === 'fail_fast') {
-    if (!input.permissionStore.hasPermission(input.entityType)) {
-      throw new Error(`Mutation blocked: permission denied for ${input.entityType}.`);
-    }
-    return;
-  }
-
-  await ensureInlineMutationPermission({
-    sessionId: input.sessionId,
-    entityType: input.entityType,
-    permissionStore: input.permissionStore,
-    sessionRequestHub: input.sessionRequestHub,
-  });
+  sessionContext: SessionContext;
+  audakoServices: AudakoServices;
+  mutationThrottle: MutationThrottle;
+  permissionService: PermissionService;
+  eventHub: SessionEventHub;
 }
 
 export function createCreateEntityTool(
   deps: CreateEntityToolDependencies,
-): AgentTool<AgentSchema<typeof createEntitySchema>> {
+): AgentTool<typeof createEntitySchema, { entityType: string; entityId: string }> {
   return {
-    name: 'audako_mcp_create_entity',
+    name: 'create_entity',
     label: 'Create Entity',
-    description: 'Create a configuration entity with schema-validated payload.',
+    description:
+      'Create a configuration entity. Common fields (name, groupId, description) are top-level parameters. Entity-specific settings go in the settings object.',
     parameters: createEntitySchema,
     execute: async (_toolCallId, params) => {
-      const sessionId = deps.sessionContext.getSessionId();
+      const sessionId = deps.sessionId;
+      const contract = resolveEntityTypeContract(params.entityType);
+      if (!contract) {
+        throw new Error(`Unsupported entity type '${params.entityType}'.`);
+      }
 
-      await ensureMutationPermission({
+      // Resolve "context" keyword to tenant root group ID
+      let resolvedGroupId = params.groupId;
+      if (resolvedGroupId === 'context') {
+        const tenantRootGroupId = deps.sessionContext.resolvedTenant?.tenantRootGroupId;
+        if (!tenantRootGroupId) {
+          throw new Error(
+            'groupId is "context" but no tenant root group is available in session context. Ensure a tenant is selected.',
+          );
+        }
+        resolvedGroupId = tenantRootGroupId;
+      }
+
+      // Reassemble flat payload from top-level parameters
+      const payload: Record<string, unknown> = {
+        name: params.name,
+        groupId: resolvedGroupId,
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...((params.settings as Record<string, unknown>) ?? {}),
+      };
+
+      await deps.permissionService.hasPermission(
         sessionId,
-        entityType: params.entityType,
-        permissionMode: normalizePermissionMode(params.permissionMode),
-        permissionStore: deps.permissions,
-        sessionRequestHub: deps.requestHub,
+        params.entityType,
+        resolvedGroupId,
+        normalizePermissionMode(params.permissionMode),
+        'create_entity',
+      );
+
+      const validationErrors = contract.validate(payload, 'create');
+      if (validationErrors.length > 0) {
+        throw new Error(`Entity payload validation failed: ${validationErrors.join('; ')}`);
+      }
+
+      const createdEntity = await deps.mutationThrottle.run(async () => {
+        const entityToCreate = contract.fromPayload(payload);
+        return deps.audakoServices.entityService.addEntity(contract.entityType, entityToCreate);
       });
 
-      await deps.scopeGuard.validate(deps.sessionContext.getGroupId(), params.entityType);
-
-      const createdEntity = await runInMutationThrottle(deps.mutationThrottle, async () => {
-        const contract = resolveEntityTypeContract(params.entityType);
-        if (!contract) {
-          throw new Error(`Unsupported entity type '${params.entityType}'.`);
-        }
-
-        const validationErrors = contract.validate(params.payload, 'create');
-        if (validationErrors.length > 0) {
-          throw new Error(`Entity payload validation failed: ${validationErrors.join('; ')}`);
-        }
-
-        return deps.audakoServices.entityData.create(params.entityType, params.payload);
-      });
-
-      const entityId = createdEntity.id ?? createdEntity.Id;
+      const entityId = createdEntity.Id;
       if (!entityId) {
         throw new Error('Created entity response did not include an ID.');
       }
 
       deps.eventHub.publish(sessionId, {
         type: 'entity.created',
+        sessionId,
         timestamp: new Date().toISOString(),
         payload: {
-          entityType: params.entityType,
+          entityType: contract.entityType,
           entityId,
-          data: createdEntity,
+          data: contract.toPayload(createdEntity),
         },
       });
 
       return {
-        content: [{ type: 'text', text: `Created ${params.entityType} with ID ${entityId}` }],
+        content: [{ type: 'text', text: `Created ${contract.entityType} with ID ${entityId}` }],
         details: {
-          entityType: params.entityType,
+          entityType: contract.entityType,
           entityId,
         },
       };
