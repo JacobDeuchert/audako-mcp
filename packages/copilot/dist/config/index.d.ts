@@ -25,7 +25,7 @@ export declare const appConfig: {
     logLevel: string;
 };
 /**
- * Load the system prompt for the OpenCode agent from .opencode/prompts/scada-agent.md
+ * Load the system prompt for the OpenCode agent from prompts/scada-agent.md
  * @returns Promise resolving to the system prompt text
  * @throws Error if the file cannot be read
  */

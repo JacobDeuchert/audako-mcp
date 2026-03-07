@@ -5,7 +5,7 @@ describe('@audako/contracts - Copilot Schemas', () => {
     describe('SessionBootstrapResponseSchema', () => {
         it('should validate correct bootstrap response without opencodeUrl', () => {
             const validResponse = {
-                websocketUrl: 'wss://example.com/ws',
+                websocketPath: '/api/session/sess_123/ws',
                 sessionId: 'sess_123',
                 bridgeSessionToken: 'token_abc',
                 isNew: true,
@@ -22,7 +22,7 @@ describe('@audako/contracts - Copilot Schemas', () => {
         it('should reject bootstrap response with opencodeUrl', () => {
             const invalidResponse = {
                 opencodeUrl: 'https://opencode.example.com',
-                websocketUrl: 'wss://example.com/ws',
+                websocketPath: '/api/session/sess_123/ws',
                 sessionId: 'sess_123',
                 bridgeSessionToken: 'token_abc',
                 isNew: true,
@@ -36,7 +36,7 @@ describe('@audako/contracts - Copilot Schemas', () => {
             const result = SessionBootstrapResponseSchema.safeParse(invalidResponse);
             expect(result.success).toBe(false);
         });
-        it('should require websocketUrl and sessionId', () => {
+        it('should require websocketPath and sessionId', () => {
             const missingFields = {
                 bridgeSessionToken: 'token_abc',
                 isNew: true,

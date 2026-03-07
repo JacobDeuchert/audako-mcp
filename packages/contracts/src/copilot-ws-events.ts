@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { type SessionInfoResponse, SessionInfoSnapshotSchema } from './copilot.js';
+import {
+  SessionInfoFieldsSchema,
+  type SessionInfoResponse,
+  SessionInfoSnapshotSchema,
+} from './copilot.js';
 import { QuestionRequestSchema } from './question.js';
 
 export function createSessionEventEnvelopeSchema<T extends z.ZodTypeAny>(payloadSchema: T) {
@@ -26,6 +30,86 @@ export type SessionEventEnvelope<T = unknown> = {
   timestamp: string;
   payload: T;
 };
+
+/** Minimal WebSocket interface for session event fanout */
+export interface SessionSocket {
+  readyState: number;
+  send(data: string): void;
+  close(code?: number, reason?: string): void;
+  on?(event: string, handler: (...args: any[]) => void): void;
+  ping?(): void;
+}
+
+export const BridgeSessionWebSocketUserMessageSchema = z.object({
+  type: z.literal('user_message'),
+  content: z.string(),
+});
+export type BridgeSessionWebSocketUserMessage = z.infer<
+  typeof BridgeSessionWebSocketUserMessageSchema
+>;
+
+export const BridgeSessionWebSocketPingMessageSchema = z.object({
+  type: z.literal('ping'),
+});
+export type BridgeSessionWebSocketPingMessage = z.infer<
+  typeof BridgeSessionWebSocketPingMessageSchema
+>;
+
+export const BridgeSessionWebSocketCancelMessageSchema = z.object({
+  type: z.literal('cancel'),
+});
+export type BridgeSessionWebSocketCancelMessage = z.infer<
+  typeof BridgeSessionWebSocketCancelMessageSchema
+>;
+
+export const BridgeSessionWebSocketHubResponseMessageSchema = z.object({
+  type: z.literal('hub.response'),
+  requestId: z.string(),
+  response: z.unknown(),
+});
+export type BridgeSessionWebSocketHubResponseMessage = z.infer<
+  typeof BridgeSessionWebSocketHubResponseMessageSchema
+>;
+
+export const BridgeSessionWebSocketSessionInfoUpdateMessageSchema = z.object({
+  type: z.literal('session.info.update'),
+  sessionInfo: SessionInfoFieldsSchema,
+});
+export type BridgeSessionWebSocketSessionInfoUpdateMessage = z.infer<
+  typeof BridgeSessionWebSocketSessionInfoUpdateMessageSchema
+>;
+
+export const BridgeSessionWebSocketClientMessageSchema = z.discriminatedUnion('type', [
+  BridgeSessionWebSocketUserMessageSchema,
+  BridgeSessionWebSocketPingMessageSchema,
+  BridgeSessionWebSocketCancelMessageSchema,
+  BridgeSessionWebSocketHubResponseMessageSchema,
+  BridgeSessionWebSocketSessionInfoUpdateMessageSchema,
+]);
+export type BridgeSessionWebSocketClientMessage = z.infer<
+  typeof BridgeSessionWebSocketClientMessageSchema
+>;
+
+export function isBridgeSessionWebSocketClientMessage(
+  value: unknown,
+): value is BridgeSessionWebSocketClientMessage {
+  return BridgeSessionWebSocketClientMessageSchema.safeParse(value).success;
+}
+
+export const BridgeSessionWebSocketPongMessageSchema = z.object({
+  type: z.literal('pong'),
+});
+export type BridgeSessionWebSocketPongMessage = z.infer<
+  typeof BridgeSessionWebSocketPongMessageSchema
+>;
+
+export type BridgeSessionWebSocketControlMessage = BridgeSessionWebSocketPongMessage;
+
+export function isBridgeSessionWebSocketControlMessage(
+  value: unknown,
+): value is BridgeSessionWebSocketControlMessage {
+  return BridgeSessionWebSocketPongMessageSchema.safeParse(value).success;
+}
 
 export type HubRequestPayload<TPayload = unknown> = {
   requestId: string;
@@ -214,3 +298,7 @@ export type KnownBridgeSessionWebSocketEvent =
   | AgentSessionEvent;
 
 export type BridgeSessionWebSocketEvent = KnownBridgeSessionWebSocketEvent | SessionEventEnvelope;
+
+export type BridgeSessionWebSocketServerMessage =
+  | BridgeSessionWebSocketEvent
+  | BridgeSessionWebSocketControlMessage;

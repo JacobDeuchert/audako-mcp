@@ -1,12 +1,15 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
+import { Type } from '@mariozechner/pi-ai';
 import { EntityType } from 'audako-core';
 import type { AudakoServices } from '../services/audako-services.js';
 import { toErrorResponse, toTextResponse } from './helpers.js';
-import { getEntityNameSchema } from './schemas.js';
+
+const getEntityNameSchema = Type.Object({
+  entityType: Type.String({ description: "Entity type name, for example 'Signal' or 'Group'." }),
+  entityId: Type.String({ description: 'The ID of the entity to resolve.' }),
+});
 
 const supportedEntityTypes = Object.values(EntityType) as EntityType[];
-
-type AgentSchema<T> = T & any;
 
 function resolveEntityType(entityType: string): EntityType | undefined {
   const normalizedEntityType = entityType.trim().toLowerCase();
@@ -15,9 +18,9 @@ function resolveEntityType(entityType: string): EntityType | undefined {
 
 export function createGetEntityNameTool(
   audakoServices: AudakoServices,
-): AgentTool<AgentSchema<typeof getEntityNameSchema>> {
+): AgentTool<typeof getEntityNameSchema> {
   return {
-    name: 'audako_mcp_get_entity_name',
+    name: 'get_entity_name',
     label: 'Get Entity Name',
     description: 'Get an entity name by entity type and entity ID.',
     parameters: getEntityNameSchema,
@@ -26,7 +29,7 @@ export function createGetEntityNameTool(
       const resolvedEntityType = resolveEntityType(entityType);
 
       if (!normalizedEntityId) {
-        return toErrorResponse("'entityId' must be a non-empty string.") as any;
+        return toErrorResponse("'entityId' must be a non-empty string.");
       }
 
       if (!resolvedEntityType) {
@@ -37,7 +40,7 @@ export function createGetEntityNameTool(
 
         return toErrorResponse(`Unsupported entity type '${normalizedEntityType || entityType}'.`, {
           supportedTypes: sortedSupportedEntityTypes,
-        }) as any;
+        });
       }
 
       try {
@@ -48,10 +51,10 @@ export function createGetEntityNameTool(
         );
 
         const entityName = typeof entity?.Name?.Value === 'string' ? entity.Name.Value : '';
-        return toTextResponse(entityName) as any;
+        return toTextResponse(entityName);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return toErrorResponse(`Failed to resolve entity name: ${errorMessage}`) as any;
+        return toErrorResponse(`Failed to resolve entity name: ${errorMessage}`);
       }
     },
   };

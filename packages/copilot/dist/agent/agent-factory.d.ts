@@ -37,13 +37,12 @@ export interface CreateSessionAgentConfig {
     audakoServices: AudakoServicesLike;
     eventHub: SessionEventHub;
     requestHub: ToolRequestHub;
-    systemPrompt: string;
     modelConfig: ModelConfig;
 }
 export interface SessionAgentFactoryResult {
     agent: Agent;
     destroy: () => void;
 }
-export declare function createSessionAgent(config: CreateSessionAgentConfig): SessionAgentFactoryResult;
+export declare function createSessionAgent(config: CreateSessionAgentConfig): Promise<SessionAgentFactoryResult>;
 export {};
 //# sourceMappingURL=agent-factory.d.ts.map

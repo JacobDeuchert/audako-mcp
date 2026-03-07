@@ -1,19 +1,7 @@
-/**
- * WS Event Bridge - Maps pi-mono agent events to WebSocket event envelopes
- *
- * This bridge subscribes to agent events and transforms them into the
- * standardized WebSocket event format expected by clients.
- *
- * Event Mapping:
- * - message_update (text_delta) → agent.text_delta
- * - tool_execution_start → agent.tool_start
- * - tool_execution_end → agent.tool_end
- * - turn_start → agent.turn_start
- * - turn_end → agent.turn_end
- * - agent_end (with error) → agent.error
- */
-
+import type { SessionEventEnvelope } from '@audako/contracts';
 import type { AgentEvent } from '@mariozechner/pi-agent-core';
+import type { AssistantMessage } from '@mariozechner/pi-ai';
+import { createLogger } from '../config/app-config.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
 
 interface Agent {
@@ -21,33 +9,27 @@ interface Agent {
   state?: { error?: string };
 }
 
-interface SessionEventEnvelope<T = unknown> {
-  type: string;
-  sessionId: string;
-  timestamp: string;
-  payload: T;
-}
+const wsBridgeLogger = createLogger('ws-event-bridge');
 
-/**
- * Creates a bridge between pi-mono agent events and WebSocket clients.
- *
- * @param agent - Pi-mono Agent instance to subscribe to
- * @param sessionId - Session identifier for event routing
- * @param eventHub - Event hub for publishing to WebSocket clients
- * @returns Unsubscribe function to stop event forwarding
- */
 export function createWsEventBridge(
   agent: Agent,
   sessionId: string,
   eventHub: SessionEventHub,
 ): () => void {
-  // Generate stable turn IDs for turn_start/turn_end pairs
   let currentTurnId: string | null = null;
 
   const handleAgentEvent = (event: AgentEvent): void => {
+    wsBridgeLogger.info(
+      {
+        sessionId,
+        eventType: event.type,
+        event,
+      },
+      'Received agent event',
+    );
+
     switch (event.type) {
       case 'message_update': {
-        // Only forward text_delta events (ignore tool_call, thinking, etc.)
         if (event.assistantMessageEvent.type === 'text_delta') {
           eventHub.publish(
             sessionId,
@@ -83,6 +65,10 @@ export function createWsEventBridge(
       }
 
       case 'turn_start': {
+        if (currentTurnId) {
+          break;
+        }
+
         currentTurnId = generateTurnId();
         eventHub.publish(
           sessionId,
@@ -95,12 +81,16 @@ export function createWsEventBridge(
       }
 
       case 'turn_end': {
+        if (isToolUseTurn(event.message)) {
+          break;
+        }
+
         const turnId = currentTurnId || generateTurnId();
         eventHub.publish(
           sessionId,
           buildWsEvent('agent.turn_end', sessionId, {
             turnId,
-            finalMessage: undefined,
+            finalMessage: extractAssistantText(event.message),
           }),
         );
         currentTurnId = null;
@@ -108,7 +98,6 @@ export function createWsEventBridge(
       }
 
       case 'agent_end': {
-        // Only emit agent.error if agent state has an error
         const errorMessage = agent.state?.error;
         if (errorMessage) {
           eventHub.publish(
@@ -118,10 +107,11 @@ export function createWsEventBridge(
             }),
           );
         }
+
+        currentTurnId = null;
         break;
       }
 
-      // Ignore other event types (agent_start, message_start, message_end, tool_execution_update)
       default:
         break;
     }
@@ -132,9 +122,46 @@ export function createWsEventBridge(
   return unsubscribe;
 }
 
-/**
- * Build WebSocket event envelope with current timestamp.
- */
+function isAssistantMessage(message: unknown): message is AssistantMessage {
+  if (!message || typeof message !== 'object') {
+    return false;
+  }
+
+  const candidate = message as {
+    role?: unknown;
+    content?: unknown;
+    stopReason?: unknown;
+  };
+
+  return (
+    candidate.role === 'assistant' &&
+    Array.isArray(candidate.content) &&
+    typeof candidate.stopReason === 'string'
+  );
+}
+
+function isToolUseTurn(message: unknown): boolean {
+  return isAssistantMessage(message) && message.stopReason === 'toolUse';
+}
+
+function extractAssistantText(message: unknown): string | undefined {
+  if (!isAssistantMessage(message)) {
+    return undefined;
+  }
+
+  let text = '';
+  for (const block of message.content) {
+    if (block.type !== 'text') {
+      continue;
+    }
+
+    text += block.text;
+  }
+
+  const trimmedText = text.trim();
+  return trimmedText || undefined;
+}
+
 function buildWsEvent<T>(type: string, sessionId: string, payload: T): SessionEventEnvelope<T> {
   return {
     type,
@@ -144,9 +171,6 @@ function buildWsEvent<T>(type: string, sessionId: string, payload: T): SessionEv
   };
 }
 
-/**
- * Generate a unique turn ID for turn_start/turn_end pairing.
- */
 function generateTurnId(): string {
   return `turn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }

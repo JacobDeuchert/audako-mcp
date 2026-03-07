@@ -28,33 +28,6 @@ type SignalContractFieldDefinition = EntityFieldDefinition & {
 
 const signalFieldDefinitions: SignalContractFieldDefinition[] = [
   {
-    key: 'name',
-    dtoName: 'name',
-    description: 'Name of the signal',
-    type: 'string',
-    entityPath: 'Name',
-    isEntityField: true,
-    requiredOnCreate: true,
-  },
-  {
-    key: 'description',
-    dtoName: 'description',
-    description: 'Description of the signal',
-    type: 'string',
-    entityPath: 'Description',
-    isEntityField: true,
-    requiredOnCreate: false,
-  },
-  {
-    key: 'groupId',
-    dtoName: 'groupId',
-    description:
-      'Parent group ID (defaults to selected tenant root when omitted). The group must exist before creating the signal. Take from session info if not provided.',
-    type: 'string',
-    entityPath: 'GroupId',
-    requiredOnCreate: true,
-  },
-  {
     key: 'type',
     dtoName: 'type',
     description: 'Signal type',
@@ -263,6 +236,9 @@ type SignalUpdatePayload = z.infer<typeof signalUpdateSchema>;
 type SignalModel = Partial<SignalCreatePayload> & {
   id?: string;
   path?: string[];
+  name?: string;
+  description?: string;
+  groupId?: string;
 };
 
 class SignalEntityContract extends BaseEntityContract<
@@ -276,7 +252,6 @@ class SignalEntityContract extends BaseEntityContract<
   public readonly description = 'Audako signal configuration entity';
   public readonly examples = {
     create: {
-      name: 'Boiler Temperature',
       type: SignalType.AnalogInput,
       address: '40001',
       minValue: 0,
@@ -287,7 +262,6 @@ class SignalEntityContract extends BaseEntityContract<
       recordingInterval: 5,
     },
     update: {
-      description: 'Updated signal description',
       maxValue: 200,
       recordingInterval: 10,
     },
@@ -382,6 +356,17 @@ class SignalEntityContract extends BaseEntityContract<
 
     this.setModelValueIfDefined(model, 'id', signal.Id);
     this.setModelValueIfDefined(model, 'path', signal.Path ? [...signal.Path] : undefined);
+    this.setModelValueIfDefined(
+      model,
+      'name',
+      EntityUtils.getPropertyValue<Signal, unknown>(signal, 'Name', true),
+    );
+    this.setModelValueIfDefined(
+      model,
+      'description',
+      EntityUtils.getPropertyValue<Signal, unknown>(signal, 'Description', true),
+    );
+    this.setModelValueIfDefined(model, 'groupId', signal.GroupId);
 
     const signalType = signal.Type?.Value;
     for (const field of this.fieldDefinitions) {
@@ -410,6 +395,11 @@ class SignalEntityContract extends BaseEntityContract<
     if (typeof model.path !== 'undefined') {
       signal.Path = [...model.path];
     }
+
+    if (model.name !== undefined) EntityUtils.setPropertyValue(signal, 'Name', model.name, true);
+    if (model.description !== undefined)
+      EntityUtils.setPropertyValue(signal, 'Description', model.description, true);
+    if (model.groupId !== undefined) signal.GroupId = model.groupId;
 
     signal.Settings = this.createSignalSettings(model);
     signal.RecordingSettings = new SignalRecordingSettings();

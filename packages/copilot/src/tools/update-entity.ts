@@ -1,164 +1,101 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
-import { resolveEntityTypeContract } from '../entity-type-definitions/index.js';
-import type { InlineMutationPermissionRequestHub } from '../services/inline-mutation-permissions.js';
-import { ensureInlineMutationPermission } from '../services/inline-mutation-permissions.js';
-import type { MutationPermissionsStore } from '../services/mutation-permissions.js';
-import { updateEntitySchema } from './schemas.js';
+import { Type } from '@mariozechner/pi-ai';
+import { resolveEntityTypeContract } from '../entity-type-definitions/entity-type-registry.js';
+import type { AudakoServices } from '../services/audako-services.js';
+import type { MutationThrottle } from '../services/mutation-throttle.js';
+import { normalizePermissionMode, type PermissionService } from '../services/permission-service.js';
+import type { SessionContext } from '../services/session-context.js';
+import type { SessionEventHub } from '../services/session-event-hub.js';
 
-type AgentSchema<T> = T & any;
-type PermissionMode = 'interactive' | 'fail_fast';
-
-type UpdateEntityResult = {
-  id?: string;
-  Id?: string;
-  [key: string]: unknown;
-};
-
-interface SessionContextLike {
-  getSessionId(): string;
-  getGroupId(): string | undefined;
-}
-
-interface MutationThrottleLike {
-  execute?(handler: () => Promise<unknown> | unknown): Promise<unknown>;
-  run?(handler: () => Promise<unknown> | unknown): Promise<unknown>;
-}
-
-interface ScopeGuardLike {
-  validate(groupId: string | undefined, entityType: string): Promise<void> | void;
-}
-
-interface EventHubLike {
-  publish(
-    sessionId: string,
-    event: {
-      type: 'entity.updated';
-      timestamp: string;
-      payload: {
-        entityType: string;
-        entityId: string;
-        changes: Record<string, unknown>;
-      };
+const updateEntitySchema = Type.Object({
+  entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
+  entityId: Type.String({ description: 'The ID of the entity to update.' }),
+  changes: Type.Object(
+    {},
+    {
+      additionalProperties: true,
+      description: 'Partial field updates. Use get-entity-definition first.',
     },
-  ): unknown;
-}
-
-interface AudakoServicesLike {
-  entityData: {
-    update(
-      entityType: string,
-      entityId: string,
-      changes: Record<string, unknown>,
-    ): Promise<UpdateEntityResult>;
-  };
-}
+  ),
+  permissionMode: Type.Optional(
+    Type.Union([Type.Literal('interactive'), Type.Literal('fail_fast')], {
+      description:
+        'Permission handling mode for out-of-context mutations. interactive prompts the user inline; fail_fast returns an out-of-context error without prompting.',
+    }),
+  ),
+});
 
 export interface UpdateEntityToolDependencies {
-  sessionContext: SessionContextLike;
-  audakoServices: AudakoServicesLike;
-  mutationThrottle: MutationThrottleLike;
-  scopeGuard: ScopeGuardLike;
-  permissions: MutationPermissionsStore;
-  eventHub: EventHubLike;
-  requestHub: InlineMutationPermissionRequestHub;
-}
-
-function normalizePermissionMode(mode: unknown): PermissionMode {
-  return mode === 'fail_fast' ? 'fail_fast' : 'interactive';
-}
-
-async function runInMutationThrottle<T>(
-  mutationThrottle: MutationThrottleLike,
-  handler: () => Promise<T> | T,
-): Promise<T> {
-  if (typeof mutationThrottle.execute === 'function') {
-    return mutationThrottle.execute(handler) as Promise<T>;
-  }
-
-  if (typeof mutationThrottle.run === 'function') {
-    return mutationThrottle.run(handler) as Promise<T>;
-  }
-
-  return handler();
-}
-
-async function ensureMutationPermission(input: {
   sessionId: string;
-  entityType: string;
-  permissionMode: PermissionMode;
-  permissionStore: MutationPermissionsStore;
-  sessionRequestHub: InlineMutationPermissionRequestHub;
-}): Promise<void> {
-  if (input.permissionMode === 'fail_fast') {
-    if (!input.permissionStore.hasPermission(input.entityType)) {
-      throw new Error(`Mutation blocked: permission denied for ${input.entityType}.`);
-    }
-    return;
-  }
-
-  await ensureInlineMutationPermission({
-    sessionId: input.sessionId,
-    entityType: input.entityType,
-    permissionStore: input.permissionStore,
-    sessionRequestHub: input.sessionRequestHub,
-  });
+  sessionContext: SessionContext;
+  audakoServices: AudakoServices;
+  mutationThrottle: MutationThrottle;
+  permissionService: PermissionService;
+  eventHub: SessionEventHub;
 }
 
 export function createUpdateEntityTool(
   deps: UpdateEntityToolDependencies,
-): AgentTool<AgentSchema<typeof updateEntitySchema>> {
+): AgentTool<typeof updateEntitySchema, { entityType: string; entityId: string }> {
   return {
-    name: 'audako_mcp_update_entity',
+    name: 'update_entity',
     label: 'Update Entity',
     description: 'Update an existing configuration entity with partial changes.',
     parameters: updateEntitySchema,
     execute: async (_toolCallId, params) => {
-      const sessionId = deps.sessionContext.getSessionId();
+      const sessionId = deps.sessionId;
+      const contract = resolveEntityTypeContract(params.entityType);
+      if (!contract) {
+        throw new Error(`Unsupported entity type '${params.entityType}'.`);
+      }
 
-      await ensureMutationPermission({
+      const existingForScope = await deps.audakoServices.entityService.getPartialEntityById(
+        contract.entityType,
+        params.entityId,
+        { GroupId: 1 },
+      );
+      const groupIdValue = (existingForScope as Record<string, unknown>).GroupId;
+      const entityGroupId = typeof groupIdValue === 'string' ? groupIdValue : undefined;
+
+      await deps.permissionService.hasPermission(
         sessionId,
-        entityType: params.entityType,
-        permissionMode: normalizePermissionMode(params.permissionMode),
-        permissionStore: deps.permissions,
-        sessionRequestHub: deps.requestHub,
-      });
+        params.entityType,
+        entityGroupId,
+        normalizePermissionMode(params.permissionMode),
+        'update_entity',
+      );
 
-      await deps.scopeGuard.validate(deps.sessionContext.getGroupId(), params.entityType);
+      const validationErrors = contract.validate(params.changes, 'update');
+      if (validationErrors.length > 0) {
+        throw new Error(`Entity update validation failed: ${validationErrors.join('; ')}`);
+      }
 
-      const updatedEntity = await runInMutationThrottle(deps.mutationThrottle, async () => {
-        const contract = resolveEntityTypeContract(params.entityType);
-        if (!contract) {
-          throw new Error(`Unsupported entity type '${params.entityType}'.`);
-        }
-
-        const validationErrors = contract.validate(params.changes, 'update');
-        if (validationErrors.length > 0) {
-          throw new Error(`Entity update validation failed: ${validationErrors.join('; ')}`);
-        }
-
-        return deps.audakoServices.entityData.update(
-          params.entityType,
+      const updatedEntity = await deps.mutationThrottle.run(async () => {
+        const existingEntity = await deps.audakoServices.entityService.getEntityById(
+          contract.entityType,
           params.entityId,
-          params.changes,
         );
+        const entityToUpdate = contract.applyUpdate(existingEntity, params.changes);
+        return deps.audakoServices.entityService.updateEntity(contract.entityType, entityToUpdate);
       });
 
-      const entityId = updatedEntity.id ?? updatedEntity.Id ?? params.entityId;
+      const entityId = updatedEntity.Id || params.entityId;
 
       deps.eventHub.publish(sessionId, {
         type: 'entity.updated',
+        sessionId,
         timestamp: new Date().toISOString(),
         payload: {
-          entityType: params.entityType,
+          entityType: contract.entityType,
           entityId,
           changes: params.changes,
         },
       });
 
       return {
-        content: [{ type: 'text', text: `Updated ${params.entityType} with ID ${entityId}` }],
+        content: [{ type: 'text', text: `Updated ${contract.entityType} with ID ${entityId}` }],
         details: {
-          entityType: params.entityType,
+          entityType: contract.entityType,
           entityId,
         },
       };

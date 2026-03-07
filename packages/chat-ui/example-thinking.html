@@ -92,7 +92,8 @@
 
   <!-- Import and register the chat widget -->
   <script type="module">
-    import { registerChatWidget, MockAdapter } from './dist/audako-chat.js';
+    import { MockAdapter, registerChatWidget } from './dist/audako-chat.js';
+
     
     // Create mock adapter with thinking enabled
     const adapter = new MockAdapter({ showThinking: true });

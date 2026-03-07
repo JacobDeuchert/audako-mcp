@@ -1,73 +1,57 @@
-import { resolveEntityTypeContract } from '../entity-type-definitions/index.js';
-import { ensureInlineMutationPermission } from '../services/inline-mutation-permissions.js';
-import { updateEntitySchema } from './schemas.js';
-function normalizePermissionMode(mode) {
-    return mode === 'fail_fast' ? 'fail_fast' : 'interactive';
-}
-async function runInMutationThrottle(mutationThrottle, handler) {
-    if (typeof mutationThrottle.execute === 'function') {
-        return mutationThrottle.execute(handler);
-    }
-    if (typeof mutationThrottle.run === 'function') {
-        return mutationThrottle.run(handler);
-    }
-    return handler();
-}
-async function ensureMutationPermission(input) {
-    if (input.permissionMode === 'fail_fast') {
-        if (!input.permissionStore.hasPermission(input.entityType)) {
-            throw new Error(`Mutation blocked: permission denied for ${input.entityType}.`);
-        }
-        return;
-    }
-    await ensureInlineMutationPermission({
-        sessionId: input.sessionId,
-        entityType: input.entityType,
-        permissionStore: input.permissionStore,
-        sessionRequestHub: input.sessionRequestHub,
-    });
-}
+import { Type } from '@mariozechner/pi-ai';
+import { resolveEntityTypeContract } from '../entity-type-definitions/entity-type-registry.js';
+import { normalizePermissionMode } from '../services/permission-service.js';
+const updateEntitySchema = Type.Object({
+    entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
+    entityId: Type.String({ description: 'The ID of the entity to update.' }),
+    changes: Type.Object({}, {
+        additionalProperties: true,
+        description: 'Partial field updates. Use get-entity-definition first.',
+    }),
+    permissionMode: Type.Optional(Type.Union([Type.Literal('interactive'), Type.Literal('fail_fast')], {
+        description: 'Permission handling mode for out-of-context mutations. interactive prompts the user inline; fail_fast returns an out-of-context error without prompting.',
+    })),
+});
 export function createUpdateEntityTool(deps) {
     return {
-        name: 'audako_mcp_update_entity',
+        name: 'update_entity',
         label: 'Update Entity',
         description: 'Update an existing configuration entity with partial changes.',
         parameters: updateEntitySchema,
         execute: async (_toolCallId, params) => {
-            const sessionId = deps.sessionContext.getSessionId();
-            await ensureMutationPermission({
-                sessionId,
-                entityType: params.entityType,
-                permissionMode: normalizePermissionMode(params.permissionMode),
-                permissionStore: deps.permissions,
-                sessionRequestHub: deps.requestHub,
+            const sessionId = deps.sessionId;
+            const contract = resolveEntityTypeContract(params.entityType);
+            if (!contract) {
+                throw new Error(`Unsupported entity type '${params.entityType}'.`);
+            }
+            const existingForScope = await deps.audakoServices.entityService.getPartialEntityById(contract.entityType, params.entityId, { GroupId: 1 });
+            const groupIdValue = existingForScope.GroupId;
+            const entityGroupId = typeof groupIdValue === 'string' ? groupIdValue : undefined;
+            await deps.permissionService.hasPermission(sessionId, params.entityType, entityGroupId, normalizePermissionMode(params.permissionMode), 'update_entity');
+            const validationErrors = contract.validate(params.changes, 'update');
+            if (validationErrors.length > 0) {
+                throw new Error(`Entity update validation failed: ${validationErrors.join('; ')}`);
+            }
+            const updatedEntity = await deps.mutationThrottle.run(async () => {
+                const existingEntity = await deps.audakoServices.entityService.getEntityById(contract.entityType, params.entityId);
+                const entityToUpdate = contract.applyUpdate(existingEntity, params.changes);
+                return deps.audakoServices.entityService.updateEntity(contract.entityType, entityToUpdate);
             });
-            await deps.scopeGuard.validate(deps.sessionContext.getGroupId(), params.entityType);
-            const updatedEntity = await runInMutationThrottle(deps.mutationThrottle, async () => {
-                const contract = resolveEntityTypeContract(params.entityType);
-                if (!contract) {
-                    throw new Error(`Unsupported entity type '${params.entityType}'.`);
-                }
-                const validationErrors = contract.validate(params.changes, 'update');
-                if (validationErrors.length > 0) {
-                    throw new Error(`Entity update validation failed: ${validationErrors.join('; ')}`);
-                }
-                return deps.audakoServices.entityData.update(params.entityType, params.entityId, params.changes);
-            });
-            const entityId = updatedEntity.id ?? updatedEntity.Id ?? params.entityId;
+            const entityId = updatedEntity.Id || params.entityId;
             deps.eventHub.publish(sessionId, {
                 type: 'entity.updated',
+                sessionId,
                 timestamp: new Date().toISOString(),
                 payload: {
-                    entityType: params.entityType,
+                    entityType: contract.entityType,
                     entityId,
                     changes: params.changes,
                 },
             });
             return {
-                content: [{ type: 'text', text: `Updated ${params.entityType} with ID ${entityId}` }],
+                content: [{ type: 'text', text: `Updated ${contract.entityType} with ID ${entityId}` }],
                 details: {
-                    entityType: params.entityType,
+                    entityType: contract.entityType,
                     entityId,
                 },
             };

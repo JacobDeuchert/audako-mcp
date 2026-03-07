@@ -15,4 +15,3 @@ export const QuestionRequestSchema = z.object({
 });
 
 export type QuestionRequest = z.infer<typeof QuestionRequestSchema>;
-

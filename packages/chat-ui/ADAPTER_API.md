@@ -21,10 +21,29 @@ export interface ChatAdapter {
   init?(): Promise<void>;
   sendMessage(request: ChatRequest, callbacks: StreamCallbacks): Promise<void>;
   cancel?(): void;
+  updateSessionInfo?(sessionInfo: SessionInfoFields): Promise<void>;
 }
 ```
 
 `onChunk` and `onThinking` receive the accumulated text.
+
+## WebSocketAdapter custom events
+
+`WebSocketAdapter` accepts an `onCustomEvent` callback in config. Use it to consume session events that chat-ui does not handle directly.
+
+```ts
+const adapter = new WebSocketAdapter({
+  baseUrl,
+  websocketPath,
+  sessionToken,
+  sessionId,
+  onCustomEvent: (event) => {
+    if (event.type === 'my.tool.progress') {
+      console.log(event.payload);
+    }
+  },
+});
+```
 
 ## Built-in adapters
 

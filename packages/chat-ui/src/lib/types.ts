@@ -1,5 +1,6 @@
 export type QuestionOption = import('@audako/contracts').QuestionOption;
 export type QuestionRequest = import('@audako/contracts').QuestionRequest;
+export type SessionInfoFields = import('@audako/contracts').SessionInfoFields;
 
 export interface ThinkingBlock {
   content: string;
@@ -27,6 +28,11 @@ export type PublicQuestionHandler = (
 export interface ChatRequest {
   message: string;
   conversationHistory?: Message[];
+}
+
+export interface SlashCommand {
+  name: string;
+  description: string;
 }
 
 export interface StreamCallbacks {
@@ -85,6 +91,20 @@ export interface ChatAdapter {
    * Cancel an ongoing request (optional)
    */
   cancel?(): void;
+
+  updateSessionInfo?(sessionInfo: SessionInfoFields): Promise<void>;
+
+  /**
+   * Return the list of slash commands supported by this adapter.
+   * Commands appear in the autocomplete menu when the user types `/`.
+   */
+  getSlashCommands?(): SlashCommand[];
+
+  /**
+   * Start a new conversation session.
+   * Called when the user executes the `/new` slash command.
+   */
+  newSession?(): Promise<void>;
 }
 
 export interface ChatWidgetConfig {

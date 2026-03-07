@@ -1,12 +1,14 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
+import { Type } from '@mariozechner/pi-ai';
 import { EntityNameService, EntityType } from 'audako-core';
 import type { AudakoServices } from '../services/audako-services.js';
 import { toErrorResponse, toTextResponse } from './helpers.js';
-import { getGroupPathSchema } from './schemas.js';
+
+const getGroupPathSchema = Type.Object({
+  groupId: Type.String({ description: 'The group ID to resolve.' }),
+});
 
 const PATH_SEPARATOR = ' / ';
-
-type AgentSchema<T> = T & any;
 
 interface TenantServiceWithEntityLookup {
   getTenantViewForEntityId?: (entityId: string) => Promise<{
@@ -42,16 +44,16 @@ async function resolveTenantForEntityId(
 
 export function createGetGroupPathTool(
   audakoServices: AudakoServices,
-): AgentTool<AgentSchema<typeof getGroupPathSchema>> {
+): AgentTool<typeof getGroupPathSchema> {
   return {
-    name: 'audako_mcp_get_group_path',
+    name: 'get_group_path',
     label: 'Get Group Path',
     description: 'Resolve a group path by groupId and return tenant + path details for that group.',
     parameters: getGroupPathSchema,
     execute: async (_toolCallId, { groupId }) => {
       const normalizedGroupId = groupId.trim();
       if (!normalizedGroupId) {
-        return toErrorResponse("'groupId' must be a non-empty string.") as any;
+        return toErrorResponse("'groupId' must be a non-empty string.");
       }
 
       try {
@@ -71,10 +73,10 @@ export function createGetGroupPathTool(
           tenantId: tenant.Id,
           pathName,
           pathIds: fullPathIds.join(PATH_SEPARATOR),
-        }) as any;
+        });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return toErrorResponse(`Failed to resolve group path: ${errorMessage}`) as any;
+        return toErrorResponse(`Failed to resolve group path: ${errorMessage}`);
       }
     },
   };

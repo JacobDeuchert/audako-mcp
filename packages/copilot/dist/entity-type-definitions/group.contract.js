@@ -4,32 +4,6 @@ import { buildZodSchemaFromFieldDefinitions } from './zod-utils.js';
 const DEFAULT_GROUP_TYPE = 'Default';
 const groupFieldDefinitions = [
     {
-        key: 'name',
-        dtoName: 'name',
-        description: 'Name of the group',
-        type: 'string',
-        entityPath: 'Name',
-        isEntityField: true,
-        requiredOnCreate: true,
-    },
-    {
-        key: 'description',
-        dtoName: 'description',
-        description: 'Description of the group',
-        type: 'string',
-        entityPath: 'Description',
-        isEntityField: true,
-        requiredOnCreate: false,
-    },
-    {
-        key: 'groupId',
-        dtoName: 'groupId',
-        description: 'Parent group ID (defaults to selected tenant root when omitted)',
-        type: 'string',
-        entityPath: 'GroupId',
-        requiredOnCreate: false,
-    },
-    {
         key: 'type',
         dtoName: 'type',
         description: 'Can be set to Default or DigitalTwin. DigitalTwins are for maintenance objects. Set to default if asked otherwise.',
@@ -75,13 +49,10 @@ class GroupEntityContract extends BaseEntityContract {
     description = 'Audako group configuration entity';
     examples = {
         create: {
-            name: 'Alarmierungstest',
-            groupId: 'root-group-id',
             type: DEFAULT_GROUP_TYPE,
             icon: 'mat-alarm',
         },
         update: {
-            description: 'Updated group description',
             icon: 'mat-folder',
         },
     };
@@ -116,6 +87,9 @@ class GroupEntityContract extends BaseEntityContract {
         const model = {};
         this.setModelValueIfDefined(model, 'id', group.Id);
         this.setModelValueIfDefined(model, 'path', group.Path ? [...group.Path] : undefined);
+        this.setModelValueIfDefined(model, 'name', EntityUtils.getPropertyValue(group, 'Name', true));
+        this.setModelValueIfDefined(model, 'description', EntityUtils.getPropertyValue(group, 'Description', true));
+        this.setModelValueIfDefined(model, 'groupId', group.GroupId);
         for (const field of this.fieldDefinitions) {
             const dtoFieldName = this.getDtoFieldName(field);
             const value = this.getGroupFieldValue(group, field);
@@ -132,6 +106,12 @@ class GroupEntityContract extends BaseEntityContract {
         if (typeof model.path !== 'undefined') {
             group.Path = [...model.path];
         }
+        if (model.name !== undefined)
+            EntityUtils.setPropertyValue(group, 'Name', model.name, true);
+        if (model.description !== undefined)
+            EntityUtils.setPropertyValue(group, 'Description', model.description, true);
+        if (model.groupId !== undefined)
+            group.GroupId = model.groupId;
         for (const field of this.fieldDefinitions) {
             const dtoFieldName = this.getDtoFieldName(field);
             const value = modelValues[dtoFieldName];

@@ -44,14 +44,14 @@ export const appConfig = {
     logLevel,
 };
 /**
- * Load the system prompt for the OpenCode agent from .opencode/prompts/scada-agent.md
+ * Load the system prompt for the OpenCode agent from prompts/scada-agent.md
  * @returns Promise resolving to the system prompt text
  * @throws Error if the file cannot be read
  */
 export async function loadSystemPrompt() {
     try {
         const { readFile } = await import('fs/promises');
-        const systemPromptPath = path.resolve(__dirname, '../../.opencode/prompts/scada-agent.md');
+        const systemPromptPath = path.resolve(__dirname, '../../prompts/scada-agent.md');
         const content = await readFile(systemPromptPath, 'utf-8');
         return content;
     }

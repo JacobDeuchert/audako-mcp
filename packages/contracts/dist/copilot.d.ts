@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { HubResponseSessionEvent } from './copilot-ws-events.js';
 export declare const SessionInfoFieldsSchema: z.ZodObject<{
     tenantId: z.ZodOptional<z.ZodString>;
     groupId: z.ZodOptional<z.ZodString>;
@@ -103,7 +102,7 @@ export declare const SessionBootstrapRequestSchema: z.ZodObject<{
 }>;
 export type SessionBootstrapRequest = z.infer<typeof SessionBootstrapRequestSchema>;
 export declare const SessionBootstrapResponseSchema: z.ZodObject<{
-    websocketUrl: z.ZodString;
+    websocketPath: z.ZodString;
     sessionId: z.ZodString;
     bridgeSessionToken: z.ZodString;
     isNew: z.ZodBoolean;
@@ -138,7 +137,7 @@ export declare const SessionBootstrapResponseSchema: z.ZodObject<{
         app?: string | undefined;
         updatedAt?: string | undefined;
     };
-    websocketUrl: string;
+    websocketPath: string;
     bridgeSessionToken: string;
     isNew: boolean;
 }, {
@@ -151,133 +150,11 @@ export declare const SessionBootstrapResponseSchema: z.ZodObject<{
         app?: string | undefined;
         updatedAt?: string | undefined;
     };
-    websocketUrl: string;
+    websocketPath: string;
     bridgeSessionToken: string;
     isNew: boolean;
 }>;
 export type SessionBootstrapResponse = z.infer<typeof SessionBootstrapResponseSchema>;
-export declare const PushSessionEventRequestSchema: z.ZodObject<{
-    type: z.ZodString;
-    payload: z.ZodOptional<z.ZodUnknown>;
-}, "strict", z.ZodTypeAny, {
-    type: string;
-    payload?: unknown;
-}, {
-    type: string;
-    payload?: unknown;
-}>;
-export type PushSessionEventRequest = z.infer<typeof PushSessionEventRequestSchema>;
-export declare const RequestSessionEventRequestSchema: z.ZodObject<{
-    type: z.ZodString;
-    payload: z.ZodOptional<z.ZodUnknown>;
-    timeoutMs: z.ZodOptional<z.ZodNumber>;
-    longPollMs: z.ZodOptional<z.ZodNumber>;
-}, "strict", z.ZodTypeAny, {
-    type: string;
-    payload?: unknown;
-    timeoutMs?: number | undefined;
-    longPollMs?: number | undefined;
-}, {
-    type: string;
-    payload?: unknown;
-    timeoutMs?: number | undefined;
-    longPollMs?: number | undefined;
-}>;
-export type RequestSessionEventRequest = z.infer<typeof RequestSessionEventRequestSchema>;
-export declare const PushSessionEventResponseSchema: z.ZodObject<{
-    sessionId: z.ZodString;
-    deliveredTo: z.ZodNumber;
-}, "strip", z.ZodTypeAny, {
-    sessionId: string;
-    deliveredTo: number;
-}, {
-    sessionId: string;
-    deliveredTo: number;
-}>;
-export type PushSessionEventResponse = z.infer<typeof PushSessionEventResponseSchema>;
-export declare const RequestSessionEventResponseSchema: z.ZodObject<{
-    sessionId: z.ZodString;
-    requestId: z.ZodString;
-    response: z.ZodUnknown;
-    respondedAt: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    sessionId: string;
-    requestId: string;
-    respondedAt: string;
-    response?: unknown;
-}, {
-    sessionId: string;
-    requestId: string;
-    respondedAt: string;
-    response?: unknown;
-}>;
-export type RequestSessionEventResponse = z.infer<typeof RequestSessionEventResponseSchema>;
-export declare const ResolveSessionEventResponseRequestSchema: z.ZodObject<{
-    response: z.ZodUnknown;
-}, "strict", z.ZodTypeAny, {
-    response?: unknown;
-}, {
-    response?: unknown;
-}>;
-export type ResolveSessionEventResponseRequest = z.infer<typeof ResolveSessionEventResponseRequestSchema>;
-export declare const RequestSessionEventPendingResponseSchema: z.ZodObject<{
-    sessionId: z.ZodString;
-    requestId: z.ZodString;
-    status: z.ZodLiteral<"pending">;
-    expiresAt: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    status: "pending";
-    sessionId: string;
-    requestId: string;
-    expiresAt: string;
-}, {
-    status: "pending";
-    sessionId: string;
-    requestId: string;
-    expiresAt: string;
-}>;
-export type RequestSessionEventPendingResponse = z.infer<typeof RequestSessionEventPendingResponseSchema>;
-export declare const RequestSessionEventStatusResponseSchema: z.ZodObject<{
-    sessionId: z.ZodString;
-    requestId: z.ZodString;
-    status: z.ZodEnum<["pending", "resolved", "expired"]>;
-    expiresAt: z.ZodString;
-    response: z.ZodOptional<z.ZodUnknown>;
-    respondedAt: z.ZodOptional<z.ZodString>;
-}, "strip", z.ZodTypeAny, {
-    status: "pending" | "resolved" | "expired";
-    sessionId: string;
-    requestId: string;
-    expiresAt: string;
-    response?: unknown;
-    respondedAt?: string | undefined;
-}, {
-    status: "pending" | "resolved" | "expired";
-    sessionId: string;
-    requestId: string;
-    expiresAt: string;
-    response?: unknown;
-    respondedAt?: string | undefined;
-}>;
-export type RequestSessionEventStatusResponse = z.infer<typeof RequestSessionEventStatusResponseSchema>;
-export declare const ResolveSessionEventResponseSchema: z.ZodObject<{
-    sessionId: z.ZodString;
-    requestId: z.ZodString;
-    resolved: z.ZodLiteral<true>;
-}, "strip", z.ZodTypeAny, {
-    sessionId: string;
-    requestId: string;
-    resolved: true;
-}, {
-    sessionId: string;
-    requestId: string;
-    resolved: true;
-}>;
-export type ResolveSessionEventResponse = z.infer<typeof ResolveSessionEventResponseSchema>;
 export declare function isSessionInfoResponse(value: unknown): value is SessionInfoResponse;
-export declare function isRequestSessionEventResponse(value: unknown): value is RequestSessionEventResponse;
-export declare function isRequestSessionEventPendingResponse(value: unknown): value is RequestSessionEventPendingResponse;
-export declare function isRequestSessionEventStatusResponse(value: unknown): value is RequestSessionEventStatusResponse;
-export declare function isHubResponseSessionEvent(value: unknown): value is HubResponseSessionEvent;
 export type { BridgeSessionWebSocketEvent, EntityCreatedEventPayload, EntityCreatedSessionEvent, EntityMovedEventPayload, EntityMovedSessionEvent, EntityUpdatedEventPayload, EntityUpdatedSessionEvent, HubRequestPayload, HubRequestSessionEvent, HubResponsePayload, HubResponseSessionEvent, KnownBridgeSessionWebSocketEvent, McpPublishedSessionEvent, QuestionAskHubRequestEvent, QuestionAskHubRequestPayload, SessionClosedEvent, SessionClosedEventPayload, SessionEventEnvelope, SessionInfoUpdatedEvent, SessionSnapshotEvent, SessionSnapshotPayload, } from './copilot-ws-events.js';
 //# sourceMappingURL=copilot.d.ts.map

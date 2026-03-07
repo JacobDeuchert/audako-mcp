@@ -94,8 +94,12 @@ $effect(() => {
         draft={controller.state.draft}
         placeholder={composerPlaceholder}
         disabled={composerDisabled}
+        isStreaming={!!controller.state.streamingMessageId}
+        slashCommands={controller.getSlashCommands()}
         onDraftChange={controller.setDraft}
         onSubmit={controller.sendMessage}
+        onCancel={controller.cancelMessage}
+        onSlashCommand={(cmd) => controller.executeSlashCommand(cmd.name)}
       />
     {/if}
   </footer>

@@ -8,23 +8,10 @@
  * - Provides session-level connection lifecycle management
  */
 
+import type { SessionEventEnvelope, SessionSocket } from '@audako/contracts';
+
 const WS_OPEN_STATE = 1;
 const WS_CLOSED_STATE = 3;
-
-/** Minimal WebSocket interface for event fanout */
-export interface SessionSocket {
-  readyState: number;
-  send(data: string): void;
-  close(code?: number, reason?: string): void;
-}
-
-/** Event envelope structure for session events */
-export interface SessionEventEnvelope<T = unknown> {
-  type: string;
-  sessionId?: string;
-  timestamp: string;
-  payload: T;
-}
 
 /**
  * SessionEventHub manages WebSocket connections per session and broadcasts events.
@@ -87,7 +74,7 @@ export class SessionEventHub {
       try {
         socket.send(payload);
         delivered += 1;
-      } catch (error) {
+      } catch (_error) {
         staleSockets.push(socket);
         // Silently remove failed connections
       }

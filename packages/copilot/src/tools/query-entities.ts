@@ -1,14 +1,33 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
+import { StringEnum, Type } from '@mariozechner/pi-ai';
 import {
   getSupportedEntityTypeNames,
   resolveEntityTypeContract,
-} from '../entity-type-definitions/index.js';
+} from '../entity-type-definitions/entity-type-registry.js';
 import type { AudakoServices } from '../services/audako-services.js';
 import type { SessionContext } from '../services/session-context.js';
 import { isRecord, toErrorResponse, toTextResponse } from './helpers.js';
-import { queryEntitiesSchema } from './schemas.js';
 
-type AgentSchema<T> = T & any;
+const queryEntitiesSchema = Type.Object({
+  scope: StringEnum(['global', 'tenant', 'group', 'groupWithSubgroups'], {
+    description: 'Scope for the query.',
+  }),
+  scopeId: Type.Optional(
+    Type.String({
+      description:
+        'Optional scope identifier. If omitted, groupId or tenantId is taken from session info based on scope.',
+    }),
+  ),
+  entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
+  filter: Type.Object(
+    {},
+    {
+      additionalProperties: true,
+      description:
+        'REQUIRED: Mongo-style filter object that supports logical operators like $and, $or, $not, and $nor.',
+    },
+  ),
+});
 
 function hasNonEmptyScopeId(scopeId?: string): scopeId is string {
   return typeof scopeId === 'string' && scopeId.trim().length > 0;
@@ -21,9 +40,9 @@ function isValidFilter(filter: unknown): filter is Record<string, unknown> {
 export function createQueryEntitiesTool(
   sessionContext: SessionContext,
   audakoServices: AudakoServices,
-): AgentTool<AgentSchema<typeof queryEntitiesSchema>> {
+): AgentTool<typeof queryEntitiesSchema> {
   return {
-    name: 'audako_mcp_query_entities',
+    name: 'query_entities',
     label: 'Query Entities',
     description:
       'Query entities by scope with a Mongo-style filter object. Supports $and, $or, $not, and $nor operators.',
@@ -34,11 +53,11 @@ export function createQueryEntitiesTool(
         const supportedTypes = getSupportedEntityTypeNames();
         return toErrorResponse(`Unsupported entity type '${entityType}'.`, {
           supportedTypes,
-        }) as any;
+        });
       }
 
       if (!isValidFilter(filter)) {
-        return toErrorResponse("'filter' must be a JSON object.") as any;
+        return toErrorResponse("'filter' must be a JSON object.");
       }
 
       let resolvedScopeId: string | undefined;
@@ -46,14 +65,11 @@ export function createQueryEntitiesTool(
         if (hasNonEmptyScopeId(scopeId)) {
           resolvedScopeId = scopeId.trim();
         } else {
-          resolvedScopeId =
-            scope === 'tenant' ? sessionContext.getTenantId() : sessionContext.getGroupId();
+          resolvedScopeId = scope === 'tenant' ? sessionContext.tenantId : sessionContext.groupId;
         }
 
         if (!resolvedScopeId) {
-          return toErrorResponse(
-            `No '${scope}' scope ID provided and none found in session info.`,
-          ) as any;
+          return toErrorResponse(`No '${scope}' scope ID provided and none found in session info.`);
         }
       }
 
@@ -76,7 +92,7 @@ export function createQueryEntitiesTool(
           if (!tenant.Root) {
             return toErrorResponse(
               `Tenant '${resolvedScopeId}' has no root group and cannot be queried.`,
-            ) as any;
+            );
           }
 
           scopePayload.tenantId = tenant.Id;
@@ -87,9 +103,7 @@ export function createQueryEntitiesTool(
           };
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          return toErrorResponse(
-            `Failed to resolve tenant '${resolvedScopeId}': ${errorMessage}`,
-          ) as any;
+          return toErrorResponse(`Failed to resolve tenant '${resolvedScopeId}': ${errorMessage}`);
         }
       }
 
@@ -114,10 +128,10 @@ export function createQueryEntitiesTool(
           count: entities.length,
           total: queryResult.total,
           entities,
-        }) as any;
+        });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return toErrorResponse(`Failed to query entities: ${errorMessage}`) as any;
+        return toErrorResponse(`Failed to query entities: ${errorMessage}`);
       }
     },
   };

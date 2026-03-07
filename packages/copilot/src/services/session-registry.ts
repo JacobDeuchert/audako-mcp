@@ -1,6 +1,7 @@
+import { createHash, randomBytes } from 'node:crypto';
 import type { Agent } from '@mariozechner/pi-agent-core';
-import { createHash, randomBytes } from 'crypto';
-import { createLogger } from '../config/index.js';
+import { createLogger } from '../config/app-config.js';
+import type { AudakoServices } from './audako-services.js';
 import type { SessionContext } from './session-context.js';
 
 const logger = createLogger('session-registry');
@@ -15,6 +16,7 @@ export interface SessionRegistryEntry {
   agentDestroy: () => void;
   wsEventBridgeUnsubscribe: () => void;
   sessionContext: SessionContext;
+  audakoServices: AudakoServices;
   createdAt: Date;
   lastAccessedAt: Date;
 }
@@ -117,6 +119,7 @@ export class SessionRegistry {
       agentDestroy: () => void;
       wsEventBridgeUnsubscribe: () => void;
       sessionContext: SessionContext;
+      audakoServices: AudakoServices;
     }>,
   ): Promise<{ entry: SessionRegistryEntry; isNew: boolean; sessionToken: string }> {
     const key = this.generateKey(scadaUrl, accessToken);
@@ -149,6 +152,7 @@ export class SessionRegistry {
       agentDestroy: () => void;
       wsEventBridgeUnsubscribe: () => void;
       sessionContext: SessionContext;
+      audakoServices: AudakoServices;
     }>,
   ): Promise<{ entry: SessionRegistryEntry; isNew: boolean; sessionToken: string }> {
     // Check if session already exists.
@@ -177,10 +181,8 @@ export class SessionRegistry {
     const sessionId = randomBytes(16).toString('hex');
     const sessionToken = this.generateSessionToken();
 
-    const { agent, agentDestroy, wsEventBridgeUnsubscribe, sessionContext } = await createSessionFn(
-      sessionId,
-      sessionToken,
-    );
+    const { agent, agentDestroy, wsEventBridgeUnsubscribe, sessionContext, audakoServices } =
+      await createSessionFn(sessionId, sessionToken);
 
     const entry: SessionRegistryEntry = {
       sessionId,
@@ -192,6 +194,7 @@ export class SessionRegistry {
       agentDestroy,
       wsEventBridgeUnsubscribe,
       sessionContext,
+      audakoServices,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     };

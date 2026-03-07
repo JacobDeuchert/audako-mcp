@@ -1,8 +1,11 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import type { InlineMutationPermissionRequestHub } from '../services/inline-mutation-permissions.js';
 import type { MutationPermissionsStore } from '../services/mutation-permissions.js';
-import { createEntitySchema } from './schemas.js';
-type AgentSchema<T> = T & any;
+declare const createEntitySchema: import("@sinclair/typebox").TObject<{
+    entityType: import("@sinclair/typebox").TString;
+    payload: import("@sinclair/typebox").TObject<{}>;
+    permissionMode: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TUnion<[import("@sinclair/typebox").TLiteral<"interactive">, import("@sinclair/typebox").TLiteral<"fail_fast">]>>;
+}>;
 type CreateEntityResult = {
     id?: string;
     Id?: string;
@@ -44,6 +47,9 @@ export interface CreateEntityToolDependencies {
     eventHub: EventHubLike;
     requestHub: InlineMutationPermissionRequestHub;
 }
-export declare function createCreateEntityTool(deps: CreateEntityToolDependencies): AgentTool<AgentSchema<typeof createEntitySchema>>;
+export declare function createCreateEntityTool(deps: CreateEntityToolDependencies): AgentTool<typeof createEntitySchema, {
+    entityType: string;
+    entityId: string;
+}>;
 export {};
 //# sourceMappingURL=create-entity.d.ts.map

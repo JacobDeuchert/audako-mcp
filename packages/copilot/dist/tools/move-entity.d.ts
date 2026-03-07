@@ -1,8 +1,12 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import type { InlineMutationPermissionRequestHub } from '../services/inline-mutation-permissions.js';
 import type { MutationPermissionsStore } from '../services/mutation-permissions.js';
-import { moveEntitySchema } from './schemas.js';
-type AgentSchema<T> = T & any;
+declare const moveEntitySchema: import("@sinclair/typebox").TObject<{
+    entityType: import("@sinclair/typebox").TString;
+    entityId: import("@sinclair/typebox").TString;
+    targetGroupId: import("@sinclair/typebox").TString;
+    permissionMode: import("@sinclair/typebox").TOptional<import("@sinclair/typebox").TUnion<[import("@sinclair/typebox").TLiteral<"interactive">, import("@sinclair/typebox").TLiteral<"fail_fast">]>>;
+}>;
 type MoveEntityResult = {
     fromGroupId?: string;
     toGroupId?: string;
@@ -44,6 +48,11 @@ export interface MoveEntityToolDependencies {
     eventHub: EventHubLike;
     requestHub: InlineMutationPermissionRequestHub;
 }
-export declare function createMoveEntityTool(deps: MoveEntityToolDependencies): AgentTool<AgentSchema<typeof moveEntitySchema>>;
+export declare function createMoveEntityTool(deps: MoveEntityToolDependencies): AgentTool<typeof moveEntitySchema, {
+    entityType: string;
+    entityId: string;
+    fromGroupId: string;
+    toGroupId: string;
+}>;
 export {};
 //# sourceMappingURL=move-entity.d.ts.map

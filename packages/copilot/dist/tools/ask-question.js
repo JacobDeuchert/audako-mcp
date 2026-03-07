@@ -1,17 +1,27 @@
+import { Type } from '@mariozechner/pi-ai';
 import { toTextResponse } from './helpers.js';
-import { askQuestionSchema } from './schemas.js';
+const askQuestionSchema = Type.Object({
+    question: Type.String({ description: 'Complete question', minLength: 1 }),
+    header: Type.String({
+        description: 'Very short label (max 30 chars)',
+        minLength: 1,
+        maxLength: 30,
+    }),
+    options: Type.Array(Type.Object({
+        label: Type.String({ description: 'Display text (1-5 words, concise)', minLength: 1 }),
+        description: Type.String({ description: 'Explanation of choice', minLength: 1 }),
+    }), {
+        minItems: 1,
+        description: 'Available choices',
+    }),
+    multiple: Type.Optional(Type.Boolean({ description: 'Allow selecting multiple choices' })),
+});
 function normalizeQuestionOptions(options) {
     const normalized = [];
     const seenLabels = new Set();
     for (const option of options) {
         const label = option.label.trim();
         const description = option.description.trim();
-        if (!label) {
-            throw new Error('Each option label must be a non-empty string.');
-        }
-        if (!description) {
-            throw new Error('Each option description must be a non-empty string.');
-        }
         if (seenLabels.has(label)) {
             throw new Error(`Duplicate option label '${label}' is not allowed.`);
         }
@@ -42,19 +52,13 @@ function toSelectedLabels(response) {
 }
 export function createAskQuestionTool(sessionId, sessionRequestHub) {
     return {
-        name: 'audako_mcp_ask_question',
+        name: 'ask_question',
         label: 'Ask Question',
         description: 'Prompt user with a question and options, wait for response.',
         parameters: askQuestionSchema,
         execute: async (_toolCallId, params, signal) => {
             const questionText = params.question.trim();
-            if (!questionText) {
-                throw new Error("'question' must be a non-empty string.");
-            }
             const headerText = params.header.trim();
-            if (!headerText) {
-                throw new Error("'header' must be a non-empty string.");
-            }
             const normalizedOptions = normalizeQuestionOptions(params.options);
             const allowMultiple = params.multiple === true;
             const questionRequest = {

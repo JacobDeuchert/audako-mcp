@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 /**
  * Session token generation and validation service.
  * Generates cryptographically random session tokens and validates them using timing-safe comparison.

@@ -38,6 +38,171 @@ export type SessionEventEnvelope<T = unknown> = {
     timestamp: string;
     payload: T;
 };
+/** Minimal WebSocket interface for session event fanout */
+export interface SessionSocket {
+    readyState: number;
+    send(data: string): void;
+    close(code?: number, reason?: string): void;
+    on?(event: string, handler: (...args: any[]) => void): void;
+    ping?(): void;
+}
+export declare const BridgeSessionWebSocketUserMessageSchema: z.ZodObject<{
+    type: z.ZodLiteral<"user_message">;
+    content: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "user_message";
+    content: string;
+}, {
+    type: "user_message";
+    content: string;
+}>;
+export type BridgeSessionWebSocketUserMessage = z.infer<typeof BridgeSessionWebSocketUserMessageSchema>;
+export declare const BridgeSessionWebSocketPingMessageSchema: z.ZodObject<{
+    type: z.ZodLiteral<"ping">;
+}, "strip", z.ZodTypeAny, {
+    type: "ping";
+}, {
+    type: "ping";
+}>;
+export type BridgeSessionWebSocketPingMessage = z.infer<typeof BridgeSessionWebSocketPingMessageSchema>;
+export declare const BridgeSessionWebSocketCancelMessageSchema: z.ZodObject<{
+    type: z.ZodLiteral<"cancel">;
+}, "strip", z.ZodTypeAny, {
+    type: "cancel";
+}, {
+    type: "cancel";
+}>;
+export type BridgeSessionWebSocketCancelMessage = z.infer<typeof BridgeSessionWebSocketCancelMessageSchema>;
+export declare const BridgeSessionWebSocketHubResponseMessageSchema: z.ZodObject<{
+    type: z.ZodLiteral<"hub.response">;
+    requestId: z.ZodString;
+    response: z.ZodUnknown;
+}, "strip", z.ZodTypeAny, {
+    type: "hub.response";
+    requestId: string;
+    response?: unknown;
+}, {
+    type: "hub.response";
+    requestId: string;
+    response?: unknown;
+}>;
+export type BridgeSessionWebSocketHubResponseMessage = z.infer<typeof BridgeSessionWebSocketHubResponseMessageSchema>;
+export declare const BridgeSessionWebSocketSessionInfoUpdateMessageSchema: z.ZodObject<{
+    type: z.ZodLiteral<"session.info.update">;
+    sessionInfo: z.ZodObject<{
+        tenantId: z.ZodOptional<z.ZodString>;
+        groupId: z.ZodOptional<z.ZodString>;
+        entityType: z.ZodOptional<z.ZodString>;
+        app: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    }, {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    }>;
+}, "strip", z.ZodTypeAny, {
+    type: "session.info.update";
+    sessionInfo: {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    };
+}, {
+    type: "session.info.update";
+    sessionInfo: {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    };
+}>;
+export type BridgeSessionWebSocketSessionInfoUpdateMessage = z.infer<typeof BridgeSessionWebSocketSessionInfoUpdateMessageSchema>;
+export declare const BridgeSessionWebSocketClientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
+    type: z.ZodLiteral<"user_message">;
+    content: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "user_message";
+    content: string;
+}, {
+    type: "user_message";
+    content: string;
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"ping">;
+}, "strip", z.ZodTypeAny, {
+    type: "ping";
+}, {
+    type: "ping";
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"cancel">;
+}, "strip", z.ZodTypeAny, {
+    type: "cancel";
+}, {
+    type: "cancel";
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"hub.response">;
+    requestId: z.ZodString;
+    response: z.ZodUnknown;
+}, "strip", z.ZodTypeAny, {
+    type: "hub.response";
+    requestId: string;
+    response?: unknown;
+}, {
+    type: "hub.response";
+    requestId: string;
+    response?: unknown;
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"session.info.update">;
+    sessionInfo: z.ZodObject<{
+        tenantId: z.ZodOptional<z.ZodString>;
+        groupId: z.ZodOptional<z.ZodString>;
+        entityType: z.ZodOptional<z.ZodString>;
+        app: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    }, {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    }>;
+}, "strip", z.ZodTypeAny, {
+    type: "session.info.update";
+    sessionInfo: {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    };
+}, {
+    type: "session.info.update";
+    sessionInfo: {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    };
+}>]>;
+export type BridgeSessionWebSocketClientMessage = z.infer<typeof BridgeSessionWebSocketClientMessageSchema>;
+export declare function isBridgeSessionWebSocketClientMessage(value: unknown): value is BridgeSessionWebSocketClientMessage;
+export declare const BridgeSessionWebSocketPongMessageSchema: z.ZodObject<{
+    type: z.ZodLiteral<"pong">;
+}, "strip", z.ZodTypeAny, {
+    type: "pong";
+}, {
+    type: "pong";
+}>;
+export type BridgeSessionWebSocketPongMessage = z.infer<typeof BridgeSessionWebSocketPongMessageSchema>;
+export type BridgeSessionWebSocketControlMessage = BridgeSessionWebSocketPongMessage;
+export declare function isBridgeSessionWebSocketControlMessage(value: unknown): value is BridgeSessionWebSocketControlMessage;
 export type HubRequestPayload<TPayload = unknown> = {
     requestId: string;
     requestType: string;
@@ -242,8 +407,8 @@ export declare const QuestionAskHubRequestPayloadSchema: z.ZodObject<{
         allowMultiple?: boolean | undefined;
     };
     requestId: string;
-    expiresAt: string;
     requestType: "question.ask";
+    expiresAt: string;
 }, {
     payload: {
         options: {
@@ -255,8 +420,8 @@ export declare const QuestionAskHubRequestPayloadSchema: z.ZodObject<{
         allowMultiple?: boolean | undefined;
     };
     requestId: string;
-    expiresAt: string;
     requestType: "question.ask";
+    expiresAt: string;
 }>;
 export type QuestionAskHubRequestPayload = z.infer<typeof QuestionAskHubRequestPayloadSchema>;
 export declare const AgentTextDeltaPayloadSchema: z.ZodObject<{
@@ -371,4 +536,5 @@ export type McpPublishedSessionEvent = EntityCreatedSessionEvent | EntityUpdated
 export type AgentSessionEvent = AgentTextDeltaSessionEvent | AgentToolStartSessionEvent | AgentToolEndSessionEvent | AgentTurnStartSessionEvent | AgentTurnEndSessionEvent | AgentErrorSessionEvent;
 export type KnownBridgeSessionWebSocketEvent = SessionSnapshotEvent | SessionInfoUpdatedEvent | SessionClosedEvent | HubRequestSessionEvent | HubResponseSessionEvent | McpPublishedSessionEvent | AgentSessionEvent;
 export type BridgeSessionWebSocketEvent = KnownBridgeSessionWebSocketEvent | SessionEventEnvelope;
+export type BridgeSessionWebSocketServerMessage = BridgeSessionWebSocketEvent | BridgeSessionWebSocketControlMessage;
 //# sourceMappingURL=copilot-ws-events.d.ts.map

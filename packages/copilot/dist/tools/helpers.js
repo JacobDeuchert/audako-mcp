@@ -5,7 +5,7 @@ function stringifyPayload(payload) {
     const json = JSON.stringify(payload, null, 2);
     return typeof json === 'string' ? json : String(payload);
 }
-export function toTextResponse(payload) {
+export function toTextResponse(payload, details) {
     return {
         content: [
             {
@@ -13,17 +13,20 @@ export function toTextResponse(payload) {
                 text: stringifyPayload(payload),
             },
         ],
+        details: details,
     };
 }
-export function toErrorResponse(message, details) {
+export function toErrorResponse(message, errorDetails, details) {
     return {
         content: [
             {
                 type: 'text',
-                text: typeof details === 'undefined' ? message : `${message}\n\n${stringifyPayload(details)}`,
+                text: typeof errorDetails === 'undefined'
+                    ? message
+                    : `${message}\n\n${stringifyPayload(errorDetails)}`,
             },
         ],
-        isError: true,
+        details: details,
     };
 }
 export function isRecord(value) {

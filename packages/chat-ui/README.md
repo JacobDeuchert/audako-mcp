@@ -18,6 +18,8 @@ This package is built for direct use in Svelte apps (including Chrome extensions
 npm install @audako/chat-ui
 ```
 
+For copilot session bootstrap and WebSocket integration, see `SESSION_QUICKSTART.md`.
+
 ## Basic usage (Svelte)
 
 ```svelte

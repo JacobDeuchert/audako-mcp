@@ -1,5 +1,5 @@
-import { createHash, randomBytes } from 'crypto';
-import { createLogger } from '../config/index.js';
+import { createHash, randomBytes } from 'node:crypto';
+import { createLogger } from '../config/app-config.js';
 const logger = createLogger('session-registry');
 export class SessionRegistry {
     sessions;
@@ -102,7 +102,7 @@ export class SessionRegistry {
         // Create new session
         const sessionId = randomBytes(16).toString('hex');
         const sessionToken = this.generateSessionToken();
-        const { agent, agentDestroy, wsEventBridgeUnsubscribe, sessionContext } = await createSessionFn(sessionId, sessionToken);
+        const { agent, agentDestroy, wsEventBridgeUnsubscribe, sessionContext, audakoServices } = await createSessionFn(sessionId, sessionToken);
         const entry = {
             sessionId,
             scadaUrl,
@@ -113,6 +113,7 @@ export class SessionRegistry {
             agentDestroy,
             wsEventBridgeUnsubscribe,
             sessionContext,
+            audakoServices,
             createdAt: new Date(),
             lastAccessedAt: new Date(),
         };

@@ -1,6 +1,10 @@
+import { Type } from '@mariozechner/pi-ai';
 import { EntityType } from 'audako-core';
 import { toErrorResponse, toTextResponse } from './helpers.js';
-import { getEntityNameSchema } from './schemas.js';
+const getEntityNameSchema = Type.Object({
+    entityType: Type.String({ description: "Entity type name, for example 'Signal' or 'Group'." }),
+    entityId: Type.String({ description: 'The ID of the entity to resolve.' }),
+});
 const supportedEntityTypes = Object.values(EntityType);
 function resolveEntityType(entityType) {
     const normalizedEntityType = entityType.trim().toLowerCase();
@@ -8,7 +12,7 @@ function resolveEntityType(entityType) {
 }
 export function createGetEntityNameTool(audakoServices) {
     return {
-        name: 'audako_mcp_get_entity_name',
+        name: 'get_entity_name',
         label: 'Get Entity Name',
         description: 'Get an entity name by entity type and entity ID.',
         parameters: getEntityNameSchema,

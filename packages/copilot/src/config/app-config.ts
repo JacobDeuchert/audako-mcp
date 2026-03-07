@@ -1,7 +1,7 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { config } from 'dotenv';
-import path from 'path';
 import { pino } from 'pino';
-import { fileURLToPath } from 'url';
 
 // Load .env from the package root, regardless of cwd.
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,12 +38,12 @@ export const appConfig = {
   // LLM Configuration
   llm: {
     provider: process.env.LLM_PROVIDER || 'anthropic',
-    modelName: process.env.LLM_MODEL_NAME || 'anthropic/claude-sonnet-4-20250514',
+    modelName: process.env.LLM_MODEL_NAME || 'claude-sonnet-4-20250514',
   },
 
   // Mutation Configuration
   mutation: {
-    delayMs: parseInt(process.env.MUTATION_DELAY_MS || '150', 10),
+    delayMs: parseInt(process.env.MUTATION_DELAY_MS || '100', 10),
   },
 
   // Request Configuration
@@ -56,14 +56,14 @@ export const appConfig = {
 };
 
 /**
- * Load the system prompt for the OpenCode agent from .opencode/prompts/scada-agent.md
+ * Load the system prompt for the OpenCode agent from prompts/scada-agent.md
  * @returns Promise resolving to the system prompt text
  * @throws Error if the file cannot be read
  */
 export async function loadSystemPrompt(): Promise<string> {
   try {
-    const { readFile } = await import('fs/promises');
-    const systemPromptPath = path.resolve(__dirname, '../../.opencode/prompts/scada-agent.md');
+    const { readFile } = await import('node:fs/promises');
+    const systemPromptPath = path.resolve(__dirname, '../../prompts/scada-agent.md');
     const content = await readFile(systemPromptPath, 'utf-8');
     return content;
   } catch (error) {

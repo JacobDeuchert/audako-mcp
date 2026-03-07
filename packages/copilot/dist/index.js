@@ -1,4 +1,4 @@
-import { appConfig, createLogger } from './config/index.js';
+import { appConfig, createLogger } from './config/app-config.js';
 import { createServer } from './server.js';
 const logger = createLogger('main');
 async function start() {

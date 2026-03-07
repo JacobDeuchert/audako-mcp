@@ -1,4 +1,4 @@
-import { ChatAdapter, ChatRequest, PublicQuestionHandler, PublicQuestionOptions, QuestionRequest, StreamCallbacks } from '../types';
+import { ChatAdapter, ChatRequest, PublicQuestionHandler, PublicQuestionOptions, QuestionRequest, SlashCommand, StreamCallbacks } from '../types';
 /**
  * Mock adapter for testing and development
  * Simulates streaming responses with random delays and optional thinking
@@ -21,4 +21,6 @@ export declare class MockAdapter implements ChatAdapter {
     showQuestion(question: QuestionRequest, options?: PublicQuestionOptions): Promise<string[]>;
     sendMessage(_request: ChatRequest, callbacks: StreamCallbacks): Promise<void>;
     cancel(): void;
+    getSlashCommands(): SlashCommand[];
+    newSession(): Promise<void>;
 }

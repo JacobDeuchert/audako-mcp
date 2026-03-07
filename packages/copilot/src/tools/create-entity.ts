@@ -12,7 +12,7 @@ const createEntitySchema = Type.Object({
   name: Type.String({ description: 'Name of the entity.' }),
   groupId: Type.String({
     description:
-      'Parent group ID. Pass a real group ID or the literal "context" to use the tenant root group from session context.',
+      'Parent group ID. Pass a real group ID or the literal "context" to use group from session context.',
   }),
   description: Type.Optional(Type.String({ description: 'Description of the entity.' })),
   settings: Type.Optional(

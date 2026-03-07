@@ -36,7 +36,7 @@ export function buildZodSchemaFromFieldDefinitions(fields, mode) {
         const baseSchema = toZodFieldSchema(field);
         shape[dtoFieldName] = isRequired ? baseSchema : baseSchema.optional();
     }
-    return z.object(shape).strict();
+    return z.object(shape).passthrough();
 }
 export function formatZodValidationErrors(error) {
     return error.issues.map(issue => {

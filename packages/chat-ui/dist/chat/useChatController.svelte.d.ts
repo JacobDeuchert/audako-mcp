@@ -1,4 +1,4 @@
-import { ChatWidgetConfig, Message, QuestionRequest } from '../types';
+import { ChatWidgetConfig, Message, QuestionRequest, SlashCommand } from '../types';
 interface ChatControllerOptions {
     getConfig: () => ChatWidgetConfig;
     getShowThinking: () => boolean;
@@ -17,9 +17,12 @@ export declare const useChatController: ({ getConfig, getShowThinking, scrollToB
     syncConfig: () => void;
     setDraft: (value: string) => void;
     sendMessage: () => Promise<void>;
+    cancelMessage: () => void;
     toggleQuestionAnswer: (optionValue: string) => void;
     submitQuestionAnswers: () => void;
     submitCustomAnswer: (value: string) => void;
     clearQuestionFocusRequest: () => void;
+    getSlashCommands: () => SlashCommand[];
+    executeSlashCommand: (commandName: string) => Promise<void>;
 };
 export {};

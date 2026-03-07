@@ -49,7 +49,7 @@ export function buildZodSchemaFromFieldDefinitions(
     shape[dtoFieldName] = isRequired ? baseSchema : baseSchema.optional();
   }
 
-  return z.object(shape).strict();
+  return z.object(shape).passthrough();
 }
 
 export function formatZodValidationErrors(error: z.ZodError): string[] {

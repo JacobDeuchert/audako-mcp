@@ -1,6 +1,9 @@
+import { Type } from '@mariozechner/pi-ai';
 import { EntityNameService, EntityType } from 'audako-core';
 import { toErrorResponse, toTextResponse } from './helpers.js';
-import { getGroupPathSchema } from './schemas.js';
+const getGroupPathSchema = Type.Object({
+    groupId: Type.String({ description: 'The group ID to resolve.' }),
+});
 const PATH_SEPARATOR = ' / ';
 function normalizePathIds(pathValue, groupId) {
     const pathIds = Array.isArray(pathValue)
@@ -20,7 +23,7 @@ async function resolveTenantForEntityId(entityId, audakoServices) {
 }
 export function createGetGroupPathTool(audakoServices) {
     return {
-        name: 'audako_mcp_get_group_path',
+        name: 'get_group_path',
         label: 'Get Group Path',
         description: 'Resolve a group path by groupId and return tenant + path details for that group.',
         parameters: getGroupPathSchema,

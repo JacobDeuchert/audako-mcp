@@ -1,6 +1,19 @@
-import { getSupportedEntityTypeNames, resolveEntityTypeContract, } from '../entity-type-definitions/index.js';
+import { StringEnum, Type } from '@mariozechner/pi-ai';
+import { getSupportedEntityTypeNames, resolveEntityTypeContract, } from '../entity-type-definitions/entity-type-registry.js';
 import { isRecord, toErrorResponse, toTextResponse } from './helpers.js';
-import { queryEntitiesSchema } from './schemas.js';
+const queryEntitiesSchema = Type.Object({
+    scope: StringEnum(['global', 'tenant', 'group', 'groupWithSubgroups'], {
+        description: 'Scope for the query.',
+    }),
+    scopeId: Type.Optional(Type.String({
+        description: 'Optional scope identifier. If omitted, groupId or tenantId is taken from session info based on scope.',
+    })),
+    entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
+    filter: Type.Object({}, {
+        additionalProperties: true,
+        description: 'REQUIRED: Mongo-style filter object that supports logical operators like $and, $or, $not, and $nor.',
+    }),
+});
 function hasNonEmptyScopeId(scopeId) {
     return typeof scopeId === 'string' && scopeId.trim().length > 0;
 }
@@ -9,7 +22,7 @@ function isValidFilter(filter) {
 }
 export function createQueryEntitiesTool(sessionContext, audakoServices) {
     return {
-        name: 'audako_mcp_query_entities',
+        name: 'query_entities',
         label: 'Query Entities',
         description: 'Query entities by scope with a Mongo-style filter object. Supports $and, $or, $not, and $nor operators.',
         parameters: queryEntitiesSchema,
@@ -30,8 +43,7 @@ export function createQueryEntitiesTool(sessionContext, audakoServices) {
                     resolvedScopeId = scopeId.trim();
                 }
                 else {
-                    resolvedScopeId =
-                        scope === 'tenant' ? sessionContext.getTenantId() : sessionContext.getGroupId();
+                    resolvedScopeId = scope === 'tenant' ? sessionContext.tenantId : sessionContext.groupId;
                 }
                 if (!resolvedScopeId) {
                     return toErrorResponse(`No '${scope}' scope ID provided and none found in session info.`);

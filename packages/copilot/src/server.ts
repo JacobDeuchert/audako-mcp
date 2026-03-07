@@ -1,7 +1,7 @@
 import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
-import { appConfig, createLogger } from './config/index.js';
+import { appConfig, createLogger } from './config/app-config.js';
 import { healthRoutes } from './routes/health.routes.js';
 import { sessionRoutes } from './routes/session.routes.js';
 import { SessionEventHub } from './services/session-event-hub.js';

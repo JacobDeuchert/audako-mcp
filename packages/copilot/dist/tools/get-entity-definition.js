@@ -1,8 +1,11 @@
-import { getSupportedEntityTypeNames, resolveEntityTypeContract, } from '../entity-type-definitions/index.js';
+import { Type } from '@mariozechner/pi-ai';
+import { getSupportedEntityTypeNames, resolveEntityTypeContract, } from '../entity-type-definitions/entity-type-registry.js';
 import { toErrorResponse, toTextResponse } from './helpers.js';
-import { getEntityDefinitionSchema } from './schemas.js';
+const getEntityDefinitionSchema = Type.Object({
+    entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
+});
 export const getEntityDefinitionTool = {
-    name: 'audako_mcp_get_entity_definition',
+    name: 'get_entity_definition',
     label: 'Get Entity Definition',
     description: 'Return the field definition for an entity type, including required fields and enum options.',
     parameters: getEntityDefinitionSchema,

@@ -4,6 +4,7 @@ import type {
   PublicQuestionHandler,
   PublicQuestionOptions,
   QuestionRequest,
+  SlashCommand,
   StreamCallbacks,
 } from '../types';
 
@@ -146,5 +147,16 @@ export class MockAdapter implements ChatAdapter {
     if (this.abortController) {
       this.abortController.abort();
     }
+  }
+
+  getSlashCommands(): SlashCommand[] {
+    return [
+      { name: 'new', description: 'Start a new conversation' },
+      { name: 'help', description: 'Show available commands and usage tips' },
+    ];
+  }
+
+  async newSession(): Promise<void> {
+    // No-op for mock adapter — controller handles state reset
   }
 }

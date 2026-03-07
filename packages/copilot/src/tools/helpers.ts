@@ -1,10 +1,4 @@
-export interface ToolTextResponse {
-  content: Array<{
-    type: 'text';
-    text: string;
-  }>;
-  isError?: boolean;
-}
+import type { AgentToolResult } from '@mariozechner/pi-agent-core';
 
 function stringifyPayload(payload: unknown): string {
   if (typeof payload === 'string') {
@@ -15,7 +9,7 @@ function stringifyPayload(payload: unknown): string {
   return typeof json === 'string' ? json : String(payload);
 }
 
-export function toTextResponse(payload: unknown): ToolTextResponse {
+export function toTextResponse<T = undefined>(payload: unknown, details?: T): AgentToolResult<T> {
   return {
     content: [
       {
@@ -23,19 +17,26 @@ export function toTextResponse(payload: unknown): ToolTextResponse {
         text: stringifyPayload(payload),
       },
     ],
+    details: details as T,
   };
 }
 
-export function toErrorResponse(message: string, details?: unknown): ToolTextResponse {
+export function toErrorResponse<T = undefined>(
+  message: string,
+  errorDetails?: unknown,
+  details?: T,
+): AgentToolResult<T> {
   return {
     content: [
       {
         type: 'text',
         text:
-          typeof details === 'undefined' ? message : `${message}\n\n${stringifyPayload(details)}`,
+          typeof errorDetails === 'undefined'
+            ? message
+            : `${message}\n\n${stringifyPayload(errorDetails)}`,
       },
     ],
-    isError: true,
+    details: details as T,
   };
 }
 

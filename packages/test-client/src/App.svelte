@@ -56,6 +56,13 @@
           baseAdapter.cancel();
         }
       },
+
+      async updateSessionInfo(sessionInfo) {
+        addLog('adapter.updateSessionInfo', { sessionInfo });
+        if (baseAdapter.updateSessionInfo) {
+          await baseAdapter.updateSessionInfo(sessionInfo);
+        }
+      },
       
       async sendMessage(request: ChatRequest, callbacks: StreamCallbacks) {
         addLog('adapter.sendMessage', {
@@ -149,7 +156,7 @@
 
     const payload = (await response.json()) as {
       sessionId: string;
-      websocketUrl: string;
+      websocketPath: string;
       bridgeSessionToken: string;
     };
 
@@ -157,20 +164,30 @@
 
     addLog('bootstrap.success', {
       sessionId: payload.sessionId,
-      websocketUrl: payload.websocketUrl,
+      websocketPath: payload.websocketPath,
     });
 
     const baseAdapter = new WebSocketAdapter({
-      websocketUrl: payload.websocketUrl,
+      baseUrl: config.appUrl,
+      websocketPath: payload.websocketPath,
       sessionToken: payload.bridgeSessionToken,
       sessionId: payload.sessionId,
-    } as WebSocketAdapterConfig);
+      reconnectAttempts: 3,
+      onDebugEvent: (event) => {
+        addLog(`ws.${event.type}`, event.payload);
+      },
+    });
 
     adapter = createLoggingAdapter(baseAdapter);
     addLog('adapter.created', { type: 'WebSocketAdapter' });
 
     // Connect the WebSocket
     await baseAdapter.init();
+
+    if (config.sessionInfo) {
+      await baseAdapter.updateSessionInfo(config.sessionInfo);
+      addLog('session.info.update.sent', { sessionInfo: config.sessionInfo });
+    }
   }
 
   async function retryBootstrap() {

@@ -1,6 +1,6 @@
+import https from 'node:https';
 import { BaseHttpService, DataSourceHttpService, EntityHttpService, TenantHttpService, } from 'audako-core';
 import axios from 'axios';
-import https from 'https';
 // Configure axios to ignore self-signed certificates
 axios.defaults.httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -29,13 +29,6 @@ export async function createAudakoServices(systemUrl, accessToken) {
         tenantService: new TenantHttpService(httpConfig, accessToken),
         entityService,
         entityData: dataSourceService,
-        group: {
-            async moveEntity(entityType, entityId, targetGroupId) {
-                // TODO: EntityHttpService doesn't expose moveEntity yet
-                // const response = await entityService.moveEntity(entityType, entityId, targetGroupId);
-                throw new Error('moveEntity not yet implemented');
-            },
-        },
         dataSourceService,
     };
 }

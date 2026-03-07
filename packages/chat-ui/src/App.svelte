@@ -16,6 +16,12 @@ function createMockAdapterWithSecondPromptQuestion(): ChatAdapter {
         baseAdapter.cancel();
       }
     },
+    getSlashCommands() {
+      return baseAdapter.getSlashCommands();
+    },
+    async newSession() {
+      return baseAdapter.newSession();
+    },
     async sendMessage(request, callbacks) {
       promptCount += 1;
       let selectedStyles: string[] = [];

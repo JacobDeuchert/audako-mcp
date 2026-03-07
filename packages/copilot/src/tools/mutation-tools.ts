@@ -1,82 +1,45 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
-import type { InlineMutationPermissionRequestHub } from '../services/inline-mutation-permissions.js';
-import type { MutationPermissionsStore } from '../services/mutation-permissions.js';
+import type { AudakoServices } from '../services/audako-services.js';
+import type { MutationThrottle } from '../services/mutation-throttle.js';
+import type { PermissionService } from '../services/permission-service.js';
+import type { SessionContext } from '../services/session-context.js';
+import type { SessionEventHub } from '../services/session-event-hub.js';
 import { createCreateEntityTool } from './create-entity.js';
 import { createMoveEntityTool } from './move-entity.js';
 import { createUpdateEntityTool } from './update-entity.js';
 
-interface SessionContextLike {
-  getSessionId(): string;
-  getGroupId(): string | undefined;
-}
-
-interface AudakoServicesLike {
-  entityData: {
-    create(entityType: string, payload: Record<string, unknown>): Promise<Record<string, unknown>>;
-    update(
-      entityType: string,
-      entityId: string,
-      changes: Record<string, unknown>,
-    ): Promise<Record<string, unknown>>;
-  };
-  group: {
-    moveEntity(
-      entityType: string,
-      entityId: string,
-      targetGroupId: string,
-    ): Promise<{ fromGroupId?: string; toGroupId?: string }>;
-  };
-}
-
-interface MutationThrottleLike {
-  execute?(handler: () => Promise<unknown> | unknown): Promise<unknown>;
-  run?(handler: () => Promise<unknown> | unknown): Promise<unknown>;
-}
-
-interface ScopeGuardLike {
-  validate(groupId: string | undefined, entityType: string): Promise<void> | void;
-}
-
-interface EventHubLike {
-  publish(sessionId: string, event: { type: string; timestamp: string; payload: unknown }): unknown;
-}
-
 export function createMutationTools(
-  sessionContext: SessionContextLike,
-  audakoServices: AudakoServicesLike,
-  mutationThrottle: MutationThrottleLike,
-  scopeGuard: ScopeGuardLike,
-  permissions: MutationPermissionsStore,
-  eventHub: EventHubLike,
-  requestHub: InlineMutationPermissionRequestHub,
-): AgentTool<any>[] {
+  sessionId: string,
+  sessionContext: SessionContext,
+  audakoServices: AudakoServices,
+  mutationThrottle: MutationThrottle,
+  permissionService: PermissionService,
+  eventHub: SessionEventHub,
+): AgentTool[] {
   return [
     createCreateEntityTool({
+      sessionId,
       sessionContext,
       audakoServices,
       mutationThrottle,
-      scopeGuard,
-      permissions,
+      permissionService,
       eventHub,
-      requestHub,
     }),
     createUpdateEntityTool({
+      sessionId,
       sessionContext,
       audakoServices,
       mutationThrottle,
-      scopeGuard,
-      permissions,
+      permissionService,
       eventHub,
-      requestHub,
     }),
     createMoveEntityTool({
+      sessionId,
       sessionContext,
       audakoServices,
       mutationThrottle,
-      scopeGuard,
-      permissions,
+      permissionService,
       eventHub,
-      requestHub,
     }),
   ];
 }

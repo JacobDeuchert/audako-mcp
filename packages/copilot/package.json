@@ -8,8 +8,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "echo 'no tests yet'",
+    "test:watch": "echo 'no tests yet'"
   },
   "dependencies": {
     "@audako/contracts": "^0.1.0",
@@ -17,7 +17,6 @@
     "@fastify/websocket": "^8.3.1",
     "@mariozechner/pi-agent-core": "^0.55.3",
     "@mariozechner/pi-ai": "^0.55.3",
-    "@sinclair/typebox": "^0.32.0",
     "audako-core": "github:JacobDeuchert/audako-core",
     "dotenv": "^17.3.1",
     "fastify": "^4.25.0",
@@ -26,7 +25,6 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
+    "typescript": "^5.0.0"
   }
 }

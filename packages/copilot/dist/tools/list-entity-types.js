@@ -1,8 +1,9 @@
-import { listEntityTypeDefinitions } from '../entity-type-definitions/index.js';
+import { Type } from '@mariozechner/pi-ai';
+import { listEntityTypeDefinitions } from '../entity-type-definitions/entity-type-registry.js';
 import { toTextResponse } from './helpers.js';
-import { listEntityTypesSchema } from './schemas.js';
+const listEntityTypesSchema = Type.Object({}, { additionalProperties: false });
 export const listEntityTypesTool = {
-    name: 'audako_mcp_list_entity_types',
+    name: 'list_entity_types',
     label: 'List Entity Types',
     description: 'List supported configuration entity types that can be created or updated.',
     parameters: listEntityTypesSchema,

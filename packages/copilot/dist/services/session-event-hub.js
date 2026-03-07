@@ -63,7 +63,7 @@ export class SessionEventHub {
                 socket.send(payload);
                 delivered += 1;
             }
-            catch (error) {
+            catch (_error) {
                 staleSockets.push(socket);
                 // Silently remove failed connections
             }

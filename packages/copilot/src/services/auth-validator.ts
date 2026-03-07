@@ -1,6 +1,6 @@
+import https from 'node:https';
 import { BaseHttpService, UserProfileHttpService } from 'audako-core';
 import axios from 'axios';
-import https from 'https';
 
 // Allow self-signed certificates for internal SCADA endpoints.
 axios.defaults.httpsAgent = new https.Agent({

@@ -1,4 +1,10 @@
-import type { ChatWidgetConfig, Message, PublicQuestionHandler, QuestionRequest } from '../types';
+import type {
+  ChatWidgetConfig,
+  Message,
+  PublicQuestionHandler,
+  QuestionRequest,
+  SlashCommand,
+} from '../types';
 import {
   createAssistantStreamingMessage,
   createComposerPayload,
@@ -318,14 +324,64 @@ export const useChatController = ({
     }
   };
 
+  const cancelMessage = () => {
+    const resolvedConfig = getConfig();
+    const messageId = state.streamingMessageId;
+
+    if (!messageId) {
+      return;
+    }
+
+    debug('cancelMessage called', { messageId });
+
+    resolvedConfig?.adapter?.cancel?.();
+
+    updateMessageById(messageId, message => ({
+      ...message,
+      isStreaming: false,
+      thinking: message.thinking ? { ...message.thinking, isStreaming: false } : undefined,
+    }));
+    resetQuestionState();
+    state.streamingMessageId = null;
+    state.isTyping = false;
+  };
+
+  const getSlashCommands = (): SlashCommand[] => {
+    const resolvedConfig = getConfig();
+    return resolvedConfig?.adapter?.getSlashCommands?.() ?? [];
+  };
+
+  const executeSlashCommand = async (commandName: string) => {
+    const resolvedConfig = getConfig();
+    debug('executeSlashCommand called', { commandName });
+
+    if (commandName === 'new') {
+      await resolvedConfig?.adapter?.newSession?.();
+      hasSeededInitialMessage = false;
+      state.messages = [];
+      state.draft = '';
+      state.isTyping = false;
+      state.streamingMessageId = null;
+      resetQuestionState();
+      hasSeededInitialMessage = true;
+      state.messages = [
+        createSystemMessage(resolvedConfig?.initialMessage ?? DEFAULT_INITIAL_MESSAGE),
+      ];
+      debug('new session started');
+    }
+  };
+
   return {
     state,
     syncConfig,
     setDraft,
     sendMessage,
+    cancelMessage,
     toggleQuestionAnswer,
     submitQuestionAnswers,
     submitCustomAnswer,
     clearQuestionFocusRequest,
+    getSlashCommands,
+    executeSlashCommand,
   };
 };

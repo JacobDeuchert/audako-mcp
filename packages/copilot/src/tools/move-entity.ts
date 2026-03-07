@@ -1,146 +1,76 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
-import type { InlineMutationPermissionRequestHub } from '../services/inline-mutation-permissions.js';
-import { ensureInlineMutationPermission } from '../services/inline-mutation-permissions.js';
-import type { MutationPermissionsStore } from '../services/mutation-permissions.js';
-import { moveEntitySchema } from './schemas.js';
+import { Type } from '@mariozechner/pi-ai';
+import { resolveEntityTypeContract } from '../entity-type-definitions/entity-type-registry.js';
+import type { AudakoServices } from '../services/audako-services.js';
+import type { MutationThrottle } from '../services/mutation-throttle.js';
+import { normalizePermissionMode, type PermissionService } from '../services/permission-service.js';
+import type { SessionContext } from '../services/session-context.js';
+import type { SessionEventHub } from '../services/session-event-hub.js';
 
-type AgentSchema<T> = T & any;
-type PermissionMode = 'interactive' | 'fail_fast';
-
-type MoveEntityResult = {
-  fromGroupId?: string;
-  toGroupId?: string;
-};
-
-interface SessionContextLike {
-  getSessionId(): string;
-  getGroupId(): string | undefined;
-}
-
-interface MutationThrottleLike {
-  execute?(handler: () => Promise<unknown> | unknown): Promise<unknown>;
-  run?(handler: () => Promise<unknown> | unknown): Promise<unknown>;
-}
-
-interface ScopeGuardLike {
-  validate(groupId: string | undefined, entityType: string): Promise<void> | void;
-}
-
-interface EventHubLike {
-  publish(
-    sessionId: string,
-    event: {
-      type: 'entity.moved';
-      timestamp: string;
-      payload: {
-        entityType: string;
-        entityId: string;
-        fromGroupId: string;
-        toGroupId: string;
-      };
-    },
-  ): unknown;
-}
-
-interface AudakoServicesLike {
-  group: {
-    moveEntity(
-      entityType: string,
-      entityId: string,
-      targetGroupId: string,
-    ): Promise<MoveEntityResult>;
-  };
-}
+const moveEntitySchema = Type.Object({
+  entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
+  entityId: Type.String({ description: 'The ID of the entity to move.' }),
+  targetGroupId: Type.String({ description: 'The ID of the destination group.' }),
+  permissionMode: Type.Optional(
+    Type.Union([Type.Literal('interactive'), Type.Literal('fail_fast')], {
+      description:
+        'Permission handling mode for out-of-context mutations. interactive prompts the user inline; fail_fast returns an out-of-context error without prompting.',
+    }),
+  ),
+});
 
 export interface MoveEntityToolDependencies {
-  sessionContext: SessionContextLike;
-  audakoServices: AudakoServicesLike;
-  mutationThrottle: MutationThrottleLike;
-  scopeGuard: ScopeGuardLike;
-  permissions: MutationPermissionsStore;
-  eventHub: EventHubLike;
-  requestHub: InlineMutationPermissionRequestHub;
-}
-
-function normalizePermissionMode(mode: unknown): PermissionMode {
-  return mode === 'fail_fast' ? 'fail_fast' : 'interactive';
-}
-
-async function runInMutationThrottle<T>(
-  mutationThrottle: MutationThrottleLike,
-  handler: () => Promise<T> | T,
-): Promise<T> {
-  if (typeof mutationThrottle.execute === 'function') {
-    return mutationThrottle.execute(handler) as Promise<T>;
-  }
-
-  if (typeof mutationThrottle.run === 'function') {
-    return mutationThrottle.run(handler) as Promise<T>;
-  }
-
-  return handler();
-}
-
-async function ensureMutationPermission(input: {
   sessionId: string;
-  entityType: string;
-  permissionMode: PermissionMode;
-  permissionStore: MutationPermissionsStore;
-  sessionRequestHub: InlineMutationPermissionRequestHub;
-}): Promise<void> {
-  if (input.permissionMode === 'fail_fast') {
-    if (!input.permissionStore.hasPermission(input.entityType)) {
-      throw new Error(`Mutation blocked: permission denied for ${input.entityType}.`);
-    }
-    return;
-  }
-
-  await ensureInlineMutationPermission({
-    sessionId: input.sessionId,
-    entityType: input.entityType,
-    permissionStore: input.permissionStore,
-    sessionRequestHub: input.sessionRequestHub,
-  });
+  sessionContext: SessionContext;
+  audakoServices: AudakoServices;
+  mutationThrottle: MutationThrottle;
+  permissionService: PermissionService;
+  eventHub: SessionEventHub;
 }
 
 export function createMoveEntityTool(
   deps: MoveEntityToolDependencies,
-): AgentTool<AgentSchema<typeof moveEntitySchema>> {
+): AgentTool<
+  typeof moveEntitySchema,
+  { entityType: string; entityId: string; fromGroupId: string; toGroupId: string }
+> {
   return {
-    name: 'audako_mcp_move_entity',
+    name: 'move_entity',
     label: 'Move Entity',
     description: 'Move an entity to another group.',
     parameters: moveEntitySchema,
     execute: async (_toolCallId, params) => {
-      const sessionId = deps.sessionContext.getSessionId();
+      const sessionId = deps.sessionId;
+      const contract = resolveEntityTypeContract(params.entityType);
+      if (!contract) {
+        throw new Error(`Unsupported entity type '${params.entityType}'.`);
+      }
 
-      await ensureMutationPermission({
+      await deps.permissionService.hasPermission(
         sessionId,
-        entityType: params.entityType,
-        permissionMode: normalizePermissionMode(params.permissionMode),
-        permissionStore: deps.permissions,
-        sessionRequestHub: deps.requestHub,
-      });
+        params.entityType,
+        params.targetGroupId,
+        normalizePermissionMode(params.permissionMode),
+        'move_entity',
+      );
 
-      await deps.scopeGuard.validate(deps.sessionContext.getGroupId(), params.entityType);
-
-      const moveResult = await runInMutationThrottle(deps.mutationThrottle, async () => {
-        return deps.audakoServices.group.moveEntity(
-          params.entityType,
+      await deps.mutationThrottle.run(async () => {
+        await deps.audakoServices.entityService.moveTo(
           params.entityId,
           params.targetGroupId,
+          contract.entityType,
         );
       });
 
-      const fromGroupId =
-        moveResult.fromGroupId ?? deps.sessionContext.getGroupId() ?? params.targetGroupId;
-      const toGroupId = moveResult.toGroupId ?? params.targetGroupId;
+      const fromGroupId = deps.sessionContext.groupId ?? params.targetGroupId;
+      const toGroupId = params.targetGroupId;
 
       deps.eventHub.publish(sessionId, {
         type: 'entity.moved',
+        sessionId,
         timestamp: new Date().toISOString(),
         payload: {
-          entityType: params.entityType,
+          entityType: contract.entityType,
           entityId: params.entityId,
           fromGroupId,
           toGroupId,
@@ -151,11 +81,11 @@ export function createMoveEntityTool(
         content: [
           {
             type: 'text',
-            text: `Moved ${params.entityType} ${params.entityId} to group ${params.targetGroupId}`,
+            text: `Moved ${contract.entityType} ${params.entityId} to group ${params.targetGroupId}`,
           },
         ],
         details: {
-          entityType: params.entityType,
+          entityType: contract.entityType,
           entityId: params.entityId,
           fromGroupId,
           toGroupId,
