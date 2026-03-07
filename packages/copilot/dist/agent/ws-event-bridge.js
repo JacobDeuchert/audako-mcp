@@ -1,4 +1,5 @@
 import { createLogger } from '../config/app-config.js';
+import { buildSessionEvent } from '../services/session-event-utils.js';
 const wsBridgeLogger = createLogger('ws-event-bridge');
 export function createWsEventBridge(agent, sessionId, eventHub) {
     let currentTurnId = null;
@@ -11,7 +12,7 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
         switch (event.type) {
             case 'message_update': {
                 if (event.assistantMessageEvent.type === 'text_delta') {
-                    eventHub.publish(sessionId, buildWsEvent('agent.text_delta', sessionId, {
+                    eventHub.publish(sessionId, buildSessionEvent('agent.text_delta', sessionId, {
                         index: event.assistantMessageEvent.contentIndex,
                         delta: event.assistantMessageEvent.delta,
                     }));
@@ -19,14 +20,14 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
                 break;
             }
             case 'tool_execution_start': {
-                eventHub.publish(sessionId, buildWsEvent('agent.tool_start', sessionId, {
+                eventHub.publish(sessionId, buildSessionEvent('agent.tool_start', sessionId, {
                     toolName: event.toolName,
                     toolInput: event.args,
                 }));
                 break;
             }
             case 'tool_execution_end': {
-                eventHub.publish(sessionId, buildWsEvent('agent.tool_end', sessionId, {
+                eventHub.publish(sessionId, buildSessionEvent('agent.tool_end', sessionId, {
                     toolName: event.toolName,
                     toolOutput: event.result,
                 }));
@@ -37,7 +38,7 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
                     break;
                 }
                 currentTurnId = generateTurnId();
-                eventHub.publish(sessionId, buildWsEvent('agent.turn_start', sessionId, {
+                eventHub.publish(sessionId, buildSessionEvent('agent.turn_start', sessionId, {
                     turnId: currentTurnId,
                     userMessage: undefined,
                 }));
@@ -48,7 +49,7 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
                     break;
                 }
                 const turnId = currentTurnId || generateTurnId();
-                eventHub.publish(sessionId, buildWsEvent('agent.turn_end', sessionId, {
+                eventHub.publish(sessionId, buildSessionEvent('agent.turn_end', sessionId, {
                     turnId,
                     finalMessage: extractAssistantText(event.message),
                 }));
@@ -58,7 +59,7 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
             case 'agent_end': {
                 const errorMessage = agent.state?.error;
                 if (errorMessage) {
-                    eventHub.publish(sessionId, buildWsEvent('agent.error', sessionId, {
+                    eventHub.publish(sessionId, buildSessionEvent('agent.error', sessionId, {
                         errorMessage,
                     }));
                 }
@@ -97,14 +98,6 @@ function extractAssistantText(message) {
     }
     const trimmedText = text.trim();
     return trimmedText || undefined;
-}
-function buildWsEvent(type, sessionId, payload) {
-    return {
-        type,
-        sessionId,
-        timestamp: new Date().toISOString(),
-        payload,
-    };
 }
 function generateTurnId() {
     return `turn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;

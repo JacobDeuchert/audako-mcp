@@ -10,6 +10,7 @@
 
 import { EntityNameService, EntityType } from 'audako-core';
 import type { AudakoServices } from './audako-services.js';
+import { normalizePathIds } from './path-utils.js';
 
 const PATH_SEPARATOR = ' / ';
 
@@ -33,18 +34,6 @@ export interface ResolvedGroup {
   groupId: string;
   groupPath: string[];
   groupPathName: string;
-}
-
-function normalizePathIds(pathValue: unknown, groupId: string): string[] {
-  const pathIds = Array.isArray(pathValue)
-    ? pathValue.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-    : [];
-
-  if (pathIds[pathIds.length - 1] !== groupId) {
-    pathIds.push(groupId);
-  }
-
-  return pathIds;
 }
 
 export class SessionContext {

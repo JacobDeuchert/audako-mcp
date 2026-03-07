@@ -1,3 +1,4 @@
+import { EntityUtils } from 'audako-core';
 import { formatZodValidationErrors } from './zod-utils.js';
 export class BaseEntityContract {
     aliases = [];
@@ -55,6 +56,69 @@ export class BaseEntityContract {
             return result.data;
         }
         throw new Error(formatZodValidationErrors(result.error).join('; '));
+    }
+}
+export const configurationEntityFieldDefinitions = [
+    {
+        key: 'name',
+        dtoName: 'name',
+        description: 'Name of the entity.',
+        type: 'string',
+        requiredOnCreate: true,
+    },
+    {
+        key: 'description',
+        dtoName: 'description',
+        description: 'Description of the entity.',
+        type: 'string',
+        requiredOnCreate: false,
+    },
+    {
+        key: 'groupId',
+        dtoName: 'groupId',
+        description: 'Parent group ID. Pass a real group ID or the literal "context" to use group from session context.',
+        type: 'string',
+        requiredOnCreate: true,
+    },
+];
+export class ConfigurationEntityContract extends BaseEntityContract {
+    applyConfigurationEntityContext(model, context) {
+        if (!model.groupId && context?.tenantRootGroupId) {
+            model.groupId = context.tenantRootGroupId;
+        }
+    }
+    setBaseEntityModelProperties(model, entity) {
+        this.setModelValueIfDefined(model, 'id', entity.Id);
+        this.setModelValueIfDefined(model, 'path', entity.Path ? [...entity.Path] : undefined);
+        this.setModelValueIfDefined(model, 'name', EntityUtils.getPropertyValue(entity, 'Name', true));
+        this.setModelValueIfDefined(model, 'description', EntityUtils.getPropertyValue(entity, 'Description', true));
+        this.setModelValueIfDefined(model, 'groupId', entity.GroupId);
+    }
+    applyBaseEntityProperties(entity, model) {
+        if (typeof model.id !== 'undefined') {
+            entity.Id = model.id;
+        }
+        if (typeof model.path !== 'undefined') {
+            entity.Path = [...model.path];
+        }
+        if (model.name !== undefined) {
+            EntityUtils.setPropertyValue(entity, 'Name', model.name, true);
+        }
+        if (model.description !== undefined) {
+            EntityUtils.setPropertyValue(entity, 'Description', model.description, true);
+        }
+        if (model.groupId !== undefined) {
+            entity.GroupId = model.groupId;
+        }
+    }
+    getDtoFieldName(field) {
+        return field.dtoName ?? field.key;
+    }
+    setModelValueIfDefined(model, key, value) {
+        if (typeof value === 'undefined' || value === null) {
+            return;
+        }
+        model[key] = Array.isArray(value) ? [...value] : value;
     }
 }
 //# sourceMappingURL=base-entity.contract.js.map

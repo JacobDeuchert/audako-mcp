@@ -1,11 +1,8 @@
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
 import { resolveEntityTypeContract } from '../entity-type-definitions/entity-type-registry.js';
-import type { AudakoServices } from '../services/audako-services.js';
-import type { MutationThrottle } from '../services/mutation-throttle.js';
-import { normalizePermissionMode, type PermissionService } from '../services/permission-service.js';
-import type { SessionContext } from '../services/session-context.js';
-import type { SessionEventHub } from '../services/session-event-hub.js';
+import { normalizePermissionMode } from '../services/permission-service.js';
+import type { MutationToolDependencies } from './mutation-tool-dependencies.js';
 
 const updateEntitySchema = Type.Object({
   entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
@@ -25,17 +22,8 @@ const updateEntitySchema = Type.Object({
   ),
 });
 
-export interface UpdateEntityToolDependencies {
-  sessionId: string;
-  sessionContext: SessionContext;
-  audakoServices: AudakoServices;
-  mutationThrottle: MutationThrottle;
-  permissionService: PermissionService;
-  eventHub: SessionEventHub;
-}
-
 export function createUpdateEntityTool(
-  deps: UpdateEntityToolDependencies,
+  deps: MutationToolDependencies,
 ): AgentTool<typeof updateEntitySchema, { entityType: string; entityId: string }> {
   return {
     name: 'update_entity',

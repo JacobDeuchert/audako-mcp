@@ -1,0 +1,1 @@
+{"version":3,"file":"session-event-utils.js","sourceRoot":"","sources":["../../src/services/session-event-utils.ts"],"names":[],"mappings":"AAEA,MAAM,UAAU,iBAAiB,CAC/B,IAAY,EACZ,SAAiB,EACjB,OAAU;IAEV,OAAO;QACL,IAAI;QACJ,SAAS;QACT,SAAS,EAAE,IAAI,IAAI,EAAE,CAAC,WAAW,EAAE;QACnC,OAAO;KACR,CAAC;AACJ,CAAC"}

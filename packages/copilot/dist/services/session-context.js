@@ -8,16 +8,8 @@
  * additional metadata (tenant name, group path) from Audako services.
  */
 import { EntityNameService, EntityType } from 'audako-core';
+import { normalizePathIds } from './path-utils.js';
 const PATH_SEPARATOR = ' / ';
-function normalizePathIds(pathValue, groupId) {
-    const pathIds = Array.isArray(pathValue)
-        ? pathValue.filter((id) => typeof id === 'string' && id.trim().length > 0)
-        : [];
-    if (pathIds[pathIds.length - 1] !== groupId) {
-        pathIds.push(groupId);
-    }
-    return pathIds;
-}
 export class SessionContext {
     /** Static — set once at session creation, never change. */
     sessionId;

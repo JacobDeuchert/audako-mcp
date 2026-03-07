@@ -1,19 +1,11 @@
 import { Type } from '@mariozechner/pi-ai';
 import { EntityNameService, EntityType } from 'audako-core';
+import { normalizePathIds } from '../services/path-utils.js';
 import { toErrorResponse, toTextResponse } from './helpers.js';
 const getGroupPathSchema = Type.Object({
     groupId: Type.String({ description: 'The group ID to resolve.' }),
 });
 const PATH_SEPARATOR = ' / ';
-function normalizePathIds(pathValue, groupId) {
-    const pathIds = Array.isArray(pathValue)
-        ? pathValue.filter((id) => typeof id === 'string' && id.trim().length > 0)
-        : [];
-    if (pathIds[pathIds.length - 1] !== groupId) {
-        pathIds.push(groupId);
-    }
-    return pathIds;
-}
 async function resolveTenantForEntityId(entityId, audakoServices) {
     const tenantService = audakoServices.tenantService;
     if (typeof tenantService.getTenantViewForEntityId !== 'function') {

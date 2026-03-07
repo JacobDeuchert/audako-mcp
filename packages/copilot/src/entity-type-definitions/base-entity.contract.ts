@@ -1,4 +1,4 @@
-import type { ConfigurationEntity, EntityType } from 'audako-core';
+import { type ConfigurationEntity, type EntityType, EntityUtils } from 'audako-core';
 import type { z } from 'zod';
 import type {
   EntityContractContext,
@@ -106,5 +106,107 @@ export abstract class BaseEntityContract<
     }
 
     throw new Error(formatZodValidationErrors(result.error).join('; '));
+  }
+}
+
+export type ConfigurationEntityModel = Record<string, unknown> & {
+  id?: string;
+  path?: string[];
+  name?: string;
+  description?: string;
+  groupId?: string;
+};
+
+export const configurationEntityFieldDefinitions: EntityFieldDefinition[] = [
+  {
+    key: 'name',
+    dtoName: 'name',
+    description: 'Name of the entity.',
+    type: 'string',
+    requiredOnCreate: true,
+  },
+  {
+    key: 'description',
+    dtoName: 'description',
+    description: 'Description of the entity.',
+    type: 'string',
+    requiredOnCreate: false,
+  },
+  {
+    key: 'groupId',
+    dtoName: 'groupId',
+    description:
+      'Parent group ID. Pass a real group ID or the literal "context" to use group from session context.',
+    type: 'string',
+    requiredOnCreate: true,
+  },
+];
+
+export abstract class ConfigurationEntityContract<
+  TEntity extends ConfigurationEntity,
+  TCreatePayload extends Record<string, unknown>,
+  TUpdatePayload extends Record<string, unknown>,
+> extends BaseEntityContract<TEntity, TCreatePayload, TUpdatePayload> {
+  protected applyConfigurationEntityContext(
+    model: { groupId?: string },
+    context?: EntityContractContext,
+  ): void {
+    if (!model.groupId && context?.tenantRootGroupId) {
+      model.groupId = context.tenantRootGroupId;
+    }
+  }
+
+  protected setBaseEntityModelProperties(model: ConfigurationEntityModel, entity: TEntity): void {
+    this.setModelValueIfDefined(model, 'id', entity.Id);
+    this.setModelValueIfDefined(model, 'path', entity.Path ? [...entity.Path] : undefined);
+    this.setModelValueIfDefined(
+      model,
+      'name',
+      EntityUtils.getPropertyValue<TEntity, unknown>(entity, 'Name', true),
+    );
+    this.setModelValueIfDefined(
+      model,
+      'description',
+      EntityUtils.getPropertyValue<TEntity, unknown>(entity, 'Description', true),
+    );
+    this.setModelValueIfDefined(model, 'groupId', entity.GroupId);
+  }
+
+  protected applyBaseEntityProperties(entity: TEntity, model: ConfigurationEntityModel): void {
+    if (typeof model.id !== 'undefined') {
+      entity.Id = model.id;
+    }
+
+    if (typeof model.path !== 'undefined') {
+      entity.Path = [...model.path];
+    }
+
+    if (model.name !== undefined) {
+      EntityUtils.setPropertyValue(entity, 'Name', model.name, true);
+    }
+
+    if (model.description !== undefined) {
+      EntityUtils.setPropertyValue(entity, 'Description', model.description, true);
+    }
+
+    if (model.groupId !== undefined) {
+      entity.GroupId = model.groupId;
+    }
+  }
+
+  protected getDtoFieldName(field: EntityFieldDefinition): string {
+    return field.dtoName ?? field.key;
+  }
+
+  protected setModelValueIfDefined(
+    model: Record<string, unknown>,
+    key: string,
+    value: unknown,
+  ): void {
+    if (typeof value === 'undefined' || value === null) {
+      return;
+    }
+
+    model[key] = Array.isArray(value) ? [...value] : value;
   }
 }

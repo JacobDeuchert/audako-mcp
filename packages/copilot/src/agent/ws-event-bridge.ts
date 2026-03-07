@@ -1,8 +1,8 @@
-import type { SessionEventEnvelope } from '@audako/contracts';
 import type { AgentEvent } from '@mariozechner/pi-agent-core';
 import type { AssistantMessage } from '@mariozechner/pi-ai';
 import { createLogger } from '../config/app-config.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
+import { buildSessionEvent } from '../services/session-event-utils.js';
 
 interface Agent {
   subscribe: (fn: (e: AgentEvent) => void) => () => void;
@@ -33,7 +33,7 @@ export function createWsEventBridge(
         if (event.assistantMessageEvent.type === 'text_delta') {
           eventHub.publish(
             sessionId,
-            buildWsEvent('agent.text_delta', sessionId, {
+            buildSessionEvent('agent.text_delta', sessionId, {
               index: event.assistantMessageEvent.contentIndex,
               delta: event.assistantMessageEvent.delta,
             }),
@@ -45,7 +45,7 @@ export function createWsEventBridge(
       case 'tool_execution_start': {
         eventHub.publish(
           sessionId,
-          buildWsEvent('agent.tool_start', sessionId, {
+          buildSessionEvent('agent.tool_start', sessionId, {
             toolName: event.toolName,
             toolInput: event.args,
           }),
@@ -56,7 +56,7 @@ export function createWsEventBridge(
       case 'tool_execution_end': {
         eventHub.publish(
           sessionId,
-          buildWsEvent('agent.tool_end', sessionId, {
+          buildSessionEvent('agent.tool_end', sessionId, {
             toolName: event.toolName,
             toolOutput: event.result,
           }),
@@ -72,7 +72,7 @@ export function createWsEventBridge(
         currentTurnId = generateTurnId();
         eventHub.publish(
           sessionId,
-          buildWsEvent('agent.turn_start', sessionId, {
+          buildSessionEvent('agent.turn_start', sessionId, {
             turnId: currentTurnId,
             userMessage: undefined,
           }),
@@ -88,7 +88,7 @@ export function createWsEventBridge(
         const turnId = currentTurnId || generateTurnId();
         eventHub.publish(
           sessionId,
-          buildWsEvent('agent.turn_end', sessionId, {
+          buildSessionEvent('agent.turn_end', sessionId, {
             turnId,
             finalMessage: extractAssistantText(event.message),
           }),
@@ -102,7 +102,7 @@ export function createWsEventBridge(
         if (errorMessage) {
           eventHub.publish(
             sessionId,
-            buildWsEvent('agent.error', sessionId, {
+            buildSessionEvent('agent.error', sessionId, {
               errorMessage,
             }),
           );
@@ -160,15 +160,6 @@ function extractAssistantText(message: unknown): string | undefined {
 
   const trimmedText = text.trim();
   return trimmedText || undefined;
-}
-
-function buildWsEvent<T>(type: string, sessionId: string, payload: T): SessionEventEnvelope<T> {
-  return {
-    type,
-    sessionId,
-    timestamp: new Date().toISOString(),
-    payload,
-  };
 }
 
 function generateTurnId(): string {

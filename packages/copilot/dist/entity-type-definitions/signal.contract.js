@@ -1,9 +1,10 @@
 import { BitSelectConversionTypes, EntityType, EntityUtils, Signal, SignalAnalogSettings, SignalCounterSettings, SignalDigitalSettings, SignalRecordingSettings, SignalType, } from 'audako-core';
-import { BaseEntityContract } from './base-entity.contract.js';
+import { ConfigurationEntityContract, configurationEntityFieldDefinitions, } from './base-entity.contract.js';
 import { buildZodSchemaFromFieldDefinitions } from './zod-utils.js';
 const signalTypeEnumValues = Object.values(SignalType).filter(value => typeof value === 'string');
 const bitSelectConversionEnumValues = Object.values(BitSelectConversionTypes).filter(value => typeof value === 'string');
 const signalFieldDefinitions = [
+    ...configurationEntityFieldDefinitions,
     {
         key: 'type',
         dtoName: 'type',
@@ -200,7 +201,7 @@ const signalCreateSchema = buildZodSchemaFromFieldDefinitions(signalFieldDefinit
 const signalUpdateSchema = buildZodSchemaFromFieldDefinitions(signalFieldDefinitions, 'update').refine(value => Object.keys(value).length > 0, {
     message: "At least one field must be provided in 'changes'.",
 });
-class SignalEntityContract extends BaseEntityContract {
+class SignalEntityContract extends ConfigurationEntityContract {
     key = 'Signal';
     aliases = ['signal'];
     entityType = EntityType.Signal;
@@ -274,17 +275,13 @@ class SignalEntityContract extends BaseEntityContract {
     };
     fromCreatePayload(payload, context) {
         const model = { ...payload };
-        if (!model.groupId && context?.tenantRootGroupId) {
-            model.groupId = context.tenantRootGroupId;
-        }
+        this.applyConfigurationEntityContext(model, context);
         return this.toSignal(model);
     }
     fromUpdatedPayload(existingEntity, changes, context) {
         const model = this.toSignalModel(existingEntity);
         Object.assign(model, changes);
-        if (!model.groupId && context?.tenantRootGroupId) {
-            model.groupId = context.tenantRootGroupId;
-        }
+        this.applyConfigurationEntityContext(model, context);
         return this.toSignal(model);
     }
     toPayload(entity) {
@@ -292,11 +289,7 @@ class SignalEntityContract extends BaseEntityContract {
     }
     toSignalModel(signal) {
         const model = {};
-        this.setModelValueIfDefined(model, 'id', signal.Id);
-        this.setModelValueIfDefined(model, 'path', signal.Path ? [...signal.Path] : undefined);
-        this.setModelValueIfDefined(model, 'name', EntityUtils.getPropertyValue(signal, 'Name', true));
-        this.setModelValueIfDefined(model, 'description', EntityUtils.getPropertyValue(signal, 'Description', true));
-        this.setModelValueIfDefined(model, 'groupId', signal.GroupId);
+        this.setBaseEntityModelProperties(model, signal);
         const signalType = signal.Type?.Value;
         for (const field of this.fieldDefinitions) {
             if (!field.entityPath || !this.isApplicableForSignalType(field, signalType)) {
@@ -309,18 +302,7 @@ class SignalEntityContract extends BaseEntityContract {
     }
     toSignal(model) {
         const signal = new Signal();
-        if (typeof model.id !== 'undefined') {
-            signal.Id = model.id;
-        }
-        if (typeof model.path !== 'undefined') {
-            signal.Path = [...model.path];
-        }
-        if (model.name !== undefined)
-            EntityUtils.setPropertyValue(signal, 'Name', model.name, true);
-        if (model.description !== undefined)
-            EntityUtils.setPropertyValue(signal, 'Description', model.description, true);
-        if (model.groupId !== undefined)
-            signal.GroupId = model.groupId;
+        this.applyBaseEntityProperties(signal, model);
         signal.Settings = this.createSignalSettings(model);
         signal.RecordingSettings = new SignalRecordingSettings();
         const signalType = model.type ?? SignalType.AnalogInput;
@@ -348,9 +330,6 @@ class SignalEntityContract extends BaseEntityContract {
         }
         return new SignalAnalogSettings();
     }
-    getDtoFieldName(field) {
-        return field.dtoName ?? field.key;
-    }
     isApplicableForSignalType(field, signalType) {
         const appliesTo = field.appliesTo ?? this.appliesTo[field.key];
         if (!appliesTo || appliesTo.length === 0) {
@@ -360,13 +339,6 @@ class SignalEntityContract extends BaseEntityContract {
             return false;
         }
         return appliesTo.includes(signalType);
-    }
-    setModelValueIfDefined(model, key, value) {
-        if (typeof value === 'undefined' || value === null) {
-            return;
-        }
-        const modelValues = model;
-        modelValues[key] = Array.isArray(value) ? [...value] : value;
     }
 }
 export const signalEntityContract = new SignalEntityContract();

@@ -5,6 +5,8 @@ import { createAudakoServices } from '../services/audako-services.js';
 import { UpstreamAuthError, validateUpstreamToken } from '../services/auth-validator.js';
 import { DefaultPermissionService } from '../services/permission-service.js';
 import { SessionContext } from '../services/session-context.js';
+import { buildSessionEvent } from '../services/session-event-utils.js';
+import { sanitizeSessionInfoUpdate, toSessionInfoResponse, } from '../services/session-info-utils.js';
 import { ToolRequestHub } from '../services/tool-request-hub.js';
 import { createSessionWebSocketHandler } from './session-websocket-handler.js';
 const logger = createLogger('session-routes');
@@ -31,34 +33,8 @@ export async function sessionRoutes(fastify, registry, eventHub, requestHub) {
             return trimmed.replace(/\/+$/, '');
         }
     }
-    function sanitizeSessionInfoUpdate(body) {
-        return {
-            tenantId: body.tenantId?.trim() || undefined,
-            groupId: body.groupId?.trim() || undefined,
-            entityType: body.entityType?.trim() || undefined,
-            app: body.app?.trim() || undefined,
-        };
-    }
-    function buildSessionEvent(type, sessionId, payload) {
-        return {
-            type,
-            sessionId,
-            timestamp: new Date().toISOString(),
-            payload,
-        };
-    }
     function toSessionInfoSnapshot(tenantId, groupId, entityType, app) {
         return {
-            tenantId,
-            groupId,
-            entityType,
-            app,
-            updatedAt: new Date().toISOString(),
-        };
-    }
-    function toSessionInfoResponse(sessionId, tenantId, groupId, entityType, app) {
-        return {
-            sessionId,
             tenantId,
             groupId,
             entityType,
@@ -158,7 +134,12 @@ export async function sessionRoutes(fastify, registry, eventHub, requestHub) {
             if (sessionInfo && !isNew) {
                 const sanitized = sanitizeSessionInfoUpdate(sessionInfo);
                 await entry.sessionContext.update(sanitized);
-                eventHub.publish(entry.sessionId, buildSessionEvent('session.info.updated', entry.sessionId, toSessionInfoResponse(entry.sessionId, entry.sessionContext.tenantId, entry.sessionContext.groupId, entry.sessionContext.entityType, entry.sessionContext.app)));
+                eventHub.publish(entry.sessionId, buildSessionEvent('session.info.updated', entry.sessionId, toSessionInfoResponse(entry.sessionId, {
+                    tenantId: entry.sessionContext.tenantId,
+                    groupId: entry.sessionContext.groupId,
+                    entityType: entry.sessionContext.entityType,
+                    app: entry.sessionContext.app,
+                })));
             }
             const response = {
                 websocketPath: `/api/session/${encodeURIComponent(entry.sessionId)}/ws`,
@@ -197,7 +178,12 @@ export async function sessionRoutes(fastify, registry, eventHub, requestHub) {
                 message: `Session not found: ${sessionId}`,
             });
         }
-        return reply.send(toSessionInfoResponse(sessionId, entry.sessionContext.tenantId, entry.sessionContext.groupId, entry.sessionContext.entityType, entry.sessionContext.app));
+        return reply.send(toSessionInfoResponse(sessionId, {
+            tenantId: entry.sessionContext.tenantId,
+            groupId: entry.sessionContext.groupId,
+            entityType: entry.sessionContext.entityType,
+            app: entry.sessionContext.app,
+        }));
     }
 }
 //# sourceMappingURL=session.routes.js.map

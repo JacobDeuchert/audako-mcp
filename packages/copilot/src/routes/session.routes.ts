@@ -15,6 +15,11 @@ import { UpstreamAuthError, validateUpstreamToken } from '../services/auth-valid
 import { DefaultPermissionService } from '../services/permission-service.js';
 import { SessionContext } from '../services/session-context.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
+import { buildSessionEvent } from '../services/session-event-utils.js';
+import {
+  sanitizeSessionInfoUpdate,
+  toSessionInfoResponse,
+} from '../services/session-info-utils.js';
 import type { SessionRegistry } from '../services/session-registry.js';
 import type { SessionRequestHub } from '../services/session-request-hub.js';
 import { ToolRequestHub } from '../services/tool-request-hub.js';
@@ -65,28 +70,6 @@ export async function sessionRoutes(
     }
   }
 
-  function sanitizeSessionInfoUpdate(body: SessionInfoFields): SessionInfoFields {
-    return {
-      tenantId: body.tenantId?.trim() || undefined,
-      groupId: body.groupId?.trim() || undefined,
-      entityType: body.entityType?.trim() || undefined,
-      app: body.app?.trim() || undefined,
-    };
-  }
-
-  function buildSessionEvent<T>(
-    type: string,
-    sessionId: string,
-    payload: T,
-  ): SessionEventEnvelope<T> {
-    return {
-      type,
-      sessionId,
-      timestamp: new Date().toISOString(),
-      payload,
-    };
-  }
-
   function toSessionInfoSnapshot(
     tenantId?: string,
     groupId?: string,
@@ -94,23 +77,6 @@ export async function sessionRoutes(
     app?: string,
   ) {
     return {
-      tenantId,
-      groupId,
-      entityType,
-      app,
-      updatedAt: new Date().toISOString(),
-    };
-  }
-
-  function toSessionInfoResponse(
-    sessionId: string,
-    tenantId?: string,
-    groupId?: string,
-    entityType?: string,
-    app?: string,
-  ): SessionInfoResponse {
-    return {
-      sessionId,
       tenantId,
       groupId,
       entityType,
@@ -251,13 +217,12 @@ export async function sessionRoutes(
           buildSessionEvent(
             'session.info.updated',
             entry.sessionId,
-            toSessionInfoResponse(
-              entry.sessionId,
-              entry.sessionContext.tenantId,
-              entry.sessionContext.groupId,
-              entry.sessionContext.entityType,
-              entry.sessionContext.app,
-            ),
+            toSessionInfoResponse(entry.sessionId, {
+              tenantId: entry.sessionContext.tenantId,
+              groupId: entry.sessionContext.groupId,
+              entityType: entry.sessionContext.entityType,
+              app: entry.sessionContext.app,
+            }),
           ),
         );
       }
@@ -319,13 +284,12 @@ export async function sessionRoutes(
     }
 
     return reply.send(
-      toSessionInfoResponse(
-        sessionId,
-        entry.sessionContext.tenantId,
-        entry.sessionContext.groupId,
-        entry.sessionContext.entityType,
-        entry.sessionContext.app,
-      ),
+      toSessionInfoResponse(sessionId, {
+        tenantId: entry.sessionContext.tenantId,
+        groupId: entry.sessionContext.groupId,
+        entityType: entry.sessionContext.entityType,
+        app: entry.sessionContext.app,
+      }),
     );
   }
 }

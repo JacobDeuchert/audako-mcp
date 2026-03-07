@@ -1,8 +1,9 @@
 import { EntityType, EntityUtils, Field, Group } from 'audako-core';
-import { BaseEntityContract } from './base-entity.contract.js';
+import { ConfigurationEntityContract, configurationEntityFieldDefinitions, } from './base-entity.contract.js';
 import { buildZodSchemaFromFieldDefinitions } from './zod-utils.js';
 const DEFAULT_GROUP_TYPE = 'Default';
 const groupFieldDefinitions = [
+    ...configurationEntityFieldDefinitions,
     {
         key: 'type',
         dtoName: 'type',
@@ -42,7 +43,7 @@ const groupCreateSchema = buildZodSchemaFromFieldDefinitions(groupFieldDefinitio
 const groupUpdateSchema = buildZodSchemaFromFieldDefinitions(groupFieldDefinitions, 'update').refine(value => Object.keys(value).length > 0, {
     message: "At least one field must be provided in 'changes'.",
 });
-class GroupEntityContract extends BaseEntityContract {
+class GroupEntityContract extends ConfigurationEntityContract {
     key = 'Group';
     aliases = ['group'];
     entityType = EntityType.Group;
@@ -61,9 +62,7 @@ class GroupEntityContract extends BaseEntityContract {
     fieldDefinitions = groupFieldDefinitions;
     fromCreatePayload(payload, context) {
         const model = { ...payload };
-        if (!model.groupId && context?.tenantRootGroupId) {
-            model.groupId = context.tenantRootGroupId;
-        }
+        this.applyConfigurationEntityContext(model, context);
         if (!model.type) {
             model.type = DEFAULT_GROUP_TYPE;
         }
@@ -72,9 +71,7 @@ class GroupEntityContract extends BaseEntityContract {
     fromUpdatedPayload(existingEntity, changes, context) {
         const model = this.toGroupModel(existingEntity);
         Object.assign(model, changes);
-        if (!model.groupId && context?.tenantRootGroupId) {
-            model.groupId = context.tenantRootGroupId;
-        }
+        this.applyConfigurationEntityContext(model, context);
         if (!model.type) {
             model.type = DEFAULT_GROUP_TYPE;
         }
@@ -85,11 +82,7 @@ class GroupEntityContract extends BaseEntityContract {
     }
     toGroupModel(group) {
         const model = {};
-        this.setModelValueIfDefined(model, 'id', group.Id);
-        this.setModelValueIfDefined(model, 'path', group.Path ? [...group.Path] : undefined);
-        this.setModelValueIfDefined(model, 'name', EntityUtils.getPropertyValue(group, 'Name', true));
-        this.setModelValueIfDefined(model, 'description', EntityUtils.getPropertyValue(group, 'Description', true));
-        this.setModelValueIfDefined(model, 'groupId', group.GroupId);
+        this.setBaseEntityModelProperties(model, group);
         for (const field of this.fieldDefinitions) {
             const dtoFieldName = this.getDtoFieldName(field);
             const value = this.getGroupFieldValue(group, field);
@@ -100,18 +93,7 @@ class GroupEntityContract extends BaseEntityContract {
     toGroup(model, baseGroup) {
         const group = baseGroup ? this.cloneGroup(baseGroup) : new Group();
         const modelValues = model;
-        if (typeof model.id !== 'undefined') {
-            group.Id = model.id;
-        }
-        if (typeof model.path !== 'undefined') {
-            group.Path = [...model.path];
-        }
-        if (model.name !== undefined)
-            EntityUtils.setPropertyValue(group, 'Name', model.name, true);
-        if (model.description !== undefined)
-            EntityUtils.setPropertyValue(group, 'Description', model.description, true);
-        if (model.groupId !== undefined)
-            group.GroupId = model.groupId;
+        this.applyBaseEntityProperties(group, model);
         for (const field of this.fieldDefinitions) {
             const dtoFieldName = this.getDtoFieldName(field);
             const value = modelValues[dtoFieldName];
@@ -160,16 +142,6 @@ class GroupEntityContract extends BaseEntityContract {
             ...(group.AdditionalFields ?? {}),
         };
         return cloned;
-    }
-    getDtoFieldName(field) {
-        return field.dtoName ?? field.key;
-    }
-    setModelValueIfDefined(model, key, value) {
-        if (typeof value === 'undefined' || value === null) {
-            return;
-        }
-        const modelValues = model;
-        modelValues[key] = Array.isArray(value) ? [...value] : value;
     }
 }
 export const groupEntityContract = new GroupEntityContract();

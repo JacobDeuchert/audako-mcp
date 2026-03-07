@@ -2,14 +2,16 @@ import {
   type BridgeSessionWebSocketClientMessage,
   type BridgeSessionWebSocketPongMessage,
   isBridgeSessionWebSocketClientMessage,
-  type SessionEventEnvelope,
-  type SessionInfoFields,
-  type SessionInfoResponse,
   type SessionSocket,
 } from '@audako/contracts';
 import type { FastifyRequest } from 'fastify';
 import { createLogger } from '../config/app-config.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
+import { buildSessionEvent } from '../services/session-event-utils.js';
+import {
+  sanitizeSessionInfoUpdate,
+  toSessionInfoResponse,
+} from '../services/session-info-utils.js';
 import type { SessionRegistry, SessionRegistryEntry } from '../services/session-registry.js';
 import type { SessionRequestHub } from '../services/session-request-hub.js';
 
@@ -32,43 +34,10 @@ interface SessionSnapshotPayload {
   isActive: boolean;
 }
 
-function sanitizeSessionInfoUpdate(body: SessionInfoFields): SessionInfoFields {
-  return {
-    tenantId: body.tenantId?.trim() || undefined,
-    groupId: body.groupId?.trim() || undefined,
-    entityType: body.entityType?.trim() || undefined,
-    app: body.app?.trim() || undefined,
-  };
-}
-
-function toSessionInfoResponse(entry: SessionRegistryEntry): SessionInfoResponse {
-  return {
-    sessionId: entry.sessionId,
-    tenantId: entry.sessionContext.tenantId,
-    groupId: entry.sessionContext.groupId,
-    entityType: entry.sessionContext.entityType,
-    app: entry.sessionContext.app,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
 export interface SessionWebSocketHandlerDeps {
   registry: SessionRegistry;
   eventHub: SessionEventHub;
   requestHub: SessionRequestHub;
-}
-
-function buildSessionEvent<T>(
-  type: string,
-  sessionId: string,
-  payload: T,
-): SessionEventEnvelope<T> {
-  return {
-    type,
-    sessionId,
-    timestamp: new Date().toISOString(),
-    payload,
-  };
 }
 
 function buildSessionSnapshotPayload(entry: SessionRegistryEntry): SessionSnapshotPayload {
@@ -237,7 +206,12 @@ export function createSessionWebSocketHandler({
         if (message.type === 'session.info.update') {
           const sanitized = sanitizeSessionInfoUpdate(message.sessionInfo);
           await currentEntry.sessionContext.update(sanitized);
-          const response = toSessionInfoResponse(currentEntry);
+          const response = toSessionInfoResponse(currentEntry.sessionId, {
+            tenantId: currentEntry.sessionContext.tenantId,
+            groupId: currentEntry.sessionContext.groupId,
+            entityType: currentEntry.sessionContext.entityType,
+            app: currentEntry.sessionContext.app,
+          });
           eventHub.publish(
             sessionId,
             buildSessionEvent('session.info.updated', sessionId, response),

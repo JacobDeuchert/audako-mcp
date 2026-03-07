@@ -1,6 +1,10 @@
 import { EntityType, EntityUtils, Field, Group } from 'audako-core';
 import type { z } from 'zod';
-import { BaseEntityContract } from './base-entity.contract.js';
+import {
+  ConfigurationEntityContract,
+  type ConfigurationEntityModel,
+  configurationEntityFieldDefinitions,
+} from './base-entity.contract.js';
 import type { EntityContractContext, EntityFieldDefinition } from './types.js';
 import { buildZodSchemaFromFieldDefinitions } from './zod-utils.js';
 
@@ -12,6 +16,7 @@ type GroupContractFieldDefinition = EntityFieldDefinition & {
 };
 
 const groupFieldDefinitions: GroupContractFieldDefinition[] = [
+  ...configurationEntityFieldDefinitions,
   {
     key: 'type',
     dtoName: 'type',
@@ -61,15 +66,9 @@ const groupUpdateSchema = buildZodSchemaFromFieldDefinitions(
 type GroupCreatePayload = z.infer<typeof groupCreateSchema>;
 type GroupUpdatePayload = z.infer<typeof groupUpdateSchema>;
 
-type GroupModel = Partial<GroupCreatePayload> & {
-  id?: string;
-  path?: string[];
-  name?: string;
-  description?: string;
-  groupId?: string;
-};
+type GroupModel = ConfigurationEntityModel & Partial<GroupCreatePayload>;
 
-class GroupEntityContract extends BaseEntityContract<
+class GroupEntityContract extends ConfigurationEntityContract<
   Group,
   GroupCreatePayload,
   GroupUpdatePayload
@@ -95,9 +94,7 @@ class GroupEntityContract extends BaseEntityContract<
   protected fromCreatePayload(payload: GroupCreatePayload, context?: EntityContractContext): Group {
     const model: GroupModel = { ...payload };
 
-    if (!model.groupId && context?.tenantRootGroupId) {
-      model.groupId = context.tenantRootGroupId;
-    }
+    this.applyConfigurationEntityContext(model, context);
 
     if (!model.type) {
       model.type = DEFAULT_GROUP_TYPE;
@@ -114,9 +111,7 @@ class GroupEntityContract extends BaseEntityContract<
     const model = this.toGroupModel(existingEntity);
     Object.assign(model, changes);
 
-    if (!model.groupId && context?.tenantRootGroupId) {
-      model.groupId = context.tenantRootGroupId;
-    }
+    this.applyConfigurationEntityContext(model, context);
 
     if (!model.type) {
       model.type = DEFAULT_GROUP_TYPE;
@@ -132,19 +127,7 @@ class GroupEntityContract extends BaseEntityContract<
   private toGroupModel(group: Group): GroupModel {
     const model: GroupModel = {};
 
-    this.setModelValueIfDefined(model, 'id', group.Id);
-    this.setModelValueIfDefined(model, 'path', group.Path ? [...group.Path] : undefined);
-    this.setModelValueIfDefined(
-      model,
-      'name',
-      EntityUtils.getPropertyValue<Group, unknown>(group, 'Name', true),
-    );
-    this.setModelValueIfDefined(
-      model,
-      'description',
-      EntityUtils.getPropertyValue<Group, unknown>(group, 'Description', true),
-    );
-    this.setModelValueIfDefined(model, 'groupId', group.GroupId);
+    this.setBaseEntityModelProperties(model, group);
 
     for (const field of this.fieldDefinitions) {
       const dtoFieldName = this.getDtoFieldName(field);
@@ -159,18 +142,7 @@ class GroupEntityContract extends BaseEntityContract<
     const group = baseGroup ? this.cloneGroup(baseGroup) : new Group();
     const modelValues = model as Record<string, unknown>;
 
-    if (typeof model.id !== 'undefined') {
-      group.Id = model.id;
-    }
-
-    if (typeof model.path !== 'undefined') {
-      group.Path = [...model.path];
-    }
-
-    if (model.name !== undefined) EntityUtils.setPropertyValue(group, 'Name', model.name, true);
-    if (model.description !== undefined)
-      EntityUtils.setPropertyValue(group, 'Description', model.description, true);
-    if (model.groupId !== undefined) group.GroupId = model.groupId;
+    this.applyBaseEntityProperties(group, model);
 
     for (const field of this.fieldDefinitions) {
       const dtoFieldName = this.getDtoFieldName(field);
@@ -236,19 +208,6 @@ class GroupEntityContract extends BaseEntityContract<
       ...(group.AdditionalFields ?? {}),
     };
     return cloned;
-  }
-
-  private getDtoFieldName(field: EntityFieldDefinition): string {
-    return field.dtoName ?? field.key;
-  }
-
-  private setModelValueIfDefined(model: GroupModel, key: string, value: unknown): void {
-    if (typeof value === 'undefined' || value === null) {
-      return;
-    }
-
-    const modelValues = model as Record<string, unknown>;
-    modelValues[key] = Array.isArray(value) ? [...value] : value;
   }
 }
 

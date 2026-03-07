@@ -2,6 +2,7 @@ import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
 import { EntityNameService, EntityType } from 'audako-core';
 import type { AudakoServices } from '../services/audako-services.js';
+import { normalizePathIds } from '../services/path-utils.js';
 import { toErrorResponse, toTextResponse } from './helpers.js';
 
 const getGroupPathSchema = Type.Object({
@@ -15,18 +16,6 @@ interface TenantServiceWithEntityLookup {
     Id: string;
     Name: string;
   }>;
-}
-
-function normalizePathIds(pathValue: unknown, groupId: string): string[] {
-  const pathIds = Array.isArray(pathValue)
-    ? pathValue.filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-    : [];
-
-  if (pathIds[pathIds.length - 1] !== groupId) {
-    pathIds.push(groupId);
-  }
-
-  return pathIds;
 }
 
 async function resolveTenantForEntityId(

@@ -1,33 +1,9 @@
 import { isBridgeSessionWebSocketClientMessage, } from '@audako/contracts';
 import { createLogger } from '../config/app-config.js';
+import { buildSessionEvent } from '../services/session-event-utils.js';
+import { sanitizeSessionInfoUpdate, toSessionInfoResponse, } from '../services/session-info-utils.js';
 const logger = createLogger('session-websocket-handler');
 const HEARTBEAT_INTERVAL_MS = 30000;
-function sanitizeSessionInfoUpdate(body) {
-    return {
-        tenantId: body.tenantId?.trim() || undefined,
-        groupId: body.groupId?.trim() || undefined,
-        entityType: body.entityType?.trim() || undefined,
-        app: body.app?.trim() || undefined,
-    };
-}
-function toSessionInfoResponse(entry) {
-    return {
-        sessionId: entry.sessionId,
-        tenantId: entry.sessionContext.tenantId,
-        groupId: entry.sessionContext.groupId,
-        entityType: entry.sessionContext.entityType,
-        app: entry.sessionContext.app,
-        updatedAt: new Date().toISOString(),
-    };
-}
-function buildSessionEvent(type, sessionId, payload) {
-    return {
-        type,
-        sessionId,
-        timestamp: new Date().toISOString(),
-        payload,
-    };
-}
 function buildSessionSnapshotPayload(entry) {
     return {
         sessionId: entry.sessionId,
@@ -153,7 +129,12 @@ export function createSessionWebSocketHandler({ registry, eventHub, requestHub, 
                 if (message.type === 'session.info.update') {
                     const sanitized = sanitizeSessionInfoUpdate(message.sessionInfo);
                     await currentEntry.sessionContext.update(sanitized);
-                    const response = toSessionInfoResponse(currentEntry);
+                    const response = toSessionInfoResponse(currentEntry.sessionId, {
+                        tenantId: currentEntry.sessionContext.tenantId,
+                        groupId: currentEntry.sessionContext.groupId,
+                        entityType: currentEntry.sessionContext.entityType,
+                        app: currentEntry.sessionContext.app,
+                    });
                     eventHub.publish(sessionId, buildSessionEvent('session.info.updated', sessionId, response));
                     return;
                 }
