@@ -80,7 +80,10 @@ class Xn {
     this.abortController && this.abortController.abort();
   }
   getSlashCommands() {
-    return [{ name: "new", description: "Start a new conversation" }, { name: "help", description: "Show available commands and usage tips" }];
+    return [
+      { name: "new", description: "Start a new conversation" },
+      { name: "help", description: "Show available commands and usage tips" }
+    ];
   }
   async newSession() {
   }
@@ -267,7 +270,13 @@ ${c}` : this.accumulatedThinking = c, this.currentCallbacks.onThinking(this.accu
       console.warn("[WebSocketAdapter] Unsupported request type:", n);
       return;
     }
-    const i = r, c = (s = this.currentCallbacks) != null && s.onQuestion ? (a) => this.currentCallbacks.onQuestion(a) : this.publicQuestionHandler ? (a) => this.publicQuestionHandler(a, { autoFocus: !1 }) : null;
+    const i = r, c = (s = this.currentCallbacks) != null && s.onQuestion ? (a) => {
+      var l, d;
+      return (d = (l = this.currentCallbacks) == null ? void 0 : l.onQuestion) == null ? void 0 : d.call(l, a);
+    } : this.publicQuestionHandler ? (a) => {
+      var l;
+      return (l = this.publicQuestionHandler) == null ? void 0 : l.call(this, a, { autoFocus: !1 });
+    } : null;
     try {
       if (!c) {
         console.warn(

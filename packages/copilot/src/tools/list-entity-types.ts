@@ -18,6 +18,7 @@ export const listEntityTypesTool: AgentTool<typeof listEntityTypesSchema> = {
       entityType: definition.entityType,
       description: definition.description,
       fieldCount: definition.fields.length,
+      hasSettings: (definition.settingsTypes?.length ?? 0) > 0,
     }));
 
     return toTextResponse(payload);

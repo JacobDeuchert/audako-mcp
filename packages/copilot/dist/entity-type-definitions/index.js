@@ -1,23 +1,13 @@
-import { groupEntityContract } from './group.contract.js';
-import { signalEntityContract } from './signal.contract.js';
-const entityTypeContracts = [
-    groupEntityContract,
-    signalEntityContract,
-];
-function normalizeEntityType(value) {
-    return value.trim().toLowerCase();
-}
-function getContractKeys(contract) {
-    return [contract.key, contract.entityType, ...(contract.aliases ?? [])];
-}
-export function listEntityTypeDefinitions() {
-    return entityTypeContracts.map(contract => contract.getDefinition());
-}
-export function getSupportedEntityTypeNames() {
-    return entityTypeContracts.map(contract => contract.key).sort((a, b) => a.localeCompare(b));
-}
-export function resolveEntityTypeContract(entityType) {
-    const normalized = normalizeEntityType(entityType);
-    return entityTypeContracts.find(contract => getContractKeys(contract).map(normalizeEntityType).includes(normalized));
-}
+// Type definitions
+// Base contract exports
+export { ConfigurationEntityContract, configurationEntityFieldDefinitions, } from './base-entity.contract.js';
+// Legacy entity contracts (for backward compatibility)
+export { groupEntityContract } from './group.contract.js';
+// Settings types (barrel export)
+export { SignalAnalogSettings, SignalCounterSettings, SignalDigitalSettings, SignalUniversalSettings, } from './settings-types/index.js';
+export { signalEntityContract } from './signal.contract.js';
+// Type registry functions
+export { clearTypeRegistry, getTypeRegistrySize, listAllTypeKeys, registerEntityType, registerSettingsType, resolveTypeDefinition, } from './type-registry.js';
+// Utility exports
+export { buildZodSchemaFromFieldDefinitions } from './zod-utils.js';
 //# sourceMappingURL=index.js.map

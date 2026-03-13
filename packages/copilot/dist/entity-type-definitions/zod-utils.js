@@ -44,4 +44,109 @@ export function formatZodValidationErrors(error) {
         return path.length > 0 ? `${path}: ${issue.message}` : issue.message;
     });
 }
+/**
+ * Converts a SettingsFieldDefinition to a Zod schema.
+ * Similar to toZodFieldSchema but for settings fields which use `required` instead of `requiredOnCreate`.
+ */
+function settingsFieldToZodSchema(field) {
+    let schema;
+    switch (field.type) {
+        case 'string':
+            schema = z.string();
+            break;
+        case 'number':
+            schema = z.number();
+            break;
+        case 'boolean':
+            schema = z.boolean();
+            break;
+        case 'enum': {
+            const enumValues = field.enumValues ?? [];
+            if (enumValues.length === 0) {
+                throw new Error(`Settings field '${field.key}' is enum but has no enumValues configured.`);
+            }
+            const [firstValue, ...otherValues] = enumValues;
+            schema = z.enum([firstValue, ...otherValues]);
+            break;
+        }
+        default:
+            throw new Error(`Unsupported settings field type '${String(field.type)}'.`);
+    }
+    return schema.describe(field.description || field.key);
+}
+/**
+ * Builds a strict Zod schema from a SettingsTypeDefinition.
+ * Unknown fields are rejected (no .passthrough()).
+ */
+export function buildSettingsZodSchema(settingsDef) {
+    const shape = {};
+    for (const field of settingsDef.fields) {
+        const dtoFieldName = field.dtoName ?? field.key;
+        if (shape[dtoFieldName]) {
+            throw new Error(`Duplicate settings DTO field definition '${dtoFieldName}'.`);
+        }
+        const baseSchema = settingsFieldToZodSchema(field);
+        shape[dtoFieldName] = field.required ? baseSchema : baseSchema.optional();
+    }
+    // Strict schema - unknown fields will be rejected
+    return z.object(shape).strict();
+}
+/**
+ * Builds a Zod schema for nested entities with polymorphic settings support.
+ * Base fields use .passthrough() (unknown fields allowed), but settings use strict validation.
+ */
+export function buildNestedEntitySchema(entityDef, mode) {
+    const baseShape = {};
+    for (const field of entityDef.fields) {
+        const dtoFieldName = field.dtoName ?? field.key;
+        if (baseShape[dtoFieldName]) {
+            throw new Error(`Duplicate DTO field definition '${dtoFieldName}'.`);
+        }
+        const isRequired = mode === 'create' && (field.requiredOnCreate ?? false);
+        const baseSchema = toZodFieldSchema(field);
+        baseShape[dtoFieldName] = isRequired ? baseSchema : baseSchema.optional();
+    }
+    if (entityDef.settingsTypes && entityDef.settingsTypes.length > 0) {
+        const settingsOptions = [];
+        for (const settingsDef of entityDef.settingsTypes) {
+            const settingsSchema = buildSettingsZodSchema(settingsDef);
+            const option = z.object({
+                type: z.literal(settingsDef.key),
+                ...settingsSchema.shape,
+            });
+            settingsOptions.push(option);
+        }
+        if (settingsOptions.length > 0) {
+            baseShape.settings = z.union(settingsOptions);
+        }
+    }
+    return z.object(baseShape).passthrough();
+}
+/**
+ * Validates a settings payload against a SettingsTypeDefinition.
+ * Returns an array of error messages (empty if valid).
+ */
+export function validateSettingsPayload(settingsDef, payload) {
+    try {
+        const schema = buildSettingsZodSchema(settingsDef);
+        const result = schema.safeParse(payload);
+        if (result.success) {
+            return [];
+        }
+        const validFields = settingsDef.fields.map(f => f.dtoName ?? f.key).join(', ');
+        return result.error.issues.map(issue => {
+            const path = issue.path.join('.');
+            if (path.length > 0) {
+                return `${path}: ${issue.message} (Valid fields: ${validFields})`;
+            }
+            return `${issue.message} (Valid fields: ${validFields})`;
+        });
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return [
+            `Settings validation failed: ${message}. Try loading the settings type definition first.`,
+        ];
+    }
+}
 //# sourceMappingURL=zod-utils.js.map

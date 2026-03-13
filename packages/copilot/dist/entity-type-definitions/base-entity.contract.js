@@ -3,7 +3,6 @@ import { formatZodValidationErrors } from './zod-utils.js';
 export class BaseEntityContract {
     aliases = [];
     examples;
-    appliesTo = {};
     cachedDefinition;
     getDefinition() {
         if (!this.cachedDefinition) {
@@ -20,7 +19,6 @@ export class BaseEntityContract {
                     entityPath: field.entityPath,
                     requiredOnCreate: field.requiredOnCreate ?? false,
                     enumValues: field.enumValues,
-                    appliesTo: field.appliesTo ?? this.appliesTo[field.key],
                 })),
                 examples: this.examples,
             };

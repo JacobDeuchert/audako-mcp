@@ -20,8 +20,6 @@ export abstract class BaseEntityContract<
   public readonly aliases: string[] = [];
   public readonly examples?: EntityTypeExamples;
 
-  protected readonly appliesTo: Record<string, string[]> = {};
-
   protected abstract readonly createSchema: z.ZodType<TCreatePayload>;
   protected abstract readonly updateSchema: z.ZodType<TUpdatePayload>;
   protected abstract readonly fieldDefinitions: EntityFieldDefinition[];
@@ -56,7 +54,6 @@ export abstract class BaseEntityContract<
           entityPath: field.entityPath,
           requiredOnCreate: field.requiredOnCreate ?? false,
           enumValues: field.enumValues,
-          appliesTo: field.appliesTo ?? this.appliesTo[field.key],
         })),
         examples: this.examples,
       };
