@@ -1,5 +1,6 @@
 import { Agent } from '@mariozechner/pi-agent-core';
 import { getModel, streamSimple } from '@mariozechner/pi-ai';
+import { join } from 'path';
 import { appConfig, loadSystemPrompt } from '../config/app-config.js';
 import type { AudakoServices } from '../services/audako-services.js';
 import { createMutationThrottle } from '../services/mutation-throttle.js';
@@ -7,9 +8,14 @@ import type { PermissionService } from '../services/permission-service.js';
 import type { SessionContext } from '../services/session-context.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
 import type { ToolRequestHub } from '../services/tool-request-hub.js';
+import { loadSkillsFromDir } from '../skills/loader.js';
+import { formatSkillsForPrompt } from '../skills/prompt.js';
+import type { Skill } from '../skills/types.js';
 import { createAskQuestionTool } from '../tools/ask-question.js';
 import { createMutationTools } from '../tools/mutation-tools.js';
 import { createReadOnlyTools } from '../tools/read-only-tools.js';
+
+const SKILLS_DIR = join(__dirname, '../../skills');
 
 export interface CreateSessionAgentConfig {
   sessionContext: SessionContext;
@@ -21,6 +27,7 @@ export interface CreateSessionAgentConfig {
 
 export interface SessionAgentFactoryResult {
   agent: Agent;
+  skills: Skill[];
   destroy: () => void;
 }
 
@@ -28,6 +35,14 @@ export async function createSessionAgent(
   config: CreateSessionAgentConfig,
 ): Promise<SessionAgentFactoryResult> {
   const systemPrompt = await loadSystemPrompt();
+
+  const { skills, diagnostics } = loadSkillsFromDir(SKILLS_DIR);
+  if (diagnostics.length > 0) {
+    console.warn('[Skills] Loading diagnostics:', diagnostics);
+  }
+
+  const skillsSection = formatSkillsForPrompt(skills);
+  const fullSystemPrompt = systemPrompt + skillsSection;
 
   const readOnlyTools = createReadOnlyTools(config.sessionContext, config.audakoServices);
   const mutationTools = createMutationTools(
@@ -43,7 +58,7 @@ export async function createSessionAgent(
 
   const agent = new Agent({
     initialState: {
-      systemPrompt,
+      systemPrompt: fullSystemPrompt,
       model: getModel(appConfig.llm.provider as any, appConfig.llm.modelName as any),
       tools: allTools,
       thinkingLevel: 'off',
@@ -58,5 +73,5 @@ export async function createSessionAgent(
     agent.clearMessages();
   };
 
-  return { agent, destroy };
+  return { agent, skills, destroy };
 }
