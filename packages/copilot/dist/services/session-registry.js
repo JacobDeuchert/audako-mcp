@@ -68,7 +68,6 @@ export class SessionRegistry {
     }
     async getOrCreateSession(scadaUrl, accessToken, createSessionFn) {
         const key = this.generateKey(scadaUrl, accessToken);
-        // Coalesce concurrent requests for the same credentials.
         const inflight = this.inflight.get(key);
         if (inflight) {
             return inflight;
@@ -83,7 +82,6 @@ export class SessionRegistry {
         }
     }
     async doGetOrCreateSession(key, scadaUrl, accessToken, createSessionFn) {
-        // Check if session already exists.
         const existingEntry = this.sessions.get(key);
         if (existingEntry) {
             existingEntry.lastAccessedAt = new Date();
@@ -99,7 +97,6 @@ export class SessionRegistry {
                 sessionToken: existingEntry.sessionToken,
             };
         }
-        // Create new session
         const sessionId = randomBytes(16).toString('hex');
         const sessionToken = this.generateSessionToken();
         const { agent, agentDestroy, wsEventBridgeUnsubscribe, sessionContext, audakoServices } = await createSessionFn(sessionId, sessionToken);
@@ -132,7 +129,6 @@ export class SessionRegistry {
             return;
         }
         try {
-            // Cleanup agent resources
             entry.wsEventBridgeUnsubscribe();
             entry.agentDestroy();
             this.sessions.delete(key);

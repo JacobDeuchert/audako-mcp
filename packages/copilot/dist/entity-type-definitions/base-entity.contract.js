@@ -1,5 +1,30 @@
 import { EntityUtils } from 'audako-core';
+import { existsSync } from 'fs';
+import { dirname, isAbsolute, join } from 'path';
+import { fileURLToPath } from 'url';
+import { loadMarkdownFile } from '../services/doc-loader.js';
 import { formatZodValidationErrors } from './zod-utils.js';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+function resolveMarkdownPath(markdownPath) {
+    if (isAbsolute(markdownPath)) {
+        return markdownPath;
+    }
+    const candidatePaths = [
+        join(__dirname, markdownPath),
+        join(__dirname, '..', '..', 'src', 'entity-type-definitions', markdownPath),
+        join(process.cwd(), 'src', 'entity-type-definitions', markdownPath),
+        join(process.cwd(), 'packages', 'copilot', 'src', 'entity-type-definitions', markdownPath),
+    ];
+    const existingPath = candidatePaths.find(candidate => existsSync(candidate));
+    return existingPath ?? markdownPath;
+}
+function resolveExtendedInfo(extendedInfo) {
+    if (!extendedInfo.toLowerCase().endsWith('.md')) {
+        return extendedInfo;
+    }
+    return loadMarkdownFile(resolveMarkdownPath(extendedInfo));
+}
 export class BaseEntityContract {
     aliases = [];
     examples;
@@ -21,6 +46,9 @@ export class BaseEntityContract {
                     enumValues: field.enumValues,
                 })),
                 examples: this.examples,
+                extendedInfo: typeof this.extendedInfo === 'string'
+                    ? resolveExtendedInfo(this.extendedInfo)
+                    : undefined,
             };
         }
         return this.cachedDefinition;

@@ -1,5 +1,9 @@
 import { type ConfigurationEntity, type EntityType, EntityUtils } from 'audako-core';
+import { existsSync } from 'fs';
+import { dirname, isAbsolute, join } from 'path';
+import { fileURLToPath } from 'url';
 import type { z } from 'zod';
+import { loadMarkdownFile } from '../services/doc-loader.js';
 import type {
   EntityContractContext,
   EntityFieldDefinition,
@@ -9,6 +13,33 @@ import type {
 } from './types.js';
 import { formatZodValidationErrors } from './zod-utils.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+function resolveMarkdownPath(markdownPath: string): string {
+  if (isAbsolute(markdownPath)) {
+    return markdownPath;
+  }
+
+  const candidatePaths = [
+    join(__dirname, markdownPath),
+    join(__dirname, '..', '..', 'src', 'entity-type-definitions', markdownPath),
+    join(process.cwd(), 'src', 'entity-type-definitions', markdownPath),
+    join(process.cwd(), 'packages', 'copilot', 'src', 'entity-type-definitions', markdownPath),
+  ];
+
+  const existingPath = candidatePaths.find(candidate => existsSync(candidate));
+  return existingPath ?? markdownPath;
+}
+
+function resolveExtendedInfo(extendedInfo: string): string {
+  if (!extendedInfo.toLowerCase().endsWith('.md')) {
+    return extendedInfo;
+  }
+
+  return loadMarkdownFile(resolveMarkdownPath(extendedInfo));
+}
+
 export abstract class BaseEntityContract<
   TEntity extends ConfigurationEntity,
   TCreatePayload extends Record<string, unknown>,
@@ -17,6 +48,7 @@ export abstract class BaseEntityContract<
   public abstract readonly key: string;
   public abstract readonly entityType: EntityType;
   public abstract readonly description: string;
+  public abstract readonly extendedInfo?: string;
   public readonly aliases: string[] = [];
   public readonly examples?: EntityTypeExamples;
 
@@ -56,10 +88,14 @@ export abstract class BaseEntityContract<
           enumValues: field.enumValues,
         })),
         examples: this.examples,
+        extendedInfo:
+          typeof this.extendedInfo === 'string'
+            ? resolveExtendedInfo(this.extendedInfo)
+            : undefined,
       };
     }
 
-    return this.cachedDefinition;
+    return this.cachedDefinition as EntityTypeDefinition;
   }
 
   public validate(payload: Record<string, unknown>, mode: ValidationMode): string[] {

@@ -21,17 +21,6 @@ export class SessionRequestCancelledError extends Error {
         this.reason = reason;
     }
 }
-/**
- * SessionRequestHub manages request/response events for interactive agent flows.
- *
- * Pattern:
- * 1. Routes call create(sessionId, timeoutMs) to get { requestId, expiresAt, waitForResponse }
- * 2. Routes publish hub.request event with requestId
- * 3. UI responds via resolve endpoint
- * 4. waitForResponse resolves with { response, respondedAt }
- *
- * This matches backend-bridge SessionRequestHub pattern exactly.
- */
 export class SessionRequestHub {
     pendingBySession = new Map();
     resolvedBySession = new Map();
@@ -79,7 +68,6 @@ export class SessionRequestHub {
         }
         const respondedAt = new Date().toISOString();
         entry.resolve({ response, respondedAt });
-        // Cache the resolution for polling retrieval
         this.storeResolved(sessionId, {
             sessionId,
             requestId,
@@ -93,12 +81,10 @@ export class SessionRequestHub {
         };
     }
     getStatus(sessionId, requestId) {
-        // Check pending first
         const pending = this.pendingBySession.get(sessionId)?.get(requestId);
         if (pending) {
             return { status: 'pending', expiresAt: pending.expiresAt };
         }
-        // Check resolved cache
         const resolved = this.resolvedBySession.get(sessionId)?.get(requestId);
         if (resolved) {
             return {
@@ -110,10 +96,6 @@ export class SessionRequestHub {
         }
         return { status: 'expired' };
     }
-    /**
-     * Cancel all pending requests for a session.
-     * Used during session cleanup.
-     */
     cancelSession(sessionId) {
         const pendingMap = this.pendingBySession.get(sessionId);
         if (!pendingMap) {

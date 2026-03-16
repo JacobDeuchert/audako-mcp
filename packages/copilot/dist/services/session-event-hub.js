@@ -1,23 +1,7 @@
-/**
- * SessionEventHub - Manages WebSocket connections per session and fans out events.
- *
- * This service:
- * - Manages multiple WS connections per session (subscribers)
- * - Publishes events to all subscribers for a session
- * - Handles stale/closed connections gracefully
- * - Provides session-level connection lifecycle management
- */
 const WS_OPEN_STATE = 1;
 const WS_CLOSED_STATE = 3;
-/**
- * SessionEventHub manages WebSocket connections per session and broadcasts events.
- */
 export class SessionEventHub {
     subscribers = new Map();
-    /**
-     * Register a WebSocket connection for a session.
-     * Multiple connections per session are supported.
-     */
     subscribe(sessionId, socket) {
         const existing = this.subscribers.get(sessionId);
         if (existing) {
@@ -26,10 +10,6 @@ export class SessionEventHub {
         }
         this.subscribers.set(sessionId, new Set([socket]));
     }
-    /**
-     * Remove a specific WebSocket connection from a session.
-     * Cleans up the session entry if no connections remain.
-     */
     unsubscribe(sessionId, socket) {
         const sockets = this.subscribers.get(sessionId);
         if (!sockets) {
@@ -40,12 +20,6 @@ export class SessionEventHub {
             this.subscribers.delete(sessionId);
         }
     }
-    /**
-     * Publish an event to all subscribers for a session.
-     * Returns the count of connections that successfully received the event.
-     *
-     * Automatically removes stale/closed connections during delivery.
-     */
     publish(sessionId, event) {
         const sockets = this.subscribers.get(sessionId);
         if (!sockets || sockets.size === 0) {
@@ -63,27 +37,20 @@ export class SessionEventHub {
                 socket.send(payload);
                 delivered += 1;
             }
-            catch (_error) {
+            catch {
                 staleSockets.push(socket);
-                // Silently remove failed connections
             }
         }
-        // Clean up stale connections
         for (const socket of staleSockets) {
             this.unsubscribe(sessionId, socket);
         }
         return delivered;
     }
-    /**
-     * Close all WebSocket connections for a session.
-     * Sends a 'session.closed' event before terminating connections.
-     */
     closeSession(sessionId, reason) {
         const sockets = this.subscribers.get(sessionId);
         if (!sockets || sockets.size === 0) {
             return;
         }
-        // Notify subscribers before closing
         const event = {
             type: 'session.closed',
             sessionId,
@@ -91,42 +58,32 @@ export class SessionEventHub {
             payload: { reason },
         };
         this.publish(sessionId, event);
-        // Close all connections
         for (const socket of sockets) {
-            if (socket.readyState === WS_CLOSED_STATE) {
-                continue;
-            }
-            try {
-                socket.close(1000, reason);
-            }
-            catch {
-                // Ignore close errors for stale sockets
-            }
+            this.tryCloseSocket(socket, reason);
         }
         this.subscribers.delete(sessionId);
     }
-    /**
-     * Close all sessions with the given reason.
-     * Typically used during server shutdown.
-     */
     closeAll(reason = 'server_shutdown') {
         for (const sessionId of this.subscribers.keys()) {
             this.closeSession(sessionId, reason);
         }
     }
-    /**
-     * Get the count of active subscribers for a session.
-     * Useful for testing and debugging.
-     */
     getSubscriberCount(sessionId) {
         return this.subscribers.get(sessionId)?.size ?? 0;
     }
-    /**
-     * Get all active session IDs.
-     * Useful for testing and debugging.
-     */
     getActiveSessions() {
         return Array.from(this.subscribers.keys());
+    }
+    tryCloseSocket(socket, reason) {
+        if (socket.readyState === WS_CLOSED_STATE) {
+            return;
+        }
+        try {
+            socket.close(1000, reason);
+        }
+        catch {
+            return;
+        }
     }
 }
 //# sourceMappingURL=session-event-hub.js.map

@@ -8,10 +8,10 @@ import {
 } from 'audako-core';
 import axios from 'axios';
 
-// Configure axios to ignore self-signed certificates
-axios.defaults.httpsAgent = new https.Agent({
+const allowSelfSignedHttpsAgent = new https.Agent({
   rejectUnauthorized: false,
 });
+axios.defaults.httpsAgent = allowSelfSignedHttpsAgent;
 
 export interface AudakoServices {
   httpConfig: HttpConfig;
@@ -22,14 +22,6 @@ export interface AudakoServices {
   dataSourceService: DataSourceHttpService;
 }
 
-/**
- * Factory function to create fresh Audako service instances.
- * Each call returns a new set of service instances with no shared state.
- *
- * @param systemUrl - The Audako SCADA backend URL
- * @param accessToken - The access token for authentication
- * @returns Object containing all initialized service instances
- */
 export async function createAudakoServices(
   systemUrl: string,
   accessToken: string,

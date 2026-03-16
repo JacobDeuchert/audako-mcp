@@ -29,6 +29,10 @@ function toZodFieldSchema(field: EntityFieldDefinition): z.ZodTypeAny {
       schema = z.enum([firstValue, ...otherValues] as [string, ...string[]]);
       break;
     }
+    case 'polymorphic':
+      throw new Error(
+        `Polymorphic field '${field.key}' must be handled via buildNestedEntitySchema.`,
+      );
     default:
       throw new Error(`Unsupported field type '${String(field.type)}'.`);
   }
@@ -137,27 +141,22 @@ export function buildNestedEntitySchema(
       throw new Error(`Duplicate DTO field definition '${dtoFieldName}'.`);
     }
 
+    if (field.type === 'polymorphic') {
+      continue;
+    }
+
     const isRequired = mode === 'create' && (field.requiredOnCreate ?? false);
     const baseSchema = toZodFieldSchema(field);
     baseShape[dtoFieldName] = isRequired ? baseSchema : baseSchema.optional();
   }
 
-  if (entityDef.settingsTypes && entityDef.settingsTypes.length > 0) {
-    const settingsOptions: z.ZodObject<any>[] = [];
-
-    for (const settingsDef of entityDef.settingsTypes) {
-      const settingsSchema = buildSettingsZodSchema(settingsDef);
-      const option = z.object({
-        type: z.literal(settingsDef.key),
-        ...settingsSchema.shape,
-      });
-      settingsOptions.push(option);
-    }
-
-    if (settingsOptions.length > 0) {
-      baseShape.settings = z.union(
-        settingsOptions as [z.ZodObject<any>, z.ZodObject<any>, ...z.ZodObject<any>[]],
-      );
+  for (const field of entityDef.fields) {
+    if (field.type === 'polymorphic' && field.polymorphic) {
+      const dtoFieldName = field.dtoName ?? field.key;
+      const isRequired = mode === 'create' && (field.requiredOnCreate ?? false);
+      baseShape[dtoFieldName] = isRequired
+        ? z.object({}).passthrough()
+        : z.record(z.any()).optional();
     }
   }
 

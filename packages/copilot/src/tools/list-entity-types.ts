@@ -1,6 +1,11 @@
+// Import type files to trigger self-registration
+import '../entity-type-definitions/Signal/contract.js';
+import '../entity-type-definitions/Group/contract.js';
+
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
-import { listEntityTypeDefinitions } from '../entity-type-definitions/entity-type-registry.js';
+import type { EntityTypeDefinition } from '../entity-type-definitions/types.js';
+import { listTypes } from '../services/type-registry.js';
 import { toTextResponse } from './helpers.js';
 
 const listEntityTypesSchema = Type.Object({}, { additionalProperties: false });
@@ -11,15 +16,15 @@ export const listEntityTypesTool: AgentTool<typeof listEntityTypesSchema> = {
   description: 'List supported configuration entity types that can be created or updated.',
   parameters: listEntityTypesSchema,
   execute: async () => {
-    const definitions = listEntityTypeDefinitions();
-    const payload = definitions.map(definition => ({
-      key: definition.key,
-      aliases: definition.aliases ?? [],
-      entityType: definition.entityType,
-      description: definition.description,
-      fieldCount: definition.fields.length,
-      hasSettings: (definition.settingsTypes?.length ?? 0) > 0,
-    }));
+    const definitions = listTypes();
+    const payload = definitions
+      .filter((def): def is EntityTypeDefinition => 'entityType' in def)
+      .map(definition => ({
+        key: definition.key,
+        aliases: definition.aliases ?? [],
+        entityType: definition.entityType,
+        description: definition.description,
+      }));
 
     return toTextResponse(payload);
   },

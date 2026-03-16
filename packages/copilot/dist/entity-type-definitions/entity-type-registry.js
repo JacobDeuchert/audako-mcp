@@ -1,5 +1,5 @@
-import { groupEntityContract } from './group.contract.js';
-import { signalEntityContract } from './signal.contract.js';
+import { groupEntityContract } from './Group/contract.js';
+import { signalEntityContract } from './Signal/contract.js';
 const entityTypeContracts = [
     groupEntityContract,
     signalEntityContract,

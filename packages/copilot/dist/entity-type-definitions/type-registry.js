@@ -1,84 +1,70 @@
 const typeRegistry = new Map();
+const entityContractRegistry = new Map();
 function normalizeTypeKey(value) {
     return value.trim().toLowerCase();
 }
-function getEntityTypeKeys(def) {
-    const keys = [def.key, def.entityType];
-    if (def.aliases) {
+function getAllKeys(def) {
+    const keys = [def.key];
+    if ('aliases' in def && def.aliases) {
         keys.push(...def.aliases);
+    }
+    if ('entityType' in def && def.entityType) {
+        keys.push(def.entityType);
     }
     return keys;
 }
-/**
- * Registers a settings type definition.
- * Throws an error if the key is already registered.
- */
-export function registerSettingsType(def) {
-    const normalizedKey = normalizeTypeKey(def.key);
-    if (typeRegistry.has(normalizedKey)) {
-        throw new Error(`Settings type with key "${def.key}" is already registered. ` +
-            `Collision detected during registration.`);
-    }
-    typeRegistry.set(normalizedKey, def);
-}
-/**
- * Registers an entity type definition.
- * Automatically registers any associated settings types.
- * Throws an error if any key is already registered.
- */
-export function registerEntityType(def) {
-    const entityKeys = getEntityTypeKeys(def);
-    for (const key of entityKeys) {
+export function registerType(def) {
+    const keys = getAllKeys(def);
+    for (const key of keys) {
         const normalizedKey = normalizeTypeKey(key);
         if (typeRegistry.has(normalizedKey)) {
-            throw new Error(`Entity type key "${key}" (from entity "${def.key}") is already registered. ` +
+            throw new Error(`Type key "${key}" (from type "${def.key}") is already registered. ` +
                 `Collision detected during registration.`);
         }
     }
-    for (const key of entityKeys) {
+    for (const key of keys) {
         const normalizedKey = normalizeTypeKey(key);
         typeRegistry.set(normalizedKey, def);
     }
-    if (def.settingsTypes && def.settingsTypes.length > 0) {
-        for (const settingsType of def.settingsTypes) {
-            registerSettingsType(settingsType);
+}
+export function registerEntityContract(contract) {
+    const def = contract.getDefinition();
+    const keys = [contract.key, contract.entityType, ...(contract.aliases ?? [])];
+    for (const key of keys) {
+        const normalizedKey = normalizeTypeKey(key);
+        if (entityContractRegistry.has(normalizedKey)) {
+            throw new Error(`Entity contract key "${key}" (from contract "${def.key}") is already registered. ` +
+                `Collision detected during registration.`);
         }
     }
+    for (const key of keys) {
+        const normalizedKey = normalizeTypeKey(key);
+        entityContractRegistry.set(normalizedKey, contract);
+    }
 }
-/**
- * Resolves a type definition by key (case-insensitive).
- * Returns undefined if not found.
- */
-export function resolveTypeDefinition(key) {
-    const normalizedKey = normalizeTypeKey(key);
-    return typeRegistry.get(normalizedKey);
+export function resolveEntityContract(entityType) {
+    return entityContractRegistry.get(normalizeTypeKey(entityType));
 }
-/**
- * Returns all registered type keys.
- * Returns unique keys in sorted order.
- */
-export function listAllTypeKeys() {
-    const uniqueKeys = new Set();
-    for (const [_, def] of typeRegistry.entries()) {
-        if ('entityType' in def) {
-            uniqueKeys.add(def.key);
-        }
-        else {
-            uniqueKeys.add(def.key);
+export function resolveType(key) {
+    return typeRegistry.get(normalizeTypeKey(key));
+}
+export function listTypes() {
+    const seen = new Set();
+    const result = [];
+    for (const def of typeRegistry.values()) {
+        if (!seen.has(def.key)) {
+            seen.add(def.key);
+            result.push(def);
         }
     }
-    return Array.from(uniqueKeys).sort((a, b) => a.localeCompare(b));
+    return result.sort((a, b) => a.key.localeCompare(b.key));
 }
-/**
- * Clears all registered types.
- * Primarily useful for testing.
- */
+export function listTypeKeys() {
+    return listTypes().map(def => def.key);
+}
 export function clearTypeRegistry() {
     typeRegistry.clear();
 }
-/**
- * Gets the count of registered type entries (including aliases).
- */
 export function getTypeRegistrySize() {
     return typeRegistry.size;
 }

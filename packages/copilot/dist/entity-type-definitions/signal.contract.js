@@ -54,27 +54,35 @@ const signalFieldDefinitions = [
         isEntityField: true,
         requiredOnCreate: false,
     },
+    {
+        key: 'settings',
+        dtoName: 'settings',
+        description: 'Signal-specific settings based on signal type',
+        type: 'polymorphic',
+        entityPath: 'Settings',
+        isEntityField: true,
+        requiredOnCreate: false,
+        polymorphic: {
+            discriminatorField: 'type',
+            mapping: {
+                [SignalType.AnalogInput]: 'SignalAnalogSettings',
+                [SignalType.AnalogInOut]: 'SignalAnalogSettings',
+                [SignalType.DigitalInput]: 'SignalDigitalSettings',
+                [SignalType.DigitalInOut]: 'SignalDigitalSettings',
+                [SignalType.Counter]: 'SignalCounterSettings',
+                [SignalType.UniversalInput]: 'SignalUniversalSettings',
+                [SignalType.UniversalInOut]: 'SignalUniversalSettings',
+            },
+        },
+    },
 ];
-const signalTypeToSettingsType = {
-    [SignalType.AnalogInput]: 'SignalAnalogSettings',
-    [SignalType.AnalogInOut]: 'SignalAnalogSettings',
-    [SignalType.DigitalInput]: 'SignalDigitalSettings',
-    [SignalType.DigitalInOut]: 'SignalDigitalSettings',
-    [SignalType.Counter]: 'SignalCounterSettings',
-    [SignalType.UniversalInput]: 'SignalUniversalSettings',
-    [SignalType.UniversalInOut]: 'SignalUniversalSettings',
-};
-const signalSettingsTypes = [
+const knownSignalBaseFields = new Set(signalFieldDefinitions.map(field => field.dtoName ?? field.key));
+const knownSignalSettingsFields = new Set([
     SignalAnalogSettings,
     SignalDigitalSettings,
     SignalCounterSettings,
     SignalUniversalSettings,
-];
-const knownSignalBaseFields = new Set([
-    ...signalFieldDefinitions.map(field => field.dtoName ?? field.key),
-    'settings',
-]);
-const knownSignalSettingsFields = new Set(signalSettingsTypes.flatMap(settingsType => settingsType.fields.map(field => field.dtoName ?? field.key)));
+].flatMap(settingsType => settingsType.fields.map(field => field.dtoName ?? field.key)));
 const signalCreateSchema = buildZodSchemaFromFieldDefinitions(signalFieldDefinitions, 'create');
 const signalUpdateSchema = buildZodSchemaFromFieldDefinitions(signalFieldDefinitions, 'update').refine(value => Object.keys(value).length > 0, {
     message: "At least one field must be provided in 'changes'.",
@@ -104,16 +112,15 @@ class SignalEntityContract extends ConfigurationEntityContract {
             recordingInterval: 10,
         },
     };
+    extendedInfo = {
+        type: 'markdownFile',
+        path: 'signal.md',
+    };
     createSchema = signalCreateSchema;
     updateSchema = signalUpdateSchema;
     fieldDefinitions = signalFieldDefinitions;
     getDefinition() {
-        const definition = super.getDefinition();
-        definition.settingsDiscriminatorField = 'type';
-        definition.settingsPayloadField = 'settings';
-        definition.typeMapping = { ...signalTypeToSettingsType };
-        definition.settingsTypes = signalSettingsTypes;
-        return definition;
+        return super.getDefinition();
     }
     fromCreatePayload(payload, context) {
         this.assertNoFlatSettingsFields(payload);
@@ -244,9 +251,29 @@ class SignalEntityContract extends ConfigurationEntityContract {
         }
         return signalType;
     }
+    getSettingsFieldDefinition() {
+        const field = this.fieldDefinitions.find(f => f.key === 'settings');
+        if (!field) {
+            throw new Error('Settings field definition not found');
+        }
+        return field;
+    }
     getSettingsTypeDefinitionForSignalType(signalType) {
-        const settingsTypeKey = signalTypeToSettingsType[signalType];
-        const definition = signalSettingsTypes.find(settingsType => settingsType.key === settingsTypeKey);
+        const settingsField = this.getSettingsFieldDefinition();
+        if (!settingsField.polymorphic) {
+            throw new Error('Settings field is not polymorphic');
+        }
+        const settingsTypeKey = settingsField.polymorphic.mapping[signalType];
+        if (!settingsTypeKey) {
+            throw new Error(`No settings type mapping found for signal type '${signalType}'.`);
+        }
+        const allSettingsTypes = [
+            SignalAnalogSettings,
+            SignalDigitalSettings,
+            SignalCounterSettings,
+            SignalUniversalSettings,
+        ];
+        const definition = allSettingsTypes.find(settingsType => settingsType.key === settingsTypeKey);
         if (!definition) {
             throw new Error(`No settings type definition found for signal type '${signalType}' (expected '${settingsTypeKey}').`);
         }

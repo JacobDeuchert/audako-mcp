@@ -3,8 +3,8 @@ import { escapeXml } from './utils.js';
  * Formats an array of skills as an XML block for injection into the system prompt.
  *
  * Filters out skills with disableModelInvocation=true and returns an empty string
- * if no visible skills remain. Uses progressive disclosure - only name, description,
- * and filePath are included, not the full skill content.
+ * if no visible skills remain. Uses progressive disclosure - only name and description
+ * are included, not the full skill content.
  *
  * @param skills - Array of skills to format
  * @returns XML formatted string for system prompt injection, or empty string if no visible skills
@@ -24,7 +24,6 @@ export function formatSkillsForPrompt(skills) {
         lines.push('  <skill>');
         lines.push(`    <name>${escapeXml(skill.name)}</name>`);
         lines.push(`    <description>${escapeXml(skill.description)}</description>`);
-        lines.push(`    <location>${escapeXml(skill.filePath)}</location>`);
         lines.push('  </skill>');
     }
     lines.push('</available_skills>');

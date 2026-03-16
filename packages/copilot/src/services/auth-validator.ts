@@ -2,12 +2,11 @@ import https from 'node:https';
 import { BaseHttpService, UserProfileHttpService } from 'audako-core';
 import axios from 'axios';
 
-// Allow self-signed certificates for internal SCADA endpoints.
-axios.defaults.httpsAgent = new https.Agent({
+const allowSelfSignedHttpsAgent = new https.Agent({
   rejectUnauthorized: false,
 });
+axios.defaults.httpsAgent = allowSelfSignedHttpsAgent;
 
-/** Thrown when upstream token validation fails. */
 export class UpstreamAuthError extends Error {
   readonly statusCode: number;
 
@@ -18,12 +17,6 @@ export class UpstreamAuthError extends Error {
   }
 }
 
-/**
- * Validates an upstream access token by requesting the user profile
- * from the Audako API at the given `scadaUrl`.
- *
- * Throws `UpstreamAuthError` on failure with the appropriate HTTP status code.
- */
 export async function validateUpstreamToken(scadaUrl: string, accessToken: string): Promise<void> {
   try {
     const httpConfig = await BaseHttpService.requestHttpConfig(scadaUrl);
@@ -48,7 +41,6 @@ export async function validateUpstreamToken(scadaUrl: string, accessToken: strin
       throw new UpstreamAuthError(401, 'Invalid or unauthorized access token');
     }
 
-    // Network / timeout / unexpected errors
     const isNetwork = isUpstreamNetworkError(error);
 
     throw new UpstreamAuthError(

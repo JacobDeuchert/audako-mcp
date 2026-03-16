@@ -1,29 +1,16 @@
-/**
- * In-process mutable session context manager for copilot.
- *
- * Unlike MCP server (which fetches context via HTTP from bridge),
- * copilot holds context in-memory and updates it directly when UI pushes location changes.
- *
- * When tenantId or groupId change, the context automatically resolves
- * additional metadata (tenant name, group path) from Audako services.
- */
 import { EntityNameService, EntityType } from 'audako-core';
 import { normalizePathIds } from './path-utils.js';
 const PATH_SEPARATOR = ' / ';
 export class SessionContext {
-    /** Static — set once at session creation, never change. */
     sessionId;
     scadaUrl;
     accessToken;
-    /** Dynamic — updated via `update()` as the user navigates. */
     tenantId;
     groupId;
     entityType;
     app;
-    /** Resolved metadata — automatically populated on update(). */
     resolvedTenant;
     resolvedGroup;
-    /** Audako services reference — set via bindServices(). */
     services;
     constructor(fields) {
         this.sessionId = fields.sessionId;
@@ -34,21 +21,9 @@ export class SessionContext {
         this.entityType = fields.entityType;
         this.app = fields.app;
     }
-    /**
-     * Bind Audako services so update() can resolve tenant/group metadata.
-     * Must be called once after construction before the first update().
-     */
     bindServices(services) {
         this.services = services;
     }
-    /**
-     * Updates dynamic context fields.
-     * Only provided fields are updated; others remain unchanged.
-     *
-     * When tenantId changes, resolves tenant view (name, root group).
-     * When groupId changes, resolves group path (IDs and human-readable name).
-     * Resolution failures clear the resolved data silently.
-     */
     async update(fields) {
         const tenantChanged = 'tenantId' in fields && fields.tenantId !== this.tenantId;
         const groupChanged = 'groupId' in fields && fields.groupId !== this.groupId;

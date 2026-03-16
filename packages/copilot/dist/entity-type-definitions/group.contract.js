@@ -57,6 +57,7 @@ class GroupEntityContract extends ConfigurationEntityContract {
             icon: 'mat-folder',
         },
     };
+    extendedInfo = undefined;
     createSchema = groupCreateSchema;
     updateSchema = groupUpdateSchema;
     fieldDefinitions = groupFieldDefinitions;

@@ -8,6 +8,15 @@ import { createCreateEntityTool } from './create-entity.js';
 import { createMoveEntityTool } from './move-entity.js';
 import { createUpdateEntityTool } from './update-entity.js';
 
+export interface MutationToolDependencies {
+  sessionId: string;
+  sessionContext: SessionContext;
+  audakoServices: AudakoServices;
+  mutationThrottle: MutationThrottle;
+  permissionService: PermissionService;
+  eventHub: SessionEventHub;
+}
+
 export function createMutationTools(
   sessionId: string,
   sessionContext: SessionContext,

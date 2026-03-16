@@ -1,7 +1,18 @@
 import type { EntityType } from 'audako-core';
 
-export type DefinitionFieldType = 'string' | 'number' | 'boolean' | 'enum';
+export type DefinitionFieldType = 'string' | 'number' | 'boolean' | 'enum' | 'polymorphic';
 export type ValidationMode = 'create' | 'update';
+
+/**
+ * Configuration for polymorphic fields.
+ * Maps discriminator values to settings type keys.
+ */
+export interface PolymorphicFieldConfig {
+  /** Field name that determines which settings type to use (e.g., 'type') */
+  discriminatorField: string;
+  /** Maps discriminator values to settings type keys */
+  mapping: Record<string, string>;
+}
 
 export interface EntityFieldDefinition {
   key: string;
@@ -11,6 +22,8 @@ export interface EntityFieldDefinition {
   entityPath?: string;
   requiredOnCreate?: boolean;
   enumValues?: string[];
+  /** Polymorphic configuration (required when type === 'polymorphic') */
+  polymorphic?: PolymorphicFieldConfig;
 }
 
 export interface EntityTypeDefinition {
@@ -20,11 +33,7 @@ export interface EntityTypeDefinition {
   description: string;
   fields: EntityFieldDefinition[];
   examples?: EntityTypeExamples;
-  // Polymorphic settings support
-  typeMapping?: Record<string, string>;
-  settingsDiscriminatorField?: string;
-  settingsPayloadField?: string;
-  settingsTypes?: SettingsTypeDefinition[];
+  extendedInfo?: string;
 }
 
 export interface EntityContractContext {
@@ -53,6 +62,7 @@ export interface SettingsTypeDefinition {
   description: string;
   fields: SettingsFieldDefinition[];
   example?: Record<string, unknown>;
+  extendedInfo?: string;
 }
 
 // Union type for all type definitions

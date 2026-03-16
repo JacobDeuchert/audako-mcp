@@ -1,13 +1,16 @@
 import { Agent } from '@mariozechner/pi-agent-core';
 import { getModel, streamSimple } from '@mariozechner/pi-ai';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { appConfig, loadSystemPrompt } from '../config/app-config.js';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { createMutationThrottle } from '../services/mutation-throttle.js';
 import { loadSkillsFromDir } from '../skills/loader.js';
 import { formatSkillsForPrompt } from '../skills/prompt.js';
 import { createAskQuestionTool } from '../tools/ask-question.js';
 import { createMutationTools } from '../tools/mutation-tools.js';
 import { createReadOnlyTools } from '../tools/read-only-tools.js';
+import { createReadSkillTool } from '../tools/skill-tools.js';
 const SKILLS_DIR = join(__dirname, '../../skills');
 export async function createSessionAgent(config) {
     const systemPrompt = await loadSystemPrompt();
@@ -20,7 +23,8 @@ export async function createSessionAgent(config) {
     const readOnlyTools = createReadOnlyTools(config.sessionContext, config.audakoServices);
     const mutationTools = createMutationTools(config.sessionContext.sessionId, config.sessionContext, config.audakoServices, createMutationThrottle(), config.permissionService, config.eventHub);
     const askQuestionTool = createAskQuestionTool(config.sessionContext.sessionId, config.requestHub);
-    const allTools = [...readOnlyTools, ...mutationTools, askQuestionTool];
+    const skillTool = createReadSkillTool(skills);
+    const allTools = [...readOnlyTools, ...mutationTools, askQuestionTool, skillTool];
     const agent = new Agent({
         initialState: {
             systemPrompt: fullSystemPrompt,

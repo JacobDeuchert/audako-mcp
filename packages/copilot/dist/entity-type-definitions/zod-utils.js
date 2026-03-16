@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { resolveType } from '../services/type-registry.js';
 function toZodFieldSchema(field) {
     let schema;
     switch (field.type) {
@@ -20,10 +21,35 @@ function toZodFieldSchema(field) {
             schema = z.enum([firstValue, ...otherValues]);
             break;
         }
+        case 'polymorphic':
+            throw new Error(`Polymorphic field '${field.key}' must be handled via buildNestedEntitySchema.`);
         default:
             throw new Error(`Unsupported field type '${String(field.type)}'.`);
     }
     return schema.describe(field.description || field.key);
+}
+/**
+ * Builds a Zod schema for a polymorphic field.
+ * Creates a union of settings schemas based on the polymorphic mapping.
+ */
+function buildPolymorphicFieldSchema(polymorphic) {
+    const settingsOptions = [];
+    for (const [discriminatorValue, settingsTypeKey] of Object.entries(polymorphic.mapping)) {
+        const settingsDef = resolveType(settingsTypeKey);
+        if (!settingsDef || !('fields' in settingsDef)) {
+            throw new Error(`Settings type '${settingsTypeKey}' not found for discriminator value '${discriminatorValue}'.`);
+        }
+        const settingsSchema = buildSettingsZodSchema(settingsDef);
+        const option = z.object({
+            [polymorphic.discriminatorField]: z.literal(discriminatorValue),
+            ...settingsSchema.shape,
+        });
+        settingsOptions.push(option);
+    }
+    if (settingsOptions.length === 0) {
+        throw new Error('Polymorphic field has empty mapping.');
+    }
+    return z.union(settingsOptions);
 }
 export function buildZodSchemaFromFieldDefinitions(fields, mode) {
     const shape = {};
@@ -102,22 +128,20 @@ export function buildNestedEntitySchema(entityDef, mode) {
         if (baseShape[dtoFieldName]) {
             throw new Error(`Duplicate DTO field definition '${dtoFieldName}'.`);
         }
+        if (field.type === 'polymorphic') {
+            continue;
+        }
         const isRequired = mode === 'create' && (field.requiredOnCreate ?? false);
         const baseSchema = toZodFieldSchema(field);
         baseShape[dtoFieldName] = isRequired ? baseSchema : baseSchema.optional();
     }
-    if (entityDef.settingsTypes && entityDef.settingsTypes.length > 0) {
-        const settingsOptions = [];
-        for (const settingsDef of entityDef.settingsTypes) {
-            const settingsSchema = buildSettingsZodSchema(settingsDef);
-            const option = z.object({
-                type: z.literal(settingsDef.key),
-                ...settingsSchema.shape,
-            });
-            settingsOptions.push(option);
-        }
-        if (settingsOptions.length > 0) {
-            baseShape.settings = z.union(settingsOptions);
+    for (const field of entityDef.fields) {
+        if (field.type === 'polymorphic' && field.polymorphic) {
+            const dtoFieldName = field.dtoName ?? field.key;
+            const isRequired = mode === 'create' && (field.requiredOnCreate ?? false);
+            baseShape[dtoFieldName] = isRequired
+                ? z.object({}).passthrough()
+                : z.record(z.any()).optional();
         }
     }
     return z.object(baseShape).passthrough();

@@ -1,11 +1,13 @@
+// Import type files to trigger self-registration
+import '../entity-type-definitions/Signal/contract.js';
+import '../entity-type-definitions/Group/contract.js';
+
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { StringEnum, Type } from '@mariozechner/pi-ai';
-import {
-  getSupportedEntityTypeNames,
-  resolveEntityTypeContract,
-} from '../entity-type-definitions/entity-type-registry.js';
+import { resolveContract } from '../entity-type-definitions/contract-registry.js';
 import type { AudakoServices } from '../services/audako-services.js';
 import type { SessionContext } from '../services/session-context.js';
+import { listTypeKeys } from '../services/type-registry.js';
 import { isRecord, toErrorResponse, toTextResponse } from './helpers.js';
 
 const queryEntitiesSchema = Type.Object({
@@ -48,9 +50,9 @@ export function createQueryEntitiesTool(
       'Query entities by scope with a Mongo-style filter object. Supports $and, $or, $not, and $nor operators.',
     parameters: queryEntitiesSchema,
     execute: async (_toolCallId, { scope, scopeId, entityType, filter }) => {
-      const contract = resolveEntityTypeContract(entityType);
+      const contract = resolveContract(entityType);
       if (!contract) {
-        const supportedTypes = getSupportedEntityTypeNames();
+        const supportedTypes = listTypeKeys();
         return toErrorResponse(`Unsupported entity type '${entityType}'.`, {
           supportedTypes,
         });

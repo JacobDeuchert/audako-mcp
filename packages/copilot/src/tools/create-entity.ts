@@ -1,8 +1,12 @@
+// Import type files to trigger self-registration
+import '../entity-type-definitions/Signal/contract.js';
+import '../entity-type-definitions/Group/contract.js';
+
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
-import { resolveEntityTypeContract } from '../entity-type-definitions/entity-type-registry.js';
+import { resolveContract } from '../entity-type-definitions/contract-registry.js';
 import { normalizePermissionMode, type PermissionService } from '../services/permission-service.js';
-import type { MutationToolDependencies } from './mutation-tool-dependencies.js';
+import type { MutationToolDependencies } from './mutation-tools.js';
 
 const createEntitySchema = Type.Object({
   entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
@@ -11,7 +15,7 @@ const createEntitySchema = Type.Object({
     {
       additionalProperties: true,
       description:
-        'Entity data payload containing all fields for the entity. Use get_entity_definition to discover available fields for each entity type. Common fields like name, groupId, and description are included alongside entity-specific settings.',
+        'Entity data payload containing all fields for the entity. Use get-type-definition tool to discover available fields for each entity type.',
     },
   ),
   permissionMode: Type.Optional(
@@ -32,8 +36,10 @@ export function createCreateEntityTool(
       'Create a configuration entity. All fields (name, groupId, description, and entity-specific settings) go in the payload object. Use get_entity_definition to discover available fields for each entity type.',
     parameters: createEntitySchema,
     execute: async (_toolCallId, params) => {
+
+      
       const sessionId = deps.sessionId;
-      const contract = resolveEntityTypeContract(params.entityType);
+      const contract = resolveContract(params.entityType);
       if (!contract) {
         throw new Error(`Unsupported entity type '${params.entityType}'.`);
       }

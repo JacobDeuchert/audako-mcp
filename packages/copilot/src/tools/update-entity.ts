@@ -1,8 +1,12 @@
+// Import type files to trigger self-registration
+import '../entity-type-definitions/Signal/contract.js';
+import '../entity-type-definitions/Group/contract.js';
+
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
-import { resolveEntityTypeContract } from '../entity-type-definitions/entity-type-registry.js';
+import { resolveContract } from '../entity-type-definitions/contract-registry.js';
 import { normalizePermissionMode } from '../services/permission-service.js';
-import type { MutationToolDependencies } from './mutation-tool-dependencies.js';
+import type { MutationToolDependencies } from './mutation-tools.js';
 
 const updateEntitySchema = Type.Object({
   entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
@@ -32,7 +36,7 @@ export function createUpdateEntityTool(
     parameters: updateEntitySchema,
     execute: async (_toolCallId, params) => {
       const sessionId = deps.sessionId;
-      const contract = resolveEntityTypeContract(params.entityType);
+      const contract = resolveContract(params.entityType);
       if (!contract) {
         throw new Error(`Unsupported entity type '${params.entityType}'.`);
       }

@@ -1,1 +1,0 @@
-{"version":3,"file":"get-group-path.d.ts","sourceRoot":"","sources":["../../src/tools/get-group-path.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,6BAA6B,CAAC;AAE7D,OAAO,KAAK,EAAE,cAAc,EAAE,MAAM,gCAAgC,CAAC;AAIrE,QAAA,MAAM,kBAAkB;;EAEtB,CAAC;AAoCH,wBAAgB,sBAAsB,CACpC,cAAc,EAAE,cAAc,GAC7B,SAAS,CAAC,OAAO,kBAAkB,CAAC,CAoCtC"}

@@ -1,5 +1,8 @@
+// Import type files to trigger self-registration
+import '../entity-type-definitions/Signal/contract.js';
+import '../entity-type-definitions/Group/contract.js';
 import { Type } from '@mariozechner/pi-ai';
-import { listEntityTypeDefinitions } from '../entity-type-definitions/entity-type-registry.js';
+import { listTypes } from '../services/type-registry.js';
 import { toTextResponse } from './helpers.js';
 const listEntityTypesSchema = Type.Object({}, { additionalProperties: false });
 export const listEntityTypesTool = {
@@ -8,14 +11,14 @@ export const listEntityTypesTool = {
     description: 'List supported configuration entity types that can be created or updated.',
     parameters: listEntityTypesSchema,
     execute: async () => {
-        const definitions = listEntityTypeDefinitions();
-        const payload = definitions.map(definition => ({
+        const definitions = listTypes();
+        const payload = definitions
+            .filter((def) => 'entityType' in def)
+            .map(definition => ({
             key: definition.key,
             aliases: definition.aliases ?? [],
             entityType: definition.entityType,
             description: definition.description,
-            fieldCount: definition.fields.length,
-            hasSettings: (definition.settingsTypes?.length ?? 0) > 0,
         }));
         return toTextResponse(payload);
     },

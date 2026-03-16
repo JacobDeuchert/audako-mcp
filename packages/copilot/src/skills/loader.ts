@@ -3,31 +3,18 @@ import { join } from 'path';
 import type { LoadSkillsResult, ResourceDiagnostic, Skill, SkillFrontmatter } from './types.js';
 import { parseFrontmatter } from './utils.js';
 
-/**
- * Loads and parses SKILL.md files from a directory.
- *
- * Scans the directory for subdirectories containing SKILL.md files,
- * parses their frontmatter, validates required fields, and returns
- * loaded skills along with any diagnostics.
- *
- * @param dir - The directory to scan for skills
- * @returns Object containing loaded skills and diagnostics
- */
 export function loadSkillsFromDir(dir: string): LoadSkillsResult {
   const skills: Skill[] = [];
   const diagnostics: ResourceDiagnostic[] = [];
 
-  // Return empty result if directory doesn't exist
   if (!existsSync(dir)) {
     return { skills, diagnostics };
   }
 
   try {
-    // Read directory entries with file type info
     const entries = readdirSync(dir, { withFileTypes: true });
 
     for (const entry of entries) {
-      // Skip non-directories and hidden entries
       if (!entry.isDirectory() || entry.name.startsWith('.')) {
         continue;
       }
@@ -35,18 +22,15 @@ export function loadSkillsFromDir(dir: string): LoadSkillsResult {
       const skillDir = join(dir, entry.name);
       const skillFilePath = join(skillDir, 'SKILL.md');
 
-      // Check if SKILL.md exists in this subdirectory
       if (!existsSync(skillFilePath)) {
         continue;
       }
 
       try {
-        // Read and parse the SKILL.md file
         const content = readFileSync(skillFilePath, 'utf-8');
         const { frontmatter } = parseFrontmatter(content);
         const skillMeta = frontmatter as SkillFrontmatter;
 
-        // Validate required fields
         if (!skillMeta.name) {
           diagnostics.push({
             type: 'warning',
@@ -65,7 +49,6 @@ export function loadSkillsFromDir(dir: string): LoadSkillsResult {
           continue;
         }
 
-        // Create skill object
         const skill: Skill = {
           name: skillMeta.name,
           description: skillMeta.description,
@@ -77,7 +60,6 @@ export function loadSkillsFromDir(dir: string): LoadSkillsResult {
 
         skills.push(skill);
       } catch (error) {
-        // Handle errors gracefully - add to diagnostics instead of throwing
         diagnostics.push({
           type: 'error',
           message: error instanceof Error ? error.message : 'Unknown error loading skill',
@@ -86,7 +68,6 @@ export function loadSkillsFromDir(dir: string): LoadSkillsResult {
       }
     }
   } catch (error) {
-    // Handle directory read errors gracefully
     diagnostics.push({
       type: 'error',
       message: error instanceof Error ? error.message : 'Unknown error reading directory',

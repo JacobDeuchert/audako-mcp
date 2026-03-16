@@ -7,8 +7,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 config({ path: path.resolve(__dirname, '../../.env') });
 const port = parseInt(process.env.PORT || '3001', 10);
 const logLevel = process.env.LOG_LEVEL || 'info';
+const logDir = process.env.LOG_DIR || path.resolve(__dirname, '../../logs');
+const logFile = process.env.LOG_FILE || path.join(logDir, 'app.log');
 /** Root pino logger – every module should derive a child from this. */
-export const rootLogger = pino({ name: 'copilot', level: logLevel });
+export const rootLogger = pino({
+    name: 'copilot',
+    level: logLevel,
+    transport: {
+        targets: [
+            { target: 'pino/file', options: { destination: 1 } },
+            { target: 'pino/file', options: { destination: logFile, mkdir: true } },
+        ],
+    },
+});
 /** Create a named child logger that inherits the root log level. */
 export function createLogger(name) {
     return rootLogger.child({ module: name });
