@@ -4,7 +4,6 @@ export const SignalUniversalSettings = {
     key: 'SignalUniversalSettings',
     description: 'Configuration settings for universal signals (no configurable fields - defaults are applied automatically)',
     fields: universalFields,
-    example: {},
 };
 registerType(SignalUniversalSettings);
 //# sourceMappingURL=universal.settings.js.map

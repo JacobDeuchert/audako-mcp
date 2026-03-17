@@ -79,16 +79,6 @@ class GroupEntityContract extends ConfigurationEntityContract<
   public readonly aliases = ['group'];
   public readonly entityType = EntityType.Group;
   public readonly description = 'Audako group configuration entity';
-  public readonly examples = {
-    create: {
-      type: DEFAULT_GROUP_TYPE,
-      icon: 'mat-alarm',
-    },
-    update: {
-      icon: 'mat-folder',
-    },
-  };
-
   public override readonly extendedInfo = undefined;
 
   protected readonly createSchema = groupCreateSchema;

@@ -125,8 +125,9 @@ export function buildSettingsZodSchema(settingsDef: SettingsTypeDefinition): z.Z
 }
 
 /**
- * Builds a Zod schema for nested entities with polymorphic settings support.
- * Base fields use .passthrough() (unknown fields allowed), but settings use strict validation.
+ * Builds a Zod schema for entities with polymorphic fields.
+ * Polymorphic fields are treated as passthrough objects here — strict
+ * settings validation is handled by BaseEntityContract.validatePolymorphicFields().
  */
 export function buildNestedEntitySchema(
   entityDef: EntityTypeDefinition,

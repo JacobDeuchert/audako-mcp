@@ -49,11 +49,6 @@ export const SignalDigitalSettings: SettingsTypeDefinition = {
       enumValues: ['Sint', 'Int', 'Dint', 'Real'],
     },
   ],
-  example: {
-    digitalTrueCaption: 'ON',
-    digitalFalseCaption: 'OFF',
-    invert: false,
-  },
 };
 
 registerType(SignalDigitalSettings);

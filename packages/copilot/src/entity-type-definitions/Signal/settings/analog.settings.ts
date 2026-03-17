@@ -50,12 +50,6 @@ export const SignalAnalogSettings: SettingsTypeDefinition = {
   key: 'SignalAnalogSettings',
   description: 'Configuration settings for analog signals',
   fields: analogFields,
-  example: {
-    minValue: 0,
-    maxValue: 100,
-    unit: 'C',
-    decimalPlaces: 1,
-  },
 };
 
 registerType(SignalAnalogSettings);

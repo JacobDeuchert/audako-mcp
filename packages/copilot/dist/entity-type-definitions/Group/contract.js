@@ -50,15 +50,6 @@ class GroupEntityContract extends ConfigurationEntityContract {
     aliases = ['group'];
     entityType = EntityType.Group;
     description = 'Audako group configuration entity';
-    examples = {
-        create: {
-            type: DEFAULT_GROUP_TYPE,
-            icon: 'mat-alarm',
-        },
-        update: {
-            icon: 'mat-folder',
-        },
-    };
     extendedInfo = undefined;
     createSchema = groupCreateSchema;
     updateSchema = groupUpdateSchema;

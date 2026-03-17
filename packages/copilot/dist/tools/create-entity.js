@@ -2,13 +2,15 @@
 import '../entity-type-definitions/Signal/contract.js';
 import '../entity-type-definitions/Group/contract.js';
 import { Type } from '@mariozechner/pi-ai';
+import { createLogger } from '../config/app-config.js';
 import { resolveContract } from '../entity-type-definitions/contract-registry.js';
 import { normalizePermissionMode } from '../services/permission-service.js';
+const logger = createLogger('create-entity');
 const createEntitySchema = Type.Object({
     entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
     payload: Type.Object({}, {
         additionalProperties: true,
-        description: 'Entity data payload containing all fields for the entity. Use get_entity_definition to discover available fields for each entity type. Common fields like name, groupId, and description are included alongside entity-specific settings.',
+        description: 'Entity data payload containing all fields for the entity. Use get-type-definition tool to discover available fields for each entity type.',
     }),
     permissionMode: Type.Optional(Type.Union([Type.Literal('interactive'), Type.Literal('fail_fast')], {
         description: 'Permission handling mode for out-of-context mutations. interactive prompts the user inline; fail_fast returns an out-of-context error without prompting.',
@@ -21,6 +23,13 @@ export function createCreateEntityTool(deps) {
         description: 'Create a configuration entity. All fields (name, groupId, description, and entity-specific settings) go in the payload object. Use get_entity_definition to discover available fields for each entity type.',
         parameters: createEntitySchema,
         execute: async (_toolCallId, params) => {
+            logger.info({
+                sessionId: deps.sessionId,
+                tenantId: deps.sessionContext.tenantId,
+                groupId: deps.sessionContext.groupId,
+                entityType: params.entityType,
+                payload: params.payload,
+            }, 'LLM create_entity payload');
             const sessionId = deps.sessionId;
             const contract = resolveContract(params.entityType);
             if (!contract) {
@@ -45,6 +54,7 @@ export function createCreateEntityTool(deps) {
             }
             const createdEntity = await deps.mutationThrottle.run(async () => {
                 const entityToCreate = contract.fromPayload(payload);
+                logger.info({ entityType: params.entityType, entity: entityToCreate }, 'Sending entity to backend');
                 return deps.audakoServices.entityService.addEntity(contract.entityType, entityToCreate);
             });
             const entityId = createdEntity.Id;

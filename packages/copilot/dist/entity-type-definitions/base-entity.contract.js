@@ -3,7 +3,8 @@ import { existsSync } from 'fs';
 import { dirname, isAbsolute, join } from 'path';
 import { fileURLToPath } from 'url';
 import { loadMarkdownFile } from '../services/doc-loader.js';
-import { formatZodValidationErrors } from './zod-utils.js';
+import { resolveType } from '../services/type-registry.js';
+import { formatZodValidationErrors, validateSettingsPayload } from './zod-utils.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 function resolveMarkdownPath(markdownPath) {
@@ -27,7 +28,6 @@ function resolveExtendedInfo(extendedInfo) {
 }
 export class BaseEntityContract {
     aliases = [];
-    examples;
     cachedDefinition;
     getDefinition() {
         if (!this.cachedDefinition) {
@@ -44,8 +44,8 @@ export class BaseEntityContract {
                     entityPath: field.entityPath,
                     requiredOnCreate: field.requiredOnCreate ?? false,
                     enumValues: field.enumValues,
+                    polymorphic: field.polymorphic,
                 })),
-                examples: this.examples,
                 extendedInfo: typeof this.extendedInfo === 'string'
                     ? resolveExtendedInfo(this.extendedInfo)
                     : undefined,
@@ -56,10 +56,40 @@ export class BaseEntityContract {
     validate(payload, mode) {
         const schema = mode === 'create' ? this.createSchema : this.updateSchema;
         const result = schema.safeParse(payload);
-        if (result.success) {
-            return [];
+        const errors = [];
+        if (!result.success) {
+            errors.push(...formatZodValidationErrors(result.error));
         }
-        return formatZodValidationErrors(result.error);
+        errors.push(...this.validatePolymorphicFields(payload));
+        return errors;
+    }
+    validatePolymorphicFields(payload) {
+        const errors = [];
+        for (const field of this.fieldDefinitions) {
+            if (field.type !== 'polymorphic' || !field.polymorphic)
+                continue;
+            const dtoFieldName = field.dtoName ?? field.key;
+            const fieldValue = payload[dtoFieldName];
+            if (fieldValue === undefined || fieldValue === null)
+                continue;
+            const discriminatorValue = payload[field.polymorphic.discriminatorField];
+            if (typeof discriminatorValue !== 'string') {
+                errors.push(`Discriminator field '${field.polymorphic.discriminatorField}' is required and must be a string.`);
+                continue;
+            }
+            const settingsTypeKey = field.polymorphic.mapping[discriminatorValue];
+            if (!settingsTypeKey) {
+                errors.push(`No settings type mapping for ${field.polymorphic.discriminatorField}='${discriminatorValue}'.`);
+                continue;
+            }
+            const settingsTypeDef = resolveType(settingsTypeKey);
+            if (!settingsTypeDef || 'entityType' in settingsTypeDef) {
+                errors.push(`Settings type '${settingsTypeKey}' not found in type registry.`);
+                continue;
+            }
+            errors.push(...validateSettingsPayload(settingsTypeDef, fieldValue));
+        }
+        return errors;
     }
     fromPayload(payload, context) {
         const parsedPayload = this.parseCreatePayload(payload);

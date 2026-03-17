@@ -32,17 +32,11 @@ export interface EntityTypeDefinition {
   entityType: EntityType;
   description: string;
   fields: EntityFieldDefinition[];
-  examples?: EntityTypeExamples;
   extendedInfo?: string;
 }
 
 export interface EntityContractContext {
   tenantRootGroupId?: string;
-}
-
-export interface EntityTypeExamples {
-  create: Record<string, unknown>;
-  update: Record<string, unknown>;
 }
 
 // Settings type definitions for polymorphic entities (e.g., Signal with different settings types)
@@ -61,7 +55,6 @@ export interface SettingsTypeDefinition {
   key: string;
   description: string;
   fields: SettingsFieldDefinition[];
-  example?: Record<string, unknown>;
   extendedInfo?: string;
 }
 

@@ -52,7 +52,7 @@ function generateSchema(def: TypeDefinition): object {
       fieldSchema.type = 'object';
       const entityField = field as EntityFieldDefinition;
       if (entityField.polymorphic) {
-        // fieldSchema.discriminatorField = entityField.polymorphic.discriminatorField;
+        fieldSchema.discriminatorField = entityField.polymorphic.discriminatorField;
         fieldSchema.availableTypes = [...new Set(Object.values(entityField.polymorphic.mapping))];
       }
     } else {

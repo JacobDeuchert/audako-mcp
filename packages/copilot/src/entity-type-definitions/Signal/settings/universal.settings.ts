@@ -8,7 +8,6 @@ export const SignalUniversalSettings: SettingsTypeDefinition = {
   description:
     'Configuration settings for universal signals (no configurable fields - defaults are applied automatically)',
   fields: universalFields,
-  example: {},
 };
 
 registerType(SignalUniversalSettings);

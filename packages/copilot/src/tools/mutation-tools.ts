@@ -24,7 +24,7 @@ export function createMutationTools(
   mutationThrottle: MutationThrottle,
   permissionService: PermissionService,
   eventHub: SessionEventHub,
-): AgentTool[] {
+): AgentTool<any>[] {
   return [
     createCreateEntityTool({
       sessionId,

@@ -50,11 +50,6 @@ export const SignalCounterSettings: SettingsTypeDefinition = {
   key: 'SignalCounterSettings',
   description: 'Configuration settings for counter signals',
   fields: counterFields,
-  example: {
-    maxValue: 999999,
-    unit: 'counts',
-    offsetAutomatic: true,
-  },
 };
 
 registerType(SignalCounterSettings);

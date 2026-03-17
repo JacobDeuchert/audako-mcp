@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { resolveType } from '../services/type-registry.js';
 function toZodFieldSchema(field) {
     let schema;
     switch (field.type) {
@@ -27,29 +26,6 @@ function toZodFieldSchema(field) {
             throw new Error(`Unsupported field type '${String(field.type)}'.`);
     }
     return schema.describe(field.description || field.key);
-}
-/**
- * Builds a Zod schema for a polymorphic field.
- * Creates a union of settings schemas based on the polymorphic mapping.
- */
-function buildPolymorphicFieldSchema(polymorphic) {
-    const settingsOptions = [];
-    for (const [discriminatorValue, settingsTypeKey] of Object.entries(polymorphic.mapping)) {
-        const settingsDef = resolveType(settingsTypeKey);
-        if (!settingsDef || !('fields' in settingsDef)) {
-            throw new Error(`Settings type '${settingsTypeKey}' not found for discriminator value '${discriminatorValue}'.`);
-        }
-        const settingsSchema = buildSettingsZodSchema(settingsDef);
-        const option = z.object({
-            [polymorphic.discriminatorField]: z.literal(discriminatorValue),
-            ...settingsSchema.shape,
-        });
-        settingsOptions.push(option);
-    }
-    if (settingsOptions.length === 0) {
-        throw new Error('Polymorphic field has empty mapping.');
-    }
-    return z.union(settingsOptions);
 }
 export function buildZodSchemaFromFieldDefinitions(fields, mode) {
     const shape = {};
@@ -118,8 +94,9 @@ export function buildSettingsZodSchema(settingsDef) {
     return z.object(shape).strict();
 }
 /**
- * Builds a Zod schema for nested entities with polymorphic settings support.
- * Base fields use .passthrough() (unknown fields allowed), but settings use strict validation.
+ * Builds a Zod schema for entities with polymorphic fields.
+ * Polymorphic fields are treated as passthrough objects here — strict
+ * settings validation is handled by BaseEntityContract.validatePolymorphicFields().
  */
 export function buildNestedEntitySchema(entityDef, mode) {
     const baseShape = {};

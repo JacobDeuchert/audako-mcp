@@ -47,11 +47,6 @@ export const SignalCounterSettings = {
     key: 'SignalCounterSettings',
     description: 'Configuration settings for counter signals',
     fields: counterFields,
-    example: {
-        maxValue: 999999,
-        unit: 'counts',
-        offsetAutomatic: true,
-    },
 };
 registerType(SignalCounterSettings);
 //# sourceMappingURL=counter.settings.js.map

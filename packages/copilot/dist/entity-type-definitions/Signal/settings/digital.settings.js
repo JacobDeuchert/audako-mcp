@@ -47,11 +47,6 @@ export const SignalDigitalSettings = {
             enumValues: ['Sint', 'Int', 'Dint', 'Real'],
         },
     ],
-    example: {
-        digitalTrueCaption: 'ON',
-        digitalFalseCaption: 'OFF',
-        invert: false,
-    },
 };
 registerType(SignalDigitalSettings);
 //# sourceMappingURL=digital.settings.js.map

@@ -4,14 +4,15 @@ import { dirname, isAbsolute, join } from 'path';
 import { fileURLToPath } from 'url';
 import type { z } from 'zod';
 import { loadMarkdownFile } from '../services/doc-loader.js';
+import { resolveType } from '../services/type-registry.js';
 import type {
   EntityContractContext,
   EntityFieldDefinition,
   EntityTypeDefinition,
-  EntityTypeExamples,
+  SettingsTypeDefinition,
   ValidationMode,
 } from './types.js';
-import { formatZodValidationErrors } from './zod-utils.js';
+import { formatZodValidationErrors, validateSettingsPayload } from './zod-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,7 +51,6 @@ export abstract class BaseEntityContract<
   public abstract readonly description: string;
   public abstract readonly extendedInfo?: string;
   public readonly aliases: string[] = [];
-  public readonly examples?: EntityTypeExamples;
 
   protected abstract readonly createSchema: z.ZodType<TCreatePayload>;
   protected abstract readonly updateSchema: z.ZodType<TUpdatePayload>;
@@ -86,8 +86,8 @@ export abstract class BaseEntityContract<
           entityPath: field.entityPath,
           requiredOnCreate: field.requiredOnCreate ?? false,
           enumValues: field.enumValues,
+          polymorphic: field.polymorphic,
         })),
-        examples: this.examples,
         extendedInfo:
           typeof this.extendedInfo === 'string'
             ? resolveExtendedInfo(this.extendedInfo)
@@ -102,11 +102,55 @@ export abstract class BaseEntityContract<
     const schema = mode === 'create' ? this.createSchema : this.updateSchema;
     const result = schema.safeParse(payload);
 
-    if (result.success) {
-      return [];
+    const errors: string[] = [];
+    if (!result.success) {
+      errors.push(...formatZodValidationErrors(result.error));
     }
 
-    return formatZodValidationErrors(result.error);
+    errors.push(...this.validatePolymorphicFields(payload));
+
+    return errors;
+  }
+
+  protected validatePolymorphicFields(payload: Record<string, unknown>): string[] {
+    const errors: string[] = [];
+
+    for (const field of this.fieldDefinitions) {
+      if (field.type !== 'polymorphic' || !field.polymorphic) continue;
+
+      const dtoFieldName = field.dtoName ?? field.key;
+      const fieldValue = payload[dtoFieldName];
+
+      if (fieldValue === undefined || fieldValue === null) continue;
+
+      const discriminatorValue = payload[field.polymorphic.discriminatorField];
+      if (typeof discriminatorValue !== 'string') {
+        errors.push(
+          `Discriminator field '${field.polymorphic.discriminatorField}' is required and must be a string.`,
+        );
+        continue;
+      }
+
+      const settingsTypeKey = field.polymorphic.mapping[discriminatorValue];
+      if (!settingsTypeKey) {
+        errors.push(
+          `No settings type mapping for ${field.polymorphic.discriminatorField}='${discriminatorValue}'.`,
+        );
+        continue;
+      }
+
+      const settingsTypeDef = resolveType(settingsTypeKey);
+      if (!settingsTypeDef || 'entityType' in settingsTypeDef) {
+        errors.push(`Settings type '${settingsTypeKey}' not found in type registry.`);
+        continue;
+      }
+
+      errors.push(
+        ...validateSettingsPayload(settingsTypeDef as SettingsTypeDefinition, fieldValue),
+      );
+    }
+
+    return errors;
   }
 
   public fromPayload(payload: Record<string, unknown>, context?: EntityContractContext): TEntity {

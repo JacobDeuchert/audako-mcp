@@ -1,12 +1,13 @@
 import { SignalAnalogSettings as CoreSignalAnalogSettings, SignalCounterSettings as CoreSignalCounterSettings, SignalDigitalSettings as CoreSignalDigitalSettings, EntityType, EntityUtils, Signal, SignalRecordingSettings, SignalType, } from 'audako-core';
-import { registerType } from '../../services/type-registry.js';
+import { registerType, resolveType } from '../../services/type-registry.js';
 import { ConfigurationEntityContract, configurationEntityFieldDefinitions, } from '../base-entity.contract.js';
 import { registerContract } from '../contract-registry.js';
 import { buildNestedEntitySchema } from '../zod-utils.js';
-import { SignalAnalogSettings } from './settings/analog.settings.js';
-import { SignalCounterSettings } from './settings/counter.settings.js';
-import { SignalDigitalSettings } from './settings/digital.settings.js';
-import { SignalUniversalSettings } from './settings/universal.settings.js';
+// Side-effect imports to trigger settings type self-registration
+import './settings/analog.settings.js';
+import './settings/counter.settings.js';
+import './settings/digital.settings.js';
+import './settings/universal.settings.js';
 const signalTypeEnumValues = Object.values(SignalType).filter(value => typeof value === 'string');
 const signalFieldDefinitions = [
     ...configurationEntityFieldDefinitions,
@@ -78,13 +79,6 @@ const signalFieldDefinitions = [
         },
     },
 ];
-const knownSignalBaseFields = new Set(signalFieldDefinitions.map(field => field.dtoName ?? field.key));
-const knownSignalSettingsFields = new Set([
-    SignalAnalogSettings,
-    SignalDigitalSettings,
-    SignalCounterSettings,
-    SignalUniversalSettings,
-].flatMap(settingsType => settingsType.fields.map(field => field.dtoName ?? field.key)));
 const signalTypeDefinition = {
     key: 'Signal',
     entityType: EntityType.Signal,
@@ -100,33 +94,10 @@ class SignalEntityContract extends ConfigurationEntityContract {
     aliases = ['signal'];
     entityType = EntityType.Signal;
     description = 'Audako signal configuration entity';
-    examples = {
-        create: {
-            type: SignalType.AnalogInput,
-            address: '40001',
-            settings: {
-                minValue: 0,
-                maxValue: 150,
-                unit: 'C',
-                decimalPlaces: 1,
-            },
-            dataConnectionId: 'connection-id',
-            recordingInterval: 5,
-        },
-        update: {
-            settings: {
-                maxValue: 200,
-            },
-            recordingInterval: 10,
-        },
-    };
     extendedInfo = 'Signal/signal.md';
     createSchema = signalCreateSchema;
     updateSchema = signalUpdateSchema;
     fieldDefinitions = signalFieldDefinitions;
-    getDefinition() {
-        return super.getDefinition();
-    }
     fromCreatePayload(payload, context) {
         const settings = payload.settings;
         const model = { ...payload };
@@ -134,9 +105,7 @@ class SignalEntityContract extends ConfigurationEntityContract {
         if (model.dataConnectionId === 'virtual') {
             model.dataConnectionId = null;
         }
-        const signalType = this.resolveSignalType(model.type);
-        const settingsDefinition = this.getSettingsTypeDefinitionForSignalType(signalType);
-        model.settings = this.validateAndNormalizeSettings(settings, settingsDefinition, signalType);
+        model.settings = this.toRecord(settings);
         this.applyConfigurationEntityContext(model, context);
         return this.toSignal(model);
     }
@@ -149,13 +118,11 @@ class SignalEntityContract extends ConfigurationEntityContract {
         if (model.dataConnectionId === 'virtual') {
             model.dataConnectionId = null;
         }
-        const signalType = this.resolveSignalType(model.type);
-        const settingsDefinition = this.getSettingsTypeDefinitionForSignalType(signalType);
-        const normalizedSettings = this.validateAndNormalizeSettings(settings, settingsDefinition, signalType);
-        if (normalizedSettings) {
+        const newSettings = this.toRecord(settings);
+        if (newSettings) {
             model.settings = {
                 ...(this.toRecord(model.settings) ?? {}),
-                ...normalizedSettings,
+                ...newSettings,
             };
         }
         this.applyConfigurationEntityContext(model, context);
@@ -167,7 +134,6 @@ class SignalEntityContract extends ConfigurationEntityContract {
     toSignalModel(signal) {
         const model = {};
         this.setBaseEntityModelProperties(model, signal);
-        const _currentSignalType = signal.Type?.Value;
         for (const field of this.fieldDefinitions) {
             if (!field.entityPath) {
                 continue;
@@ -201,7 +167,7 @@ class SignalEntityContract extends ConfigurationEntityContract {
         signal.RecordingSettings = new SignalRecordingSettings();
         const modelValues = model;
         for (const field of this.fieldDefinitions) {
-            if (!field.entityPath) {
+            if (!field.entityPath || field.type === 'polymorphic') {
                 continue;
             }
             const dtoFieldName = this.getDtoFieldName(field);
@@ -276,73 +242,11 @@ class SignalEntityContract extends ConfigurationEntityContract {
         if (!settingsTypeKey) {
             throw new Error(`No settings type mapping found for signal type '${signalType}'.`);
         }
-        const allSettingsTypes = [
-            SignalAnalogSettings,
-            SignalDigitalSettings,
-            SignalCounterSettings,
-            SignalUniversalSettings,
-        ];
-        const definition = allSettingsTypes.find(settingsType => settingsType.key === settingsTypeKey);
-        if (!definition) {
-            throw new Error(`No settings type definition found for signal type '${signalType}' (expected '${settingsTypeKey}').`);
+        const definition = resolveType(settingsTypeKey);
+        if (!definition || 'entityType' in definition) {
+            throw new Error(`Settings type '${settingsTypeKey}' not found in type registry.`);
         }
         return definition;
-    }
-    validateAndNormalizeSettings(settingsValue, settingsTypeDefinition, signalType) {
-        if (typeof settingsValue === 'undefined' || settingsValue === null) {
-            return undefined;
-        }
-        const settings = this.toRecord(settingsValue);
-        if (!settings) {
-            throw new Error(`Invalid settings payload for signal type '${signalType}'. Field 'settings' must be an object.`);
-        }
-        const allowedFields = settingsTypeDefinition.fields.map(field => field.dtoName ?? field.key);
-        const allowedFieldSet = new Set(allowedFields);
-        const providedFields = Object.keys(settings);
-        const unknownFields = providedFields.filter(field => !allowedFieldSet.has(field));
-        if (unknownFields.length > 0) {
-            throw new Error(`Unknown settings fields for signal type '${signalType}': ${unknownFields.join(', ')}. ` +
-                `Allowed fields: ${allowedFields.join(', ')}.`);
-        }
-        const normalizedSettings = {};
-        for (const field of settingsTypeDefinition.fields) {
-            const dtoFieldName = field.dtoName ?? field.key;
-            if (!(dtoFieldName in settings)) {
-                continue;
-            }
-            const value = settings[dtoFieldName];
-            this.assertSettingsFieldValueType(signalType, field, value, dtoFieldName);
-            normalizedSettings[dtoFieldName] = value;
-        }
-        return normalizedSettings;
-    }
-    assertSettingsFieldValueType(signalType, field, value, fieldName) {
-        switch (field.type) {
-            case 'string':
-                if (typeof value !== 'string') {
-                    throw new Error(`Invalid settings.${fieldName} for signal type '${signalType}': expected string, received ${typeof value}.`);
-                }
-                return;
-            case 'number':
-                if (typeof value !== 'number' || Number.isNaN(value)) {
-                    throw new Error(`Invalid settings.${fieldName} for signal type '${signalType}': expected number, received ${typeof value}.`);
-                }
-                return;
-            case 'boolean':
-                if (typeof value !== 'boolean') {
-                    throw new Error(`Invalid settings.${fieldName} for signal type '${signalType}': expected boolean, received ${typeof value}.`);
-                }
-                return;
-            case 'enum': {
-                const enumValues = field.enumValues ?? [];
-                if (typeof value !== 'string' || !enumValues.includes(value)) {
-                    throw new Error(`Invalid settings.${fieldName} for signal type '${signalType}': expected one of ${enumValues.join(', ')}.`);
-                }
-                return;
-            }
-            default:
-                throw new Error(`Unsupported settings field type '${String(field.type)}' for settings.${fieldName}.`);
-        }
     }
     toRecord(value) {
         if (!value || typeof value !== 'object' || Array.isArray(value)) {

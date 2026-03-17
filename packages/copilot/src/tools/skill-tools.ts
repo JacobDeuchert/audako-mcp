@@ -48,14 +48,16 @@ function createSkillToolDescription(skills: Skill[]): string {
   ].join('\n');
 }
 
-export function createReadSkillTool(skills: Skill[]): AgentTool {
+const skillSchema = Type.Object({
+  name: Type.String({ description: 'Name of the skill to load' }),
+});
+
+export function createReadSkillTool(skills: Skill[]): AgentTool<typeof skillSchema> {
   return {
     name: 'skill',
     label: 'Skill',
     description: createSkillToolDescription(skills),
-    parameters: Type.Object({
-      name: Type.String({ description: 'Name of the skill to load' }),
-    }),
+    parameters: skillSchema,
     execute: async (_toolCallId, params) => {
       const { name: skillName } = params;
 
