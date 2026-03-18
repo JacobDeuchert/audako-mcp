@@ -31,8 +31,6 @@ describe('formatSkillsForPrompt', () => {
     expect(result).toContain('<name>skill-two</name>');
     expect(result).toContain('<description>First skill</description>');
     expect(result).toContain('<description>Second skill</description>');
-    expect(result).toContain('<location>/path/to/skill/SKILL.md</location>');
-    expect(result).toContain('<location>/other/path/SKILL.md</location>');
   });
 
   it('should return empty string for empty skills array', () => {
@@ -96,8 +94,6 @@ describe('formatSkillsForPrompt', () => {
     ];
 
     const result = formatSkillsForPrompt(skills);
-
-    expect(result).toContain('<location>/path/with&lt;special&gt;/SKILL.md</location>');
   });
 
   it('should produce proper XML structure with correct indentation', () => {
@@ -110,7 +106,6 @@ describe('formatSkillsForPrompt', () => {
     expect(lines).toContain('  <skill>');
     expect(lines).toContain('    <name>my-skill</name>');
     expect(lines).toContain('    <description>My description</description>');
-    expect(lines).toContain('    <location>/path/to/skill/SKILL.md</location>');
     expect(lines).toContain('  </skill>');
     expect(lines).toContain('</available_skills>');
   });
