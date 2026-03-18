@@ -32,7 +32,6 @@ export const config = {
   sessionInfo: {
     tenantId: '69812a3e528b0200012457ff',
     groupId: '69812a3e528b0200012457f8',
-    entityType: null,
     app: 'configuration', // 'designer', 'monitoring', 'analytics', etc.
   },
 

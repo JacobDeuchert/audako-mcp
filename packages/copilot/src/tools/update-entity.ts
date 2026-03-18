@@ -72,6 +72,7 @@ export function createUpdateEntityTool(
       });
 
       const entityId = updatedEntity.Id || params.entityId;
+      const changedFields = Object.keys(params.changes);
 
       deps.eventHub.publish(sessionId, {
         type: 'entity.updated',
@@ -80,7 +81,15 @@ export function createUpdateEntityTool(
         payload: {
           entityType: contract.entityType,
           entityId,
+          groupId:
+            typeof updatedEntity.GroupId === 'string' ? updatedEntity.GroupId : entityGroupId ?? '',
+          changedFields,
           changes: params.changes,
+          metadata: {
+            tenantId: deps.sessionContext.tenantId,
+            sourceTool: 'update-entity',
+            timestamp: new Date().toISOString(),
+          },
         },
       });
 

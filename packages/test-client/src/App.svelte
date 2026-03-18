@@ -2,13 +2,14 @@
   import { onMount } from 'svelte';
   import {
     ChatWidget,
-    WebSocketAdapter,
+    SocketIOAdapter,
     type ChatWidgetConfig,
     type ChatAdapter,
-    type WebSocketAdapterConfig,
+    type SocketIOAdapterConfig,
     type StreamCallbacks,
     type ChatRequest,
   } from '@audako/chat-ui';
+  import type { SessionBootstrapResponse } from '@audako/contracts';
   import '@audako/chat-ui/style.css';
   import { config } from './config';
 
@@ -154,34 +155,25 @@
       throw new Error(message);
     }
 
-    const payload = (await response.json()) as {
-      sessionId: string;
-      websocketPath: string;
-      bridgeSessionToken: string;
-    };
+    const payload = (await response.json()) as SessionBootstrapResponse;
 
     activeSessionId = payload.sessionId;
 
     addLog('bootstrap.success', {
       sessionId: payload.sessionId,
-      websocketPath: payload.websocketPath,
+      realtime: payload.realtime,
     });
 
-    const baseAdapter = new WebSocketAdapter({
+    const baseAdapter = new SocketIOAdapter({
       baseUrl: config.appUrl,
-      websocketPath: payload.websocketPath,
-      sessionToken: payload.bridgeSessionToken,
       sessionId: payload.sessionId,
+      realtime: payload.realtime,
       reconnectAttempts: 3,
-      onDebugEvent: (event) => {
-        addLog(`ws.${event.type}`, event.payload);
-      },
     });
 
     adapter = createLoggingAdapter(baseAdapter);
-    addLog('adapter.created', { type: 'WebSocketAdapter' });
+    addLog('adapter.created', { type: 'SocketIOAdapter' });
 
-    // Connect the WebSocket
     await baseAdapter.init();
 
     if (config.sessionInfo) {
@@ -223,7 +215,7 @@
   <div class="flex items-center justify-between gap-3">
     <h2 class="text-sm font-medium leading-tight">{title}</h2>
     <span class="text-xs opacity-70 px-2 py-1 bg-black/5 rounded-full">
-      {sessionInfo.entityType}
+      {sessionInfo.app}
     </span>
   </div>
 {/snippet}
@@ -235,7 +227,7 @@
       <div>
         <h1 class="text-2xl font-bold text-slate-900">{config.chat.title}</h1>
         <p class="text-sm text-slate-500">
-          {config.appUrl} • {sessionInfo.tenantId}/{sessionInfo.groupId} • {sessionInfo.entityType}
+          {config.appUrl} • {sessionInfo.tenantId}/{sessionInfo.groupId} • {sessionInfo.app}
         </p>
         {#if activeSessionId}
           <p class="text-xs text-slate-400">session: {activeSessionId}</p>

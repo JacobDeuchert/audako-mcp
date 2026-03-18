@@ -2,11 +2,8 @@ import type {
   ErrorResponse,
   SessionBootstrapRequest,
   SessionBootstrapResponse,
-  SessionEventEnvelope,
-  SessionInfoFields,
-  SessionInfoResponse,
 } from '@audako/contracts';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { Context, Hono } from 'hono';
 import { createSessionAgent } from '../agent/agent-factory.js';
 import { createWsEventBridge } from '../agent/ws-event-bridge.js';
 import { createLogger } from '../config/app-config.js';
@@ -23,38 +20,26 @@ import {
 import type { SessionRegistry } from '../services/session-registry.js';
 import type { SessionRequestHub } from '../services/session-request-hub.js';
 import { ToolRequestHub } from '../services/tool-request-hub.js';
-import { createSessionWebSocketHandler } from './session-websocket-handler.js';
 
 const logger = createLogger('session-routes');
 
-export async function sessionRoutes(
-  fastify: FastifyInstance,
-  registry: SessionRegistry,
-  eventHub: SessionEventHub,
-  requestHub: SessionRequestHub,
-) {
+interface SessionRoutesDependencies {
+  registry: SessionRegistry;
+  eventHub: SessionEventHub;
+  requestHub: SessionRequestHub;
+}
+
+export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies): void {
+  const { registry, eventHub, requestHub } = deps;
   const toolRequestHub = new ToolRequestHub(requestHub, eventHub);
   const permissionService = new DefaultPermissionService(registry, toolRequestHub);
   registry.onSessionRemoved(entry => {
     permissionService.clearSession(entry.sessionId);
   });
 
-  const handleWebSocket = createSessionWebSocketHandler({ registry, eventHub, requestHub });
-
   // ── Route map ────────────────────────────────────────────────────────
-  fastify.post<{ Body: SessionBootstrapRequest; Reply: SessionBootstrapResponse | ErrorResponse }>(
-    '/api/session/bootstrap',
-    handleBootstrap,
-  );
-  fastify.get<{ Params: { sessionId: string } }>(
-    '/api/session/:sessionId/ws',
-    { websocket: true },
-    handleWebSocket,
-  );
-  fastify.get<{ Params: { sessionId: string }; Reply: SessionInfoResponse | ErrorResponse }>(
-    '/api/session/:sessionId/info',
-    handleGetSessionInfo,
-  );
+  app.post('/api/session/bootstrap', handleBootstrap);
+  app.get('/api/session/:sessionId/info', handleGetSessionInfo);
 
   // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -85,58 +70,65 @@ export async function sessionRoutes(
     };
   }
 
-  function requireSessionAuth(
-    request: FastifyRequest<{ Params: { sessionId: string } }>,
-    reply: FastifyReply,
-  ): boolean {
-    const { sessionId } = request.params;
-    const authHeader = request.headers.authorization;
+  function unauthorized(context: Context, message: string): Response {
+    const payload: ErrorResponse = {
+      error: 'Unauthorized',
+      message,
+    };
+
+    return context.json(payload, 401);
+  }
+
+  function requireSessionAuth(context: Context, sessionId: string): Response | null {
+    const authHeader = context.req.header('authorization');
 
     if (!authHeader) {
-      reply.status(401).send({
-        error: 'Unauthorized',
-        message: 'Authorization header required',
-      });
-      return false;
+      return unauthorized(context, 'Authorization header required');
     }
 
     const match = authHeader.match(/^Bearer\s+(.+)$/i);
     if (!match) {
-      reply.status(401).send({
-        error: 'Unauthorized',
-        message: 'Invalid authorization format',
-      });
-      return false;
+      return unauthorized(context, 'Invalid authorization format');
     }
 
     const token = match[1];
     if (!registry.verifySessionToken(sessionId, token)) {
-      reply.status(401).send({
-        error: 'Unauthorized',
-        message: 'Invalid session token',
-      });
-      return false;
+      return unauthorized(context, 'Invalid session token');
     }
 
-    return true;
+    return null;
   }
 
   // ── Handlers ─────────────────────────────────────────────────────────
 
-  async function handleBootstrap(
-    request: FastifyRequest<{ Body: SessionBootstrapRequest }>,
-    reply: FastifyReply,
-  ) {
-    const { scadaUrl, accessToken, sessionInfo } = request.body;
+  async function handleBootstrap(context: Context): Promise<Response> {
+    let body: SessionBootstrapRequest;
+
+    try {
+      body = await context.req.json<SessionBootstrapRequest>();
+    } catch {
+      return context.json(
+        {
+          error: 'Bad Request',
+          message: 'Invalid JSON body',
+        } satisfies ErrorResponse,
+        400,
+      );
+    }
+
+    const { scadaUrl, accessToken, sessionInfo } = body;
 
     const normalizedScadaUrl = scadaUrl ? normalizeScadaUrl(scadaUrl) : undefined;
     const normalizedAccessToken = accessToken?.trim();
 
     if (!normalizedScadaUrl || !normalizedAccessToken) {
-      return reply.status(400).send({
-        error: 'Bad Request',
-        message: 'scadaUrl and accessToken are required',
-      });
+      return context.json(
+        {
+          error: 'Bad Request',
+          message: 'scadaUrl and accessToken are required',
+        } satisfies ErrorResponse,
+        400,
+      );
     }
 
     logger.info(
@@ -156,10 +148,13 @@ export async function sessionRoutes(
           { scadaUrl: normalizedScadaUrl, statusCode: authError.statusCode },
           'Bootstrap upstream auth failed',
         );
-        return reply.status(authError.statusCode).send({
-          error: authError.statusCode === 403 ? 'Forbidden' : 'Unauthorized',
-          message: authError.message,
-        });
+        return context.json(
+          {
+            error: authError.statusCode === 403 ? 'Forbidden' : 'Unauthorized',
+            message: authError.message,
+          } satisfies ErrorResponse,
+          authError.statusCode === 403 ? 403 : 401,
+        );
       }
       throw authError;
     }
@@ -215,7 +210,7 @@ export async function sessionRoutes(
         eventHub.publish(
           entry.sessionId,
           buildSessionEvent(
-            'session.info.updated',
+            'session.updated',
             entry.sessionId,
             toSessionInfoResponse(entry.sessionId, {
               tenantId: entry.sessionContext.tenantId,
@@ -228,9 +223,7 @@ export async function sessionRoutes(
       }
 
       const response: SessionBootstrapResponse = {
-        websocketPath: `/api/session/${encodeURIComponent(entry.sessionId)}/ws`,
         sessionId: entry.sessionId,
-        bridgeSessionToken: sessionToken,
         isNew,
         scadaUrl: entry.scadaUrl,
         sessionInfo: toSessionInfoSnapshot(
@@ -239,6 +232,20 @@ export async function sessionRoutes(
           entry.sessionContext.entityType,
           entry.sessionContext.app,
         ),
+        realtime: {
+          transport: 'socket.io',
+          protocolVersion: 'v1',
+          namespace: '/session',
+          path: '/socket.io',
+          auth: {
+            type: 'session_token',
+            token: sessionToken,
+          },
+          room: {
+            type: 'session',
+            id: entry.sessionId,
+          },
+        },
       };
 
       logger.info(
@@ -250,7 +257,7 @@ export async function sessionRoutes(
         'Bootstrap request resolved',
       );
 
-      return reply.send(response);
+      return context.json(response);
     } catch (error) {
       logger.error(
         {
@@ -260,30 +267,46 @@ export async function sessionRoutes(
         'Bootstrap request failed',
       );
 
-      return reply.status(500).send({
-        error: 'Failed to bootstrap chat session',
-        message: error instanceof Error ? error.message : String(error),
-      });
+      return context.json(
+        {
+          error: 'Failed to bootstrap chat session',
+          message: error instanceof Error ? error.message : String(error),
+        },
+        500,
+      );
     }
   }
 
-  async function handleGetSessionInfo(
-    request: FastifyRequest<{ Params: { sessionId: string } }>,
-    reply: FastifyReply,
-  ) {
-    if (!requireSessionAuth(request, reply)) return;
+  async function handleGetSessionInfo(context: Context): Promise<Response> {
+    const sessionId = context.req.param('sessionId');
+    if (!sessionId) {
+      return context.json(
+        {
+          error: 'Bad Request',
+          message: 'sessionId is required',
+        } satisfies ErrorResponse,
+        400,
+      );
+    }
 
-    const { sessionId } = request.params;
+    const authResponse = requireSessionAuth(context, sessionId);
+    if (authResponse) {
+      return authResponse;
+    }
+
     const entry = registry.getSession(sessionId);
 
     if (!entry) {
-      return reply.status(404).send({
-        error: 'Not Found',
-        message: `Session not found: ${sessionId}`,
-      });
+      return context.json(
+        {
+          error: 'Not Found',
+          message: `Session not found: ${sessionId}`,
+        } satisfies ErrorResponse,
+        404,
+      );
     }
 
-    return reply.send(
+    return context.json(
       toSessionInfoResponse(sessionId, {
         tenantId: entry.sessionContext.tenantId,
         groupId: entry.sessionContext.groupId,

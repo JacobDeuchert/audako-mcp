@@ -4,10 +4,36 @@ import { createServer } from './server.js';
 const logger = createLogger('main');
 
 async function start() {
-  try {
-    const server = await createServer();
+  const server = await createServer();
+  let isShuttingDown = false;
 
-    await server.listen({
+  const shutdown = async (signal: NodeJS.Signals) => {
+    if (isShuttingDown) {
+      return;
+    }
+
+    isShuttingDown = true;
+
+    logger.info({ signal }, 'Shutdown signal received');
+
+    try {
+      await server.shutdown();
+      process.exit(0);
+    } catch (error) {
+      logger.error({ error, signal }, 'Failed during shutdown');
+      process.exit(1);
+    }
+  };
+
+  process.once('SIGTERM', () => {
+    void shutdown('SIGTERM');
+  });
+  process.once('SIGINT', () => {
+    void shutdown('SIGINT');
+  });
+
+  try {
+    await server.start({
       port: appConfig.port,
       host: appConfig.host,
     });
@@ -24,6 +50,7 @@ async function start() {
     );
   } catch (error) {
     logger.error({ error }, 'Failed to start server');
+    await server.shutdown();
     process.exit(1);
   }
 }

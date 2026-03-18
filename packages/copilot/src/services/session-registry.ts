@@ -21,7 +21,11 @@ export interface SessionRegistryEntry {
   lastAccessedAt: Date;
 }
 
-export type SessionRemovalReason = 'idle_timeout' | 'manual' | 'server_shutdown';
+export type SessionRemovalReason =
+  | 'idle_timeout'
+  | 'manual'
+  | 'server_shutdown'
+  | 'controller_disconnect';
 
 type SessionRemovedListener = (entry: SessionRegistryEntry, reason: SessionRemovalReason) => void;
 
@@ -240,6 +244,18 @@ export class SessionRegistry {
         'Error removing session',
       );
     }
+  }
+
+  async removeSessionBySessionId(
+    sessionId: string,
+    reason: SessionRemovalReason = 'manual',
+  ): Promise<void> {
+    const key = this.sessionIdToKey.get(sessionId);
+    if (!key) {
+      return;
+    }
+
+    await this.removeSession(key, reason);
   }
 
   cleanupIdleSessions(): void {

@@ -1,27 +1,20 @@
 import { z } from 'zod';
 import {
   SessionInfoFieldsSchema,
-  type SessionInfoResponse,
+  SessionInfoResponseSchema,
   SessionInfoSnapshotSchema,
 } from './copilot.js';
 import { QuestionRequestSchema } from './question.js';
 
 export function createSessionEventEnvelopeSchema<T extends z.ZodTypeAny>(payloadSchema: T) {
-  return z.object({
-    type: z.string(),
-    sessionId: z.string(),
-    timestamp: z.string(),
-    payload: payloadSchema,
-  });
-}
-
-export function createHubRequestPayloadSchema<T extends z.ZodTypeAny>(payloadSchema: T) {
-  return z.object({
-    requestId: z.string(),
-    requestType: z.string(),
-    payload: payloadSchema,
-    expiresAt: z.string(),
-  });
+  return z
+    .object({
+      type: z.string(),
+      sessionId: z.string(),
+      timestamp: z.string(),
+      payload: payloadSchema,
+    })
+    .strict();
 }
 
 export type SessionEventEnvelope<T = unknown> = {
@@ -31,236 +24,235 @@ export type SessionEventEnvelope<T = unknown> = {
   payload: T;
 };
 
-/** Minimal WebSocket interface for session event fanout */
-export interface SessionSocket {
-  readyState: number;
-  send(data: string): void;
-  close(code?: number, reason?: string): void;
-  on?(event: string, handler: (...args: any[]) => void): void;
-  ping?(): void;
-}
+export const CopilotV1EventNames = [
+  'prompt.send',
+  'prompt.cancel',
+  'question.answer',
+  'session.update',
+  'session.snapshot',
+  'session.updated',
+  'session.closed',
+  'assistant.delta',
+  'assistant.done',
+  'assistant.error',
+  'entity.created',
+  'entity.updated',
+  'entity.moved',
+] as const;
 
-export const BridgeSessionWebSocketUserMessageSchema = z.object({
-  type: z.literal('user_message'),
-  content: z.string(),
-});
-export type BridgeSessionWebSocketUserMessage = z.infer<
-  typeof BridgeSessionWebSocketUserMessageSchema
->;
+export const CopilotV1EventNameSchema = z.enum(CopilotV1EventNames);
+export type CopilotV1EventName = z.infer<typeof CopilotV1EventNameSchema>;
 
-export const BridgeSessionWebSocketPingMessageSchema = z.object({
-  type: z.literal('ping'),
-});
-export type BridgeSessionWebSocketPingMessage = z.infer<
-  typeof BridgeSessionWebSocketPingMessageSchema
->;
-
-export const BridgeSessionWebSocketCancelMessageSchema = z.object({
-  type: z.literal('cancel'),
-});
-export type BridgeSessionWebSocketCancelMessage = z.infer<
-  typeof BridgeSessionWebSocketCancelMessageSchema
->;
-
-export const BridgeSessionWebSocketHubResponseMessageSchema = z.object({
-  type: z.literal('hub.response'),
-  requestId: z.string(),
-  response: z.unknown(),
-});
-export type BridgeSessionWebSocketHubResponseMessage = z.infer<
-  typeof BridgeSessionWebSocketHubResponseMessageSchema
->;
-
-export const BridgeSessionWebSocketSessionInfoUpdateMessageSchema = z.object({
-  type: z.literal('session.info.update'),
-  sessionInfo: SessionInfoFieldsSchema,
-});
-export type BridgeSessionWebSocketSessionInfoUpdateMessage = z.infer<
-  typeof BridgeSessionWebSocketSessionInfoUpdateMessageSchema
->;
-
-export const BridgeSessionWebSocketClientMessageSchema = z.discriminatedUnion('type', [
-  BridgeSessionWebSocketUserMessageSchema,
-  BridgeSessionWebSocketPingMessageSchema,
-  BridgeSessionWebSocketCancelMessageSchema,
-  BridgeSessionWebSocketHubResponseMessageSchema,
-  BridgeSessionWebSocketSessionInfoUpdateMessageSchema,
+export const CommandNameSchema = z.enum([
+  'prompt.send',
+  'prompt.cancel',
+  'question.answer',
+  'session.update',
 ]);
-export type BridgeSessionWebSocketClientMessage = z.infer<
-  typeof BridgeSessionWebSocketClientMessageSchema
->;
+export type CommandName = z.infer<typeof CommandNameSchema>;
 
-export function isBridgeSessionWebSocketClientMessage(
-  value: unknown,
-): value is BridgeSessionWebSocketClientMessage {
-  return BridgeSessionWebSocketClientMessageSchema.safeParse(value).success;
-}
+export const CommandAcknowledgementPayloadSchema = z
+  .object({
+    commandId: z.string(),
+    command: CommandNameSchema,
+    status: z.enum(['accepted', 'rejected']),
+    acknowledgedAt: z.string(),
+    error: z
+      .object({
+        code: z.string(),
+        message: z.string(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type CommandAcknowledgementPayload = z.infer<typeof CommandAcknowledgementPayloadSchema>;
 
-export const BridgeSessionWebSocketPongMessageSchema = z.object({
-  type: z.literal('pong'),
-});
-export type BridgeSessionWebSocketPongMessage = z.infer<
-  typeof BridgeSessionWebSocketPongMessageSchema
->;
+export const PromptSendPayloadSchema = z
+  .object({
+    commandId: z.string(),
+    content: z.string(),
+  })
+  .strict();
+export type PromptSendPayload = z.infer<typeof PromptSendPayloadSchema>;
 
-export type BridgeSessionWebSocketControlMessage = BridgeSessionWebSocketPongMessage;
+export const PromptCancelPayloadSchema = z
+  .object({
+    commandId: z.string(),
+    reason: z.string().optional(),
+  })
+  .strict();
+export type PromptCancelPayload = z.infer<typeof PromptCancelPayloadSchema>;
 
-export function isBridgeSessionWebSocketControlMessage(
-  value: unknown,
-): value is BridgeSessionWebSocketControlMessage {
-  return BridgeSessionWebSocketPongMessageSchema.safeParse(value).success;
-}
+export const QuestionAskPayloadSchema = z
+  .object({
+    questionId: z.string(),
+    request: QuestionRequestSchema,
+    expiresAt: z.string().optional(),
+  })
+  .strict();
+export type QuestionAskPayload = z.infer<typeof QuestionAskPayloadSchema>;
 
-export type HubRequestPayload<TPayload = unknown> = {
-  requestId: string;
-  requestType: string;
-  payload: TPayload;
-  expiresAt: string;
-};
+export const QuestionAnswerPayloadSchema = z
+  .object({
+    commandId: z.string(),
+    questionId: z.string(),
+    answers: z.array(z.string()),
+  })
+  .strict();
+export type QuestionAnswerPayload = z.infer<typeof QuestionAnswerPayloadSchema>;
 
-export type HubRequestSessionEvent<TPayload = unknown> = SessionEventEnvelope<
-  HubRequestPayload<TPayload>
-> & { type: 'hub.request' };
+export const SessionUpdatePayloadSchema = z
+  .object({
+    commandId: z.string(),
+    sessionInfo: SessionInfoFieldsSchema,
+  })
+  .strict();
+export type SessionUpdatePayload = z.infer<typeof SessionUpdatePayloadSchema>;
 
-export const HubResponsePayloadSchema = z.object({
-  requestId: z.string(),
-  response: z.unknown(),
-  respondedAt: z.string(),
-});
-export type HubResponsePayload = z.infer<typeof HubResponsePayloadSchema>;
+export type SessionCommand =
+  | PromptSendSessionEvent
+  | PromptCancelSessionEvent
+  | QuestionAnswerSessionEvent
+  | SessionUpdateSessionEvent;
 
-export type HubResponseSessionEvent = SessionEventEnvelope<HubResponsePayload> & {
-  type: 'hub.response';
-};
-
-export const SessionSnapshotPayloadSchema = z.object({
-  sessionId: z.string(),
-  scadaUrl: z.string(),
-  sessionInfo: SessionInfoSnapshotSchema,
-  isActive: z.boolean(),
-});
+export const SessionSnapshotPayloadSchema = z
+  .object({
+    sessionId: z.string(),
+    scadaUrl: z.string(),
+    sessionInfo: SessionInfoSnapshotSchema,
+    isActive: z.boolean(),
+  })
+  .strict();
 export type SessionSnapshotPayload = z.infer<typeof SessionSnapshotPayloadSchema>;
 
-export const SessionClosedEventPayloadSchema = z.object({
-  reason: z.string(),
-});
+export const SessionUpdatedPayloadSchema = SessionInfoResponseSchema;
+export type SessionUpdatedPayload = z.infer<typeof SessionUpdatedPayloadSchema>;
+
+export const SessionClosedEventPayloadSchema = z
+  .object({
+    reason: z.string(),
+  })
+  .strict();
 export type SessionClosedEventPayload = z.infer<typeof SessionClosedEventPayloadSchema>;
 
-export const EntityCreatedEventPayloadSchema = z.object({
-  entityType: z.string(),
-  entityId: z.string(),
-  tenantId: z.string(),
-  groupId: z.string(),
-  sourceTool: z.literal('create-entity'),
-  timestamp: z.string(),
-});
+export const AssistantTextDeltaPayloadSchema = z
+  .object({
+    kind: z.literal('text'),
+    index: z.number(),
+    delta: z.string(),
+  })
+  .strict();
+
+export const AssistantDeltaPayloadSchema = AssistantTextDeltaPayloadSchema;
+export type AssistantDeltaPayload = z.infer<typeof AssistantDeltaPayloadSchema>;
+
+export const AssistantDonePayloadSchema = z
+  .object({
+    turnId: z.string().describe('Server-generated assistant turn identifier.'),
+    finalText: z.string().describe('Final assistant text content for the completed turn.'),
+    finishReason: z
+      .string()
+      .describe('Assistant stop reason reported when the turn completed.'),
+  })
+  .strict();
+export type AssistantDonePayload = z.infer<typeof AssistantDonePayloadSchema>;
+
+export const AssistantErrorPayloadSchema = z
+  .object({
+    errorMessage: z.string(),
+    errorCode: z.string().optional(),
+    context: z.unknown().optional(),
+  })
+  .strict();
+export type AssistantErrorPayload = z.infer<typeof AssistantErrorPayloadSchema>;
+
+export const EntityEventMetadataCoreSchema = z
+  .object({
+    tenantId: z.string().optional().describe('Resolved tenant context for the mutation event.'),
+    sourceTool: z.enum(['create-entity', 'update-entity', 'move-entity']),
+    timestamp: z.string().describe('ISO timestamp when the mutation event payload was built.'),
+  })
+  .strict();
+
+export const EntityCreatedEventPayloadSchema = z
+  .object({
+    entityType: z.string(),
+    entityId: z.string(),
+    groupId: z.string(),
+    metadata: EntityEventMetadataCoreSchema.extend({
+      sourceTool: z.literal('create-entity'),
+    }),
+    data: z.record(z.string(), z.unknown()),
+  })
+  .strict();
 export type EntityCreatedEventPayload = z.infer<typeof EntityCreatedEventPayloadSchema>;
 
-export const EntityUpdatedEventPayloadSchema = z.object({
-  entityType: z.string(),
-  entityId: z.string(),
-  tenantId: z.string(),
-  groupId: z.string(),
-  changedFields: z.array(z.string()),
-  sourceTool: z.literal('update-entity'),
-  timestamp: z.string(),
-});
+export const EntityUpdatedEventPayloadSchema = z
+  .object({
+    entityType: z.string(),
+    entityId: z.string(),
+    groupId: z.string(),
+    changedFields: z.array(z.string()).min(1),
+    changes: z.record(z.string(), z.unknown()),
+    metadata: EntityEventMetadataCoreSchema.extend({
+      sourceTool: z.literal('update-entity'),
+    }),
+  })
+  .strict();
 export type EntityUpdatedEventPayload = z.infer<typeof EntityUpdatedEventPayloadSchema>;
 
-export const EntityMovedEventPayloadSchema = z.object({
-  entityType: z.string(),
-  entityId: z.string(),
-  tenantId: z.string(),
-  sourceGroupId: z.string().optional(),
-  targetGroupId: z.string(),
-  sourceTool: z.literal('move-entity'),
-  timestamp: z.string(),
-});
+export const EntityMovedEventPayloadSchema = z
+  .object({
+    entityType: z.string(),
+    entityId: z.string(),
+    sourceGroupId: z.string().optional(),
+    targetGroupId: z.string(),
+    metadata: EntityEventMetadataCoreSchema.extend({
+      sourceTool: z.literal('move-entity'),
+    }),
+  })
+  .strict();
 export type EntityMovedEventPayload = z.infer<typeof EntityMovedEventPayloadSchema>;
 
-export const QuestionAskHubRequestPayloadSchema = createHubRequestPayloadSchema(
-  QuestionRequestSchema,
-).extend({
-  requestType: z.literal('question.ask'),
-});
-export type QuestionAskHubRequestPayload = z.infer<typeof QuestionAskHubRequestPayloadSchema>;
-
-// Agent event types for pi-mono agent
-export const AgentTextDeltaPayloadSchema = z.object({
-  index: z.number(),
-  delta: z.string(),
-});
-export type AgentTextDeltaPayload = z.infer<typeof AgentTextDeltaPayloadSchema>;
-
-export type AgentTextDeltaSessionEvent = SessionEventEnvelope<AgentTextDeltaPayload> & {
-  type: 'agent.text_delta';
+export type PromptSendSessionEvent = SessionEventEnvelope<PromptSendPayload> & {
+  type: 'prompt.send';
 };
 
-export const AgentToolStartPayloadSchema = z.object({
-  toolName: z.string(),
-  toolInput: z.unknown(),
-});
-export type AgentToolStartPayload = z.infer<typeof AgentToolStartPayloadSchema>;
-
-export type AgentToolStartSessionEvent = SessionEventEnvelope<AgentToolStartPayload> & {
-  type: 'agent.tool_start';
+export type PromptCancelSessionEvent = SessionEventEnvelope<PromptCancelPayload> & {
+  type: 'prompt.cancel';
 };
 
-export const AgentToolEndPayloadSchema = z.object({
-  toolName: z.string(),
-  toolOutput: z.unknown(),
-});
-export type AgentToolEndPayload = z.infer<typeof AgentToolEndPayloadSchema>;
-
-export type AgentToolEndSessionEvent = SessionEventEnvelope<AgentToolEndPayload> & {
-  type: 'agent.tool_end';
+export type QuestionAnswerSessionEvent = SessionEventEnvelope<QuestionAnswerPayload> & {
+  type: 'question.answer';
 };
 
-export const AgentTurnStartPayloadSchema = z.object({
-  turnId: z.string(),
-  userMessage: z.string().optional(),
-});
-export type AgentTurnStartPayload = z.infer<typeof AgentTurnStartPayloadSchema>;
-
-export type AgentTurnStartSessionEvent = SessionEventEnvelope<AgentTurnStartPayload> & {
-  type: 'agent.turn_start';
-};
-
-export const AgentTurnEndPayloadSchema = z.object({
-  turnId: z.string(),
-  finalMessage: z.string().optional(),
-});
-export type AgentTurnEndPayload = z.infer<typeof AgentTurnEndPayloadSchema>;
-
-export type AgentTurnEndSessionEvent = SessionEventEnvelope<AgentTurnEndPayload> & {
-  type: 'agent.turn_end';
-};
-
-export const AgentErrorPayloadSchema = z.object({
-  errorMessage: z.string(),
-  errorCode: z.string().optional(),
-  context: z.unknown().optional(),
-});
-export type AgentErrorPayload = z.infer<typeof AgentErrorPayloadSchema>;
-
-export type AgentErrorSessionEvent = SessionEventEnvelope<AgentErrorPayload> & {
-  type: 'agent.error';
+export type SessionUpdateSessionEvent = SessionEventEnvelope<SessionUpdatePayload> & {
+  type: 'session.update';
 };
 
 export type SessionSnapshotEvent = SessionEventEnvelope<SessionSnapshotPayload> & {
   type: 'session.snapshot';
 };
 
-export type SessionInfoUpdatedEvent = SessionEventEnvelope<SessionInfoResponse> & {
-  type: 'session.info.updated';
+export type SessionUpdatedEvent = SessionEventEnvelope<SessionUpdatedPayload> & {
+  type: 'session.updated';
 };
 
 export type SessionClosedEvent = SessionEventEnvelope<SessionClosedEventPayload> & {
   type: 'session.closed';
 };
 
-export type QuestionAskHubRequestEvent = SessionEventEnvelope<QuestionAskHubRequestPayload> & {
-  type: 'hub.request';
+export type AssistantDeltaSessionEvent = SessionEventEnvelope<AssistantDeltaPayload> & {
+  type: 'assistant.delta';
+};
+
+export type AssistantDoneSessionEvent = SessionEventEnvelope<AssistantDonePayload> & {
+  type: 'assistant.done';
+};
+
+export type AssistantErrorSessionEvent = SessionEventEnvelope<AssistantErrorPayload> & {
+  type: 'assistant.error';
 };
 
 export type EntityCreatedSessionEvent = SessionEventEnvelope<EntityCreatedEventPayload> & {
@@ -275,30 +267,17 @@ export type EntityMovedSessionEvent = SessionEventEnvelope<EntityMovedEventPaylo
   type: 'entity.moved';
 };
 
-export type McpPublishedSessionEvent =
+export type KnownCopilotV1SessionEvent =
+  | PromptSendSessionEvent
+  | PromptCancelSessionEvent
+  | QuestionAnswerSessionEvent
+  | SessionUpdateSessionEvent
+  | SessionSnapshotEvent
+  | SessionUpdatedEvent
+  | SessionClosedEvent
+  | AssistantDeltaSessionEvent
+  | AssistantDoneSessionEvent
+  | AssistantErrorSessionEvent
   | EntityCreatedSessionEvent
   | EntityUpdatedSessionEvent
   | EntityMovedSessionEvent;
-
-export type AgentSessionEvent =
-  | AgentTextDeltaSessionEvent
-  | AgentToolStartSessionEvent
-  | AgentToolEndSessionEvent
-  | AgentTurnStartSessionEvent
-  | AgentTurnEndSessionEvent
-  | AgentErrorSessionEvent;
-
-export type KnownBridgeSessionWebSocketEvent =
-  | SessionSnapshotEvent
-  | SessionInfoUpdatedEvent
-  | SessionClosedEvent
-  | HubRequestSessionEvent
-  | HubResponseSessionEvent
-  | McpPublishedSessionEvent
-  | AgentSessionEvent;
-
-export type BridgeSessionWebSocketEvent = KnownBridgeSessionWebSocketEvent | SessionEventEnvelope;
-
-export type BridgeSessionWebSocketServerMessage =
-  | BridgeSessionWebSocketEvent
-  | BridgeSessionWebSocketControlMessage;

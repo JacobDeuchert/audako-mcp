@@ -31,14 +31,38 @@ export const SessionBootstrapRequestSchema = z
 
 export type SessionBootstrapRequest = z.infer<typeof SessionBootstrapRequestSchema>;
 
-export const SessionBootstrapResponseSchema = z.object({
-  websocketPath: z.string(),
-  sessionId: z.string(),
-  bridgeSessionToken: z.string(),
-  isNew: z.boolean(),
-  scadaUrl: z.string(),
-  sessionInfo: SessionInfoSnapshotSchema,
-});
+export const RealtimeDescriptorSchema = z
+  .object({
+    transport: z.literal('socket.io'),
+    protocolVersion: z.literal('v1'),
+    namespace: z.literal('/session'),
+    path: z.literal('/socket.io'),
+    auth: z
+      .object({
+        type: z.literal('session_token'),
+        token: z.string(),
+      })
+      .strict(),
+    room: z
+      .object({
+        type: z.literal('session'),
+        id: z.string(),
+      })
+      .strict(),
+  })
+  .strict();
+
+export type RealtimeDescriptor = z.infer<typeof RealtimeDescriptorSchema>;
+
+export const SessionBootstrapResponseSchema = z
+  .object({
+    sessionId: z.string(),
+    isNew: z.boolean(),
+    scadaUrl: z.string(),
+    sessionInfo: SessionInfoSnapshotSchema,
+    realtime: RealtimeDescriptorSchema,
+  })
+  .strict();
 
 export type SessionBootstrapResponse = z.infer<typeof SessionBootstrapResponseSchema>;
 
@@ -47,25 +71,37 @@ export function isSessionInfoResponse(value: unknown): value is SessionInfoRespo
 }
 
 export type {
-  BridgeSessionWebSocketEvent,
+  AssistantDeltaPayload,
+  AssistantDeltaSessionEvent,
+  AssistantDonePayload,
+  AssistantDoneSessionEvent,
+  AssistantErrorPayload,
+  AssistantErrorSessionEvent,
+  CommandAcknowledgementPayload,
+  CommandName,
+  CopilotV1EventName,
   EntityCreatedEventPayload,
   EntityCreatedSessionEvent,
   EntityMovedEventPayload,
   EntityMovedSessionEvent,
   EntityUpdatedEventPayload,
   EntityUpdatedSessionEvent,
-  HubRequestPayload,
-  HubRequestSessionEvent,
-  HubResponsePayload,
-  HubResponseSessionEvent,
-  KnownBridgeSessionWebSocketEvent,
-  McpPublishedSessionEvent,
-  QuestionAskHubRequestEvent,
-  QuestionAskHubRequestPayload,
+  KnownCopilotV1SessionEvent,
+  PromptCancelPayload,
+  PromptCancelSessionEvent,
+  PromptSendPayload,
+  PromptSendSessionEvent,
+  QuestionAnswerPayload,
+  QuestionAnswerSessionEvent,
+  QuestionAskPayload,
   SessionClosedEvent,
   SessionClosedEventPayload,
+  SessionCommand,
   SessionEventEnvelope,
-  SessionInfoUpdatedEvent,
   SessionSnapshotEvent,
   SessionSnapshotPayload,
+  SessionUpdatedEvent,
+  SessionUpdatedPayload,
+  SessionUpdatePayload,
+  SessionUpdateSessionEvent,
 } from './copilot-ws-events.js';

@@ -6,7 +6,7 @@ import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { Type } from '@mariozechner/pi-ai';
 import { createLogger } from '../config/app-config.js';
 import { resolveContract } from '../entity-type-definitions/contract-registry.js';
-import { normalizePermissionMode, type PermissionService } from '../services/permission-service.js';
+import { normalizePermissionMode } from '../services/permission-service.js';
 import type { MutationToolDependencies } from './mutation-tools.js';
 
 const logger = createLogger('create-entity');
@@ -107,6 +107,15 @@ export function createCreateEntityTool(
         payload: {
           entityType: contract.entityType,
           entityId,
+          groupId:
+            typeof createdEntity.GroupId === 'string'
+              ? createdEntity.GroupId
+              : resolvedGroupId ?? '',
+          metadata: {
+            tenantId: deps.sessionContext.tenantId,
+            sourceTool: 'create-entity',
+            timestamp: new Date().toISOString(),
+          },
           data: contract.toPayload(createdEntity),
         },
       });

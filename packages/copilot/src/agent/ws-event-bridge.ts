@@ -33,34 +33,13 @@ export function createWsEventBridge(
         if (event.assistantMessageEvent.type === 'text_delta') {
           eventHub.publish(
             sessionId,
-            buildSessionEvent('agent.text_delta', sessionId, {
+            buildSessionEvent('assistant.delta', sessionId, {
+              kind: 'text',
               index: event.assistantMessageEvent.contentIndex,
               delta: event.assistantMessageEvent.delta,
             }),
           );
         }
-        break;
-      }
-
-      case 'tool_execution_start': {
-        eventHub.publish(
-          sessionId,
-          buildSessionEvent('agent.tool_start', sessionId, {
-            toolName: event.toolName,
-            toolInput: event.args,
-          }),
-        );
-        break;
-      }
-
-      case 'tool_execution_end': {
-        eventHub.publish(
-          sessionId,
-          buildSessionEvent('agent.tool_end', sessionId, {
-            toolName: event.toolName,
-            toolOutput: event.result,
-          }),
-        );
         break;
       }
 
@@ -70,13 +49,6 @@ export function createWsEventBridge(
         }
 
         currentTurnId = generateTurnId();
-        eventHub.publish(
-          sessionId,
-          buildSessionEvent('agent.turn_start', sessionId, {
-            turnId: currentTurnId,
-            userMessage: undefined,
-          }),
-        );
         break;
       }
 
@@ -88,9 +60,10 @@ export function createWsEventBridge(
         const turnId = currentTurnId || generateTurnId();
         eventHub.publish(
           sessionId,
-          buildSessionEvent('agent.turn_end', sessionId, {
+          buildSessionEvent('assistant.done', sessionId, {
             turnId,
-            finalMessage: extractAssistantText(event.message),
+            finalText: extractAssistantText(event.message),
+            finishReason: extractFinishReason(event.message),
           }),
         );
         currentTurnId = null;
@@ -102,7 +75,7 @@ export function createWsEventBridge(
         if (errorMessage) {
           eventHub.publish(
             sessionId,
-            buildSessionEvent('agent.error', sessionId, {
+            buildSessionEvent('assistant.error', sessionId, {
               errorMessage,
             }),
           );
@@ -146,7 +119,7 @@ function isToolUseTurn(message: unknown): boolean {
 
 function extractAssistantText(message: unknown): string | undefined {
   if (!isAssistantMessage(message)) {
-    return undefined;
+    return '';
   }
 
   let text = '';
@@ -158,8 +131,15 @@ function extractAssistantText(message: unknown): string | undefined {
     text += block.text;
   }
 
-  const trimmedText = text.trim();
-  return trimmedText || undefined;
+  return text.trim();
+}
+
+function extractFinishReason(message: unknown): string {
+  if (!isAssistantMessage(message)) {
+    return 'unknown';
+  }
+
+  return message.stopReason;
 }
 
 function generateTurnId(): string {

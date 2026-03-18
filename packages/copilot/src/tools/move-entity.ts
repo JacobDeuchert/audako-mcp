@@ -24,7 +24,7 @@ export function createMoveEntityTool(
   deps: MutationToolDependencies,
 ): AgentTool<
   typeof moveEntitySchema,
-  { entityType: string; entityId: string; fromGroupId: string; toGroupId: string }
+  { entityType: string; entityId: string; sourceGroupId?: string; targetGroupId: string }
 > {
   return {
     name: 'move_entity',
@@ -46,6 +46,13 @@ export function createMoveEntityTool(
         'move_entity',
       );
 
+      const existingEntity = await deps.audakoServices.entityService.getPartialEntityById(
+        contract.entityType,
+        params.entityId,
+        { GroupId: 1 },
+      );
+      const currentGroupId = (existingEntity as Record<string, unknown>).GroupId;
+
       await deps.mutationThrottle.run(async () => {
         await deps.audakoServices.entityService.moveTo(
           params.entityId,
@@ -54,8 +61,8 @@ export function createMoveEntityTool(
         );
       });
 
-      const fromGroupId = deps.sessionContext.groupId ?? params.targetGroupId;
-      const toGroupId = params.targetGroupId;
+      const sourceGroupId = typeof currentGroupId === 'string' ? currentGroupId : undefined;
+      const targetGroupId = params.targetGroupId;
 
       deps.eventHub.publish(sessionId, {
         type: 'entity.moved',
@@ -64,8 +71,13 @@ export function createMoveEntityTool(
         payload: {
           entityType: contract.entityType,
           entityId: params.entityId,
-          fromGroupId,
-          toGroupId,
+          sourceGroupId,
+          targetGroupId,
+          metadata: {
+            tenantId: deps.sessionContext.tenantId,
+            sourceTool: 'move-entity',
+            timestamp: new Date().toISOString(),
+          },
         },
       });
 
@@ -79,8 +91,8 @@ export function createMoveEntityTool(
         details: {
           entityType: contract.entityType,
           entityId: params.entityId,
-          fromGroupId,
-          toGroupId,
+          sourceGroupId,
+          targetGroupId,
         },
       };
     },

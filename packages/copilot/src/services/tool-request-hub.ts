@@ -1,4 +1,4 @@
-import type { QuestionRequest } from '@audako/contracts';
+import type { QuestionAskPayload, QuestionRequest } from '@audako/contracts';
 import type { SessionEventHub } from './session-event-hub.js';
 import type { SessionRequestHub } from './session-request-hub.js';
 
@@ -14,15 +14,14 @@ export class ToolRequestHub {
     const pendingRequest = this.requestHub.create(sessionId, timeoutMs);
 
     const event = {
-      type: 'hub.request' as const,
+      type: 'question.ask' as const,
       sessionId,
       timestamp: new Date().toISOString(),
       payload: {
-        requestId: pendingRequest.requestId,
-        requestType: 'question.ask' as const,
-        payload: request,
+        questionId: pendingRequest.requestId,
+        request,
         expiresAt: pendingRequest.expiresAt,
-      },
+      } satisfies QuestionAskPayload,
     };
 
     try {

@@ -1,67 +1,56 @@
-import type { SessionEventEnvelope, SessionSocket } from '@audako/contracts';
+import type { SessionEventEnvelope } from '@audako/contracts';
 
-const WS_OPEN_STATE = 1;
-const WS_CLOSED_STATE = 3;
+type SessionListener = (event: SessionEventEnvelope) => void;
 
 export class SessionEventHub {
-  private readonly subscribers = new Map<string, Set<SessionSocket>>();
+  private readonly listeners = new Map<string, Set<SessionListener>>();
 
-  subscribe(sessionId: string, socket: SessionSocket): void {
-    const existing = this.subscribers.get(sessionId);
+  subscribe(sessionId: string, listener: SessionListener): () => void {
+    const existing = this.listeners.get(sessionId);
     if (existing) {
-      existing.add(socket);
-      return;
+      existing.add(listener);
+    } else {
+      this.listeners.set(sessionId, new Set([listener]));
     }
 
-    this.subscribers.set(sessionId, new Set([socket]));
+    return () => {
+      this.unsubscribe(sessionId, listener);
+    };
   }
 
-  unsubscribe(sessionId: string, socket: SessionSocket): void {
-    const sockets = this.subscribers.get(sessionId);
-    if (!sockets) {
+  unsubscribe(sessionId: string, listener: SessionListener): void {
+    const sessionListeners = this.listeners.get(sessionId);
+    if (!sessionListeners) {
       return;
     }
 
-    sockets.delete(socket);
-    if (sockets.size === 0) {
-      this.subscribers.delete(sessionId);
+    sessionListeners.delete(listener);
+    if (sessionListeners.size === 0) {
+      this.listeners.delete(sessionId);
     }
   }
 
   publish(sessionId: string, event: SessionEventEnvelope): number {
-    const sockets = this.subscribers.get(sessionId);
-    if (!sockets || sockets.size === 0) {
+    const sessionListeners = this.listeners.get(sessionId);
+    if (!sessionListeners || sessionListeners.size === 0) {
       return 0;
     }
 
-    const payload = JSON.stringify(event);
-    const staleSockets: SessionSocket[] = [];
     let delivered = 0;
 
-    for (const socket of sockets) {
-      if (socket.readyState !== WS_OPEN_STATE) {
-        staleSockets.push(socket);
-        continue;
-      }
-
+    for (const listener of sessionListeners) {
       try {
-        socket.send(payload);
+        listener(event);
         delivered += 1;
-      } catch {
-        staleSockets.push(socket);
-      }
-    }
-
-    for (const socket of staleSockets) {
-      this.unsubscribe(sessionId, socket);
+      } catch {}
     }
 
     return delivered;
   }
 
   closeSession(sessionId: string, reason: string): void {
-    const sockets = this.subscribers.get(sessionId);
-    if (!sockets || sockets.size === 0) {
+    const listeners = this.listeners.get(sessionId);
+    if (!listeners || listeners.size === 0) {
       return;
     }
 
@@ -74,36 +63,20 @@ export class SessionEventHub {
 
     this.publish(sessionId, event);
 
-    for (const socket of sockets) {
-      this.tryCloseSocket(socket, reason);
-    }
-
-    this.subscribers.delete(sessionId);
+    this.listeners.delete(sessionId);
   }
 
   closeAll(reason = 'server_shutdown'): void {
-    for (const sessionId of this.subscribers.keys()) {
+    for (const sessionId of this.listeners.keys()) {
       this.closeSession(sessionId, reason);
     }
   }
 
   getSubscriberCount(sessionId: string): number {
-    return this.subscribers.get(sessionId)?.size ?? 0;
+    return this.listeners.get(sessionId)?.size ?? 0;
   }
 
   getActiveSessions(): string[] {
-    return Array.from(this.subscribers.keys());
-  }
-
-  private tryCloseSocket(socket: SessionSocket, reason: string): void {
-    if (socket.readyState === WS_CLOSED_STATE) {
-      return;
-    }
-
-    try {
-      socket.close(1000, reason);
-    } catch {
-      return;
-    }
+    return Array.from(this.listeners.keys());
   }
 }
