@@ -1,11 +1,10 @@
 import { z } from 'zod';
-import { type SessionInfoResponse } from './copilot.js';
 export declare function createSessionEventEnvelopeSchema<T extends z.ZodTypeAny>(payloadSchema: T): z.ZodObject<{
     type: z.ZodString;
     sessionId: z.ZodString;
     timestamp: z.ZodString;
     payload: T;
-}, "strip", z.ZodTypeAny, z.objectUtil.addQuestionMarks<z.baseObjectOutputType<{
+}, "strict", z.ZodTypeAny, z.objectUtil.addQuestionMarks<z.baseObjectOutputType<{
     type: z.ZodString;
     sessionId: z.ZodString;
     timestamp: z.ZodString;
@@ -15,22 +14,6 @@ export declare function createSessionEventEnvelopeSchema<T extends z.ZodTypeAny>
     sessionId: z.ZodString;
     timestamp: z.ZodString;
     payload: T;
-}> extends infer T_2 ? { [k_1 in keyof T_2]: T_2[k_1]; } : never>;
-export declare function createHubRequestPayloadSchema<T extends z.ZodTypeAny>(payloadSchema: T): z.ZodObject<{
-    requestId: z.ZodString;
-    requestType: z.ZodString;
-    payload: T;
-    expiresAt: z.ZodString;
-}, "strip", z.ZodTypeAny, z.objectUtil.addQuestionMarks<z.baseObjectOutputType<{
-    requestId: z.ZodString;
-    requestType: z.ZodString;
-    payload: T;
-    expiresAt: z.ZodString;
-}>, any> extends infer T_1 ? { [k in keyof T_1]: T_1[k]; } : never, z.baseObjectInputType<{
-    requestId: z.ZodString;
-    requestType: z.ZodString;
-    payload: T;
-    expiresAt: z.ZodString;
 }> extends infer T_2 ? { [k_1 in keyof T_2]: T_2[k_1]; } : never>;
 export type SessionEventEnvelope<T = unknown> = {
     type: string;
@@ -38,331 +21,71 @@ export type SessionEventEnvelope<T = unknown> = {
     timestamp: string;
     payload: T;
 };
-/** Minimal WebSocket interface for session event fanout */
-export interface SessionSocket {
-    readyState: number;
-    send(data: string): void;
-    close(code?: number, reason?: string): void;
-    on?(event: string, handler: (...args: any[]) => void): void;
-    ping?(): void;
-}
-export declare const BridgeSessionWebSocketUserMessageSchema: z.ZodObject<{
-    type: z.ZodLiteral<"user_message">;
+export declare const CopilotV1EventNames: readonly ["prompt.send", "prompt.cancel", "question.answer", "session.update", "session.snapshot", "session.updated", "session.closed", "assistant.delta", "assistant.done", "assistant.error", "entity.created", "entity.updated", "entity.moved", "child_task.accepted", "child_task.started", "child_task.completed", "child_task.failed", "child_task.cancelled"];
+export declare const CopilotV1EventNameSchema: z.ZodEnum<["prompt.send", "prompt.cancel", "question.answer", "session.update", "session.snapshot", "session.updated", "session.closed", "assistant.delta", "assistant.done", "assistant.error", "entity.created", "entity.updated", "entity.moved", "child_task.accepted", "child_task.started", "child_task.completed", "child_task.failed", "child_task.cancelled"]>;
+export type CopilotV1EventName = z.infer<typeof CopilotV1EventNameSchema>;
+export declare const CommandNameSchema: z.ZodEnum<["prompt.send", "prompt.cancel", "question.answer", "session.update"]>;
+export type CommandName = z.infer<typeof CommandNameSchema>;
+export declare const CommandAcknowledgementPayloadSchema: z.ZodObject<{
+    commandId: z.ZodString;
+    command: z.ZodEnum<["prompt.send", "prompt.cancel", "question.answer", "session.update"]>;
+    status: z.ZodEnum<["accepted", "rejected"]>;
+    acknowledgedAt: z.ZodString;
+    error: z.ZodOptional<z.ZodObject<{
+        code: z.ZodString;
+        message: z.ZodString;
+    }, "strict", z.ZodTypeAny, {
+        message: string;
+        code: string;
+    }, {
+        message: string;
+        code: string;
+    }>>;
+}, "strict", z.ZodTypeAny, {
+    status: "accepted" | "rejected";
+    commandId: string;
+    command: "prompt.send" | "prompt.cancel" | "question.answer" | "session.update";
+    acknowledgedAt: string;
+    error?: {
+        message: string;
+        code: string;
+    } | undefined;
+}, {
+    status: "accepted" | "rejected";
+    commandId: string;
+    command: "prompt.send" | "prompt.cancel" | "question.answer" | "session.update";
+    acknowledgedAt: string;
+    error?: {
+        message: string;
+        code: string;
+    } | undefined;
+}>;
+export type CommandAcknowledgementPayload = z.infer<typeof CommandAcknowledgementPayloadSchema>;
+export declare const PromptSendPayloadSchema: z.ZodObject<{
+    commandId: z.ZodString;
     content: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    type: "user_message";
+}, "strict", z.ZodTypeAny, {
+    commandId: string;
     content: string;
 }, {
-    type: "user_message";
+    commandId: string;
     content: string;
 }>;
-export type BridgeSessionWebSocketUserMessage = z.infer<typeof BridgeSessionWebSocketUserMessageSchema>;
-export declare const BridgeSessionWebSocketPingMessageSchema: z.ZodObject<{
-    type: z.ZodLiteral<"ping">;
-}, "strip", z.ZodTypeAny, {
-    type: "ping";
+export type PromptSendPayload = z.infer<typeof PromptSendPayloadSchema>;
+export declare const PromptCancelPayloadSchema: z.ZodObject<{
+    commandId: z.ZodString;
+    reason: z.ZodOptional<z.ZodString>;
+}, "strict", z.ZodTypeAny, {
+    commandId: string;
+    reason?: string | undefined;
 }, {
-    type: "ping";
+    commandId: string;
+    reason?: string | undefined;
 }>;
-export type BridgeSessionWebSocketPingMessage = z.infer<typeof BridgeSessionWebSocketPingMessageSchema>;
-export declare const BridgeSessionWebSocketCancelMessageSchema: z.ZodObject<{
-    type: z.ZodLiteral<"cancel">;
-}, "strip", z.ZodTypeAny, {
-    type: "cancel";
-}, {
-    type: "cancel";
-}>;
-export type BridgeSessionWebSocketCancelMessage = z.infer<typeof BridgeSessionWebSocketCancelMessageSchema>;
-export declare const BridgeSessionWebSocketHubResponseMessageSchema: z.ZodObject<{
-    type: z.ZodLiteral<"hub.response">;
-    requestId: z.ZodString;
-    response: z.ZodUnknown;
-}, "strip", z.ZodTypeAny, {
-    type: "hub.response";
-    requestId: string;
-    response?: unknown;
-}, {
-    type: "hub.response";
-    requestId: string;
-    response?: unknown;
-}>;
-export type BridgeSessionWebSocketHubResponseMessage = z.infer<typeof BridgeSessionWebSocketHubResponseMessageSchema>;
-export declare const BridgeSessionWebSocketSessionInfoUpdateMessageSchema: z.ZodObject<{
-    type: z.ZodLiteral<"session.info.update">;
-    sessionInfo: z.ZodObject<{
-        tenantId: z.ZodOptional<z.ZodString>;
-        groupId: z.ZodOptional<z.ZodString>;
-        entityType: z.ZodOptional<z.ZodString>;
-        app: z.ZodOptional<z.ZodString>;
-    }, "strip", z.ZodTypeAny, {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-    }, {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-    }>;
-}, "strip", z.ZodTypeAny, {
-    type: "session.info.update";
-    sessionInfo: {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-    };
-}, {
-    type: "session.info.update";
-    sessionInfo: {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-    };
-}>;
-export type BridgeSessionWebSocketSessionInfoUpdateMessage = z.infer<typeof BridgeSessionWebSocketSessionInfoUpdateMessageSchema>;
-export declare const BridgeSessionWebSocketClientMessageSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
-    type: z.ZodLiteral<"user_message">;
-    content: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    type: "user_message";
-    content: string;
-}, {
-    type: "user_message";
-    content: string;
-}>, z.ZodObject<{
-    type: z.ZodLiteral<"ping">;
-}, "strip", z.ZodTypeAny, {
-    type: "ping";
-}, {
-    type: "ping";
-}>, z.ZodObject<{
-    type: z.ZodLiteral<"cancel">;
-}, "strip", z.ZodTypeAny, {
-    type: "cancel";
-}, {
-    type: "cancel";
-}>, z.ZodObject<{
-    type: z.ZodLiteral<"hub.response">;
-    requestId: z.ZodString;
-    response: z.ZodUnknown;
-}, "strip", z.ZodTypeAny, {
-    type: "hub.response";
-    requestId: string;
-    response?: unknown;
-}, {
-    type: "hub.response";
-    requestId: string;
-    response?: unknown;
-}>, z.ZodObject<{
-    type: z.ZodLiteral<"session.info.update">;
-    sessionInfo: z.ZodObject<{
-        tenantId: z.ZodOptional<z.ZodString>;
-        groupId: z.ZodOptional<z.ZodString>;
-        entityType: z.ZodOptional<z.ZodString>;
-        app: z.ZodOptional<z.ZodString>;
-    }, "strip", z.ZodTypeAny, {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-    }, {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-    }>;
-}, "strip", z.ZodTypeAny, {
-    type: "session.info.update";
-    sessionInfo: {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-    };
-}, {
-    type: "session.info.update";
-    sessionInfo: {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-    };
-}>]>;
-export type BridgeSessionWebSocketClientMessage = z.infer<typeof BridgeSessionWebSocketClientMessageSchema>;
-export declare function isBridgeSessionWebSocketClientMessage(value: unknown): value is BridgeSessionWebSocketClientMessage;
-export declare const BridgeSessionWebSocketPongMessageSchema: z.ZodObject<{
-    type: z.ZodLiteral<"pong">;
-}, "strip", z.ZodTypeAny, {
-    type: "pong";
-}, {
-    type: "pong";
-}>;
-export type BridgeSessionWebSocketPongMessage = z.infer<typeof BridgeSessionWebSocketPongMessageSchema>;
-export type BridgeSessionWebSocketControlMessage = BridgeSessionWebSocketPongMessage;
-export declare function isBridgeSessionWebSocketControlMessage(value: unknown): value is BridgeSessionWebSocketControlMessage;
-export type HubRequestPayload<TPayload = unknown> = {
-    requestId: string;
-    requestType: string;
-    payload: TPayload;
-    expiresAt: string;
-};
-export type HubRequestSessionEvent<TPayload = unknown> = SessionEventEnvelope<HubRequestPayload<TPayload>> & {
-    type: 'hub.request';
-};
-export declare const HubResponsePayloadSchema: z.ZodObject<{
-    requestId: z.ZodString;
-    response: z.ZodUnknown;
-    respondedAt: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    requestId: string;
-    respondedAt: string;
-    response?: unknown;
-}, {
-    requestId: string;
-    respondedAt: string;
-    response?: unknown;
-}>;
-export type HubResponsePayload = z.infer<typeof HubResponsePayloadSchema>;
-export type HubResponseSessionEvent = SessionEventEnvelope<HubResponsePayload> & {
-    type: 'hub.response';
-};
-export declare const SessionSnapshotPayloadSchema: z.ZodObject<{
-    sessionId: z.ZodString;
-    scadaUrl: z.ZodString;
-    sessionInfo: z.ZodObject<{
-        tenantId: z.ZodOptional<z.ZodString>;
-        groupId: z.ZodOptional<z.ZodString>;
-        entityType: z.ZodOptional<z.ZodString>;
-        app: z.ZodOptional<z.ZodString>;
-    } & {
-        updatedAt: z.ZodOptional<z.ZodString>;
-    }, "strip", z.ZodTypeAny, {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-        updatedAt?: string | undefined;
-    }, {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-        updatedAt?: string | undefined;
-    }>;
-    isActive: z.ZodBoolean;
-}, "strip", z.ZodTypeAny, {
-    sessionId: string;
-    scadaUrl: string;
-    sessionInfo: {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-        updatedAt?: string | undefined;
-    };
-    isActive: boolean;
-}, {
-    sessionId: string;
-    scadaUrl: string;
-    sessionInfo: {
-        tenantId?: string | undefined;
-        groupId?: string | undefined;
-        entityType?: string | undefined;
-        app?: string | undefined;
-        updatedAt?: string | undefined;
-    };
-    isActive: boolean;
-}>;
-export type SessionSnapshotPayload = z.infer<typeof SessionSnapshotPayloadSchema>;
-export declare const SessionClosedEventPayloadSchema: z.ZodObject<{
-    reason: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    reason: string;
-}, {
-    reason: string;
-}>;
-export type SessionClosedEventPayload = z.infer<typeof SessionClosedEventPayloadSchema>;
-export declare const EntityCreatedEventPayloadSchema: z.ZodObject<{
-    entityType: z.ZodString;
-    entityId: z.ZodString;
-    tenantId: z.ZodString;
-    groupId: z.ZodString;
-    sourceTool: z.ZodLiteral<"create-entity">;
-    timestamp: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    tenantId: string;
-    groupId: string;
-    entityType: string;
-    timestamp: string;
-    entityId: string;
-    sourceTool: "create-entity";
-}, {
-    tenantId: string;
-    groupId: string;
-    entityType: string;
-    timestamp: string;
-    entityId: string;
-    sourceTool: "create-entity";
-}>;
-export type EntityCreatedEventPayload = z.infer<typeof EntityCreatedEventPayloadSchema>;
-export declare const EntityUpdatedEventPayloadSchema: z.ZodObject<{
-    entityType: z.ZodString;
-    entityId: z.ZodString;
-    tenantId: z.ZodString;
-    groupId: z.ZodString;
-    changedFields: z.ZodArray<z.ZodString, "many">;
-    sourceTool: z.ZodLiteral<"update-entity">;
-    timestamp: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    tenantId: string;
-    groupId: string;
-    entityType: string;
-    timestamp: string;
-    entityId: string;
-    sourceTool: "update-entity";
-    changedFields: string[];
-}, {
-    tenantId: string;
-    groupId: string;
-    entityType: string;
-    timestamp: string;
-    entityId: string;
-    sourceTool: "update-entity";
-    changedFields: string[];
-}>;
-export type EntityUpdatedEventPayload = z.infer<typeof EntityUpdatedEventPayloadSchema>;
-export declare const EntityMovedEventPayloadSchema: z.ZodObject<{
-    entityType: z.ZodString;
-    entityId: z.ZodString;
-    tenantId: z.ZodString;
-    sourceGroupId: z.ZodOptional<z.ZodString>;
-    targetGroupId: z.ZodString;
-    sourceTool: z.ZodLiteral<"move-entity">;
-    timestamp: z.ZodString;
-}, "strip", z.ZodTypeAny, {
-    tenantId: string;
-    entityType: string;
-    timestamp: string;
-    entityId: string;
-    sourceTool: "move-entity";
-    targetGroupId: string;
-    sourceGroupId?: string | undefined;
-}, {
-    tenantId: string;
-    entityType: string;
-    timestamp: string;
-    entityId: string;
-    sourceTool: "move-entity";
-    targetGroupId: string;
-    sourceGroupId?: string | undefined;
-}>;
-export type EntityMovedEventPayload = z.infer<typeof EntityMovedEventPayloadSchema>;
-export declare const QuestionAskHubRequestPayloadSchema: z.ZodObject<{
-    requestId: z.ZodString;
-    payload: z.ZodObject<{
+export type PromptCancelPayload = z.infer<typeof PromptCancelPayloadSchema>;
+export declare const QuestionAskPayloadSchema: z.ZodObject<{
+    questionId: z.ZodString;
+    request: z.ZodObject<{
         text: z.ZodString;
         header: z.ZodString;
         options: z.ZodArray<z.ZodObject<{
@@ -393,11 +116,10 @@ export declare const QuestionAskHubRequestPayloadSchema: z.ZodObject<{
         header: string;
         allowMultiple?: boolean | undefined;
     }>;
-    expiresAt: z.ZodString;
-} & {
-    requestType: z.ZodLiteral<"question.ask">;
-}, "strip", z.ZodTypeAny, {
-    payload: {
+    expiresAt: z.ZodOptional<z.ZodString>;
+}, "strict", z.ZodTypeAny, {
+    questionId: string;
+    request: {
         options: {
             label: string;
             description: string;
@@ -406,11 +128,10 @@ export declare const QuestionAskHubRequestPayloadSchema: z.ZodObject<{
         header: string;
         allowMultiple?: boolean | undefined;
     };
-    requestId: string;
-    requestType: "question.ask";
-    expiresAt: string;
+    expiresAt?: string | undefined;
 }, {
-    payload: {
+    questionId: string;
+    request: {
         options: {
             label: string;
             description: string;
@@ -419,86 +140,187 @@ export declare const QuestionAskHubRequestPayloadSchema: z.ZodObject<{
         header: string;
         allowMultiple?: boolean | undefined;
     };
-    requestId: string;
-    requestType: "question.ask";
-    expiresAt: string;
+    expiresAt?: string | undefined;
 }>;
-export type QuestionAskHubRequestPayload = z.infer<typeof QuestionAskHubRequestPayloadSchema>;
-export declare const AgentTextDeltaPayloadSchema: z.ZodObject<{
+export type QuestionAskPayload = z.infer<typeof QuestionAskPayloadSchema>;
+export declare const QuestionAnswerPayloadSchema: z.ZodObject<{
+    commandId: z.ZodString;
+    questionId: z.ZodString;
+    answers: z.ZodArray<z.ZodString, "many">;
+}, "strict", z.ZodTypeAny, {
+    commandId: string;
+    questionId: string;
+    answers: string[];
+}, {
+    commandId: string;
+    questionId: string;
+    answers: string[];
+}>;
+export type QuestionAnswerPayload = z.infer<typeof QuestionAnswerPayloadSchema>;
+export declare const SessionUpdatePayloadSchema: z.ZodObject<{
+    commandId: z.ZodString;
+    sessionInfo: z.ZodObject<{
+        tenantId: z.ZodOptional<z.ZodString>;
+        groupId: z.ZodOptional<z.ZodString>;
+        entityType: z.ZodOptional<z.ZodString>;
+        app: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    }, {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    }>;
+}, "strict", z.ZodTypeAny, {
+    sessionInfo: {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    };
+    commandId: string;
+}, {
+    sessionInfo: {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+    };
+    commandId: string;
+}>;
+export type SessionUpdatePayload = z.infer<typeof SessionUpdatePayloadSchema>;
+export type SessionCommand = PromptSendSessionEvent | PromptCancelSessionEvent | QuestionAnswerSessionEvent | SessionUpdateSessionEvent;
+export declare const SessionSnapshotPayloadSchema: z.ZodObject<{
+    sessionId: z.ZodString;
+    scadaUrl: z.ZodString;
+    sessionInfo: z.ZodObject<{
+        tenantId: z.ZodOptional<z.ZodString>;
+        groupId: z.ZodOptional<z.ZodString>;
+        entityType: z.ZodOptional<z.ZodString>;
+        app: z.ZodOptional<z.ZodString>;
+    } & {
+        updatedAt: z.ZodOptional<z.ZodString>;
+    }, "strip", z.ZodTypeAny, {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+        updatedAt?: string | undefined;
+    }, {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+        updatedAt?: string | undefined;
+    }>;
+    isActive: z.ZodBoolean;
+}, "strict", z.ZodTypeAny, {
+    sessionId: string;
+    scadaUrl: string;
+    sessionInfo: {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+        updatedAt?: string | undefined;
+    };
+    isActive: boolean;
+}, {
+    sessionId: string;
+    scadaUrl: string;
+    sessionInfo: {
+        tenantId?: string | undefined;
+        groupId?: string | undefined;
+        entityType?: string | undefined;
+        app?: string | undefined;
+        updatedAt?: string | undefined;
+    };
+    isActive: boolean;
+}>;
+export type SessionSnapshotPayload = z.infer<typeof SessionSnapshotPayloadSchema>;
+export declare const SessionUpdatedPayloadSchema: z.ZodObject<{
+    tenantId: z.ZodOptional<z.ZodString>;
+    groupId: z.ZodOptional<z.ZodString>;
+    entityType: z.ZodOptional<z.ZodString>;
+    app: z.ZodOptional<z.ZodString>;
+} & {
+    updatedAt: z.ZodOptional<z.ZodString>;
+} & {
+    sessionId: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    sessionId: string;
+    tenantId?: string | undefined;
+    groupId?: string | undefined;
+    entityType?: string | undefined;
+    app?: string | undefined;
+    updatedAt?: string | undefined;
+}, {
+    sessionId: string;
+    tenantId?: string | undefined;
+    groupId?: string | undefined;
+    entityType?: string | undefined;
+    app?: string | undefined;
+    updatedAt?: string | undefined;
+}>;
+export type SessionUpdatedPayload = z.infer<typeof SessionUpdatedPayloadSchema>;
+export declare const SessionClosedEventPayloadSchema: z.ZodObject<{
+    reason: z.ZodString;
+}, "strict", z.ZodTypeAny, {
+    reason: string;
+}, {
+    reason: string;
+}>;
+export type SessionClosedEventPayload = z.infer<typeof SessionClosedEventPayloadSchema>;
+export declare const AssistantTextDeltaPayloadSchema: z.ZodObject<{
+    kind: z.ZodLiteral<"text">;
     index: z.ZodNumber;
     delta: z.ZodString;
-}, "strip", z.ZodTypeAny, {
+}, "strict", z.ZodTypeAny, {
+    kind: "text";
     index: number;
     delta: string;
 }, {
+    kind: "text";
     index: number;
     delta: string;
 }>;
-export type AgentTextDeltaPayload = z.infer<typeof AgentTextDeltaPayloadSchema>;
-export type AgentTextDeltaSessionEvent = SessionEventEnvelope<AgentTextDeltaPayload> & {
-    type: 'agent.text_delta';
-};
-export declare const AgentToolStartPayloadSchema: z.ZodObject<{
-    toolName: z.ZodString;
-    toolInput: z.ZodUnknown;
-}, "strip", z.ZodTypeAny, {
-    toolName: string;
-    toolInput?: unknown;
+export declare const AssistantDeltaPayloadSchema: z.ZodObject<{
+    kind: z.ZodLiteral<"text">;
+    index: z.ZodNumber;
+    delta: z.ZodString;
+}, "strict", z.ZodTypeAny, {
+    kind: "text";
+    index: number;
+    delta: string;
 }, {
-    toolName: string;
-    toolInput?: unknown;
+    kind: "text";
+    index: number;
+    delta: string;
 }>;
-export type AgentToolStartPayload = z.infer<typeof AgentToolStartPayloadSchema>;
-export type AgentToolStartSessionEvent = SessionEventEnvelope<AgentToolStartPayload> & {
-    type: 'agent.tool_start';
-};
-export declare const AgentToolEndPayloadSchema: z.ZodObject<{
-    toolName: z.ZodString;
-    toolOutput: z.ZodUnknown;
-}, "strip", z.ZodTypeAny, {
-    toolName: string;
-    toolOutput?: unknown;
-}, {
-    toolName: string;
-    toolOutput?: unknown;
-}>;
-export type AgentToolEndPayload = z.infer<typeof AgentToolEndPayloadSchema>;
-export type AgentToolEndSessionEvent = SessionEventEnvelope<AgentToolEndPayload> & {
-    type: 'agent.tool_end';
-};
-export declare const AgentTurnStartPayloadSchema: z.ZodObject<{
+export type AssistantDeltaPayload = z.infer<typeof AssistantDeltaPayloadSchema>;
+export declare const AssistantDonePayloadSchema: z.ZodObject<{
     turnId: z.ZodString;
-    userMessage: z.ZodOptional<z.ZodString>;
-}, "strip", z.ZodTypeAny, {
+    finalText: z.ZodString;
+    finishReason: z.ZodString;
+}, "strict", z.ZodTypeAny, {
     turnId: string;
-    userMessage?: string | undefined;
+    finalText: string;
+    finishReason: string;
 }, {
     turnId: string;
-    userMessage?: string | undefined;
+    finalText: string;
+    finishReason: string;
 }>;
-export type AgentTurnStartPayload = z.infer<typeof AgentTurnStartPayloadSchema>;
-export type AgentTurnStartSessionEvent = SessionEventEnvelope<AgentTurnStartPayload> & {
-    type: 'agent.turn_start';
-};
-export declare const AgentTurnEndPayloadSchema: z.ZodObject<{
-    turnId: z.ZodString;
-    finalMessage: z.ZodOptional<z.ZodString>;
-}, "strip", z.ZodTypeAny, {
-    turnId: string;
-    finalMessage?: string | undefined;
-}, {
-    turnId: string;
-    finalMessage?: string | undefined;
-}>;
-export type AgentTurnEndPayload = z.infer<typeof AgentTurnEndPayloadSchema>;
-export type AgentTurnEndSessionEvent = SessionEventEnvelope<AgentTurnEndPayload> & {
-    type: 'agent.turn_end';
-};
-export declare const AgentErrorPayloadSchema: z.ZodObject<{
+export type AssistantDonePayload = z.infer<typeof AssistantDonePayloadSchema>;
+export declare const AssistantErrorPayloadSchema: z.ZodObject<{
     errorMessage: z.ZodString;
     errorCode: z.ZodOptional<z.ZodString>;
     context: z.ZodOptional<z.ZodUnknown>;
-}, "strip", z.ZodTypeAny, {
+}, "strict", z.ZodTypeAny, {
     errorMessage: string;
     errorCode?: string | undefined;
     context?: unknown;
@@ -507,21 +329,175 @@ export declare const AgentErrorPayloadSchema: z.ZodObject<{
     errorCode?: string | undefined;
     context?: unknown;
 }>;
-export type AgentErrorPayload = z.infer<typeof AgentErrorPayloadSchema>;
-export type AgentErrorSessionEvent = SessionEventEnvelope<AgentErrorPayload> & {
-    type: 'agent.error';
+export type AssistantErrorPayload = z.infer<typeof AssistantErrorPayloadSchema>;
+export declare const EntityEventMetadataCoreSchema: z.ZodObject<{
+    tenantId: z.ZodOptional<z.ZodString>;
+    sourceTool: z.ZodEnum<["create-entity", "update-entity", "move-entity"]>;
+    timestamp: z.ZodString;
+}, "strict", z.ZodTypeAny, {
+    timestamp: string;
+    sourceTool: "create-entity" | "update-entity" | "move-entity";
+    tenantId?: string | undefined;
+}, {
+    timestamp: string;
+    sourceTool: "create-entity" | "update-entity" | "move-entity";
+    tenantId?: string | undefined;
+}>;
+export declare const EntityCreatedEventPayloadSchema: z.ZodObject<{
+    entityType: z.ZodString;
+    entityId: z.ZodString;
+    groupId: z.ZodString;
+    metadata: z.ZodObject<{
+        tenantId: z.ZodOptional<z.ZodString>;
+        timestamp: z.ZodString;
+    } & {
+        sourceTool: z.ZodLiteral<"create-entity">;
+    }, "strict", z.ZodTypeAny, {
+        timestamp: string;
+        sourceTool: "create-entity";
+        tenantId?: string | undefined;
+    }, {
+        timestamp: string;
+        sourceTool: "create-entity";
+        tenantId?: string | undefined;
+    }>;
+    data: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+}, "strict", z.ZodTypeAny, {
+    groupId: string;
+    entityType: string;
+    entityId: string;
+    metadata: {
+        timestamp: string;
+        sourceTool: "create-entity";
+        tenantId?: string | undefined;
+    };
+    data: Record<string, unknown>;
+}, {
+    groupId: string;
+    entityType: string;
+    entityId: string;
+    metadata: {
+        timestamp: string;
+        sourceTool: "create-entity";
+        tenantId?: string | undefined;
+    };
+    data: Record<string, unknown>;
+}>;
+export type EntityCreatedEventPayload = z.infer<typeof EntityCreatedEventPayloadSchema>;
+export declare const EntityUpdatedEventPayloadSchema: z.ZodObject<{
+    entityType: z.ZodString;
+    entityId: z.ZodString;
+    groupId: z.ZodString;
+    changedFields: z.ZodArray<z.ZodString, "many">;
+    changes: z.ZodRecord<z.ZodString, z.ZodUnknown>;
+    metadata: z.ZodObject<{
+        tenantId: z.ZodOptional<z.ZodString>;
+        timestamp: z.ZodString;
+    } & {
+        sourceTool: z.ZodLiteral<"update-entity">;
+    }, "strict", z.ZodTypeAny, {
+        timestamp: string;
+        sourceTool: "update-entity";
+        tenantId?: string | undefined;
+    }, {
+        timestamp: string;
+        sourceTool: "update-entity";
+        tenantId?: string | undefined;
+    }>;
+}, "strict", z.ZodTypeAny, {
+    groupId: string;
+    entityType: string;
+    entityId: string;
+    metadata: {
+        timestamp: string;
+        sourceTool: "update-entity";
+        tenantId?: string | undefined;
+    };
+    changedFields: string[];
+    changes: Record<string, unknown>;
+}, {
+    groupId: string;
+    entityType: string;
+    entityId: string;
+    metadata: {
+        timestamp: string;
+        sourceTool: "update-entity";
+        tenantId?: string | undefined;
+    };
+    changedFields: string[];
+    changes: Record<string, unknown>;
+}>;
+export type EntityUpdatedEventPayload = z.infer<typeof EntityUpdatedEventPayloadSchema>;
+export declare const EntityMovedEventPayloadSchema: z.ZodObject<{
+    entityType: z.ZodString;
+    entityId: z.ZodString;
+    sourceGroupId: z.ZodOptional<z.ZodString>;
+    targetGroupId: z.ZodString;
+    metadata: z.ZodObject<{
+        tenantId: z.ZodOptional<z.ZodString>;
+        timestamp: z.ZodString;
+    } & {
+        sourceTool: z.ZodLiteral<"move-entity">;
+    }, "strict", z.ZodTypeAny, {
+        timestamp: string;
+        sourceTool: "move-entity";
+        tenantId?: string | undefined;
+    }, {
+        timestamp: string;
+        sourceTool: "move-entity";
+        tenantId?: string | undefined;
+    }>;
+}, "strict", z.ZodTypeAny, {
+    entityType: string;
+    entityId: string;
+    metadata: {
+        timestamp: string;
+        sourceTool: "move-entity";
+        tenantId?: string | undefined;
+    };
+    targetGroupId: string;
+    sourceGroupId?: string | undefined;
+}, {
+    entityType: string;
+    entityId: string;
+    metadata: {
+        timestamp: string;
+        sourceTool: "move-entity";
+        tenantId?: string | undefined;
+    };
+    targetGroupId: string;
+    sourceGroupId?: string | undefined;
+}>;
+export type EntityMovedEventPayload = z.infer<typeof EntityMovedEventPayloadSchema>;
+export type PromptSendSessionEvent = SessionEventEnvelope<PromptSendPayload> & {
+    type: 'prompt.send';
+};
+export type PromptCancelSessionEvent = SessionEventEnvelope<PromptCancelPayload> & {
+    type: 'prompt.cancel';
+};
+export type QuestionAnswerSessionEvent = SessionEventEnvelope<QuestionAnswerPayload> & {
+    type: 'question.answer';
+};
+export type SessionUpdateSessionEvent = SessionEventEnvelope<SessionUpdatePayload> & {
+    type: 'session.update';
 };
 export type SessionSnapshotEvent = SessionEventEnvelope<SessionSnapshotPayload> & {
     type: 'session.snapshot';
 };
-export type SessionInfoUpdatedEvent = SessionEventEnvelope<SessionInfoResponse> & {
-    type: 'session.info.updated';
+export type SessionUpdatedEvent = SessionEventEnvelope<SessionUpdatedPayload> & {
+    type: 'session.updated';
 };
 export type SessionClosedEvent = SessionEventEnvelope<SessionClosedEventPayload> & {
     type: 'session.closed';
 };
-export type QuestionAskHubRequestEvent = SessionEventEnvelope<QuestionAskHubRequestPayload> & {
-    type: 'hub.request';
+export type AssistantDeltaSessionEvent = SessionEventEnvelope<AssistantDeltaPayload> & {
+    type: 'assistant.delta';
+};
+export type AssistantDoneSessionEvent = SessionEventEnvelope<AssistantDonePayload> & {
+    type: 'assistant.done';
+};
+export type AssistantErrorSessionEvent = SessionEventEnvelope<AssistantErrorPayload> & {
+    type: 'assistant.error';
 };
 export type EntityCreatedSessionEvent = SessionEventEnvelope<EntityCreatedEventPayload> & {
     type: 'entity.created';
@@ -532,9 +508,117 @@ export type EntityUpdatedSessionEvent = SessionEventEnvelope<EntityUpdatedEventP
 export type EntityMovedSessionEvent = SessionEventEnvelope<EntityMovedEventPayload> & {
     type: 'entity.moved';
 };
-export type McpPublishedSessionEvent = EntityCreatedSessionEvent | EntityUpdatedSessionEvent | EntityMovedSessionEvent;
-export type AgentSessionEvent = AgentTextDeltaSessionEvent | AgentToolStartSessionEvent | AgentToolEndSessionEvent | AgentTurnStartSessionEvent | AgentTurnEndSessionEvent | AgentErrorSessionEvent;
-export type KnownBridgeSessionWebSocketEvent = SessionSnapshotEvent | SessionInfoUpdatedEvent | SessionClosedEvent | HubRequestSessionEvent | HubResponseSessionEvent | McpPublishedSessionEvent | AgentSessionEvent;
-export type BridgeSessionWebSocketEvent = KnownBridgeSessionWebSocketEvent | SessionEventEnvelope;
-export type BridgeSessionWebSocketServerMessage = BridgeSessionWebSocketEvent | BridgeSessionWebSocketControlMessage;
+export declare const ChildTaskAcceptedPayloadSchema: z.ZodObject<{
+    childSessionId: z.ZodString;
+    parentSessionId: z.ZodString;
+    profileName: z.ZodString;
+    description: z.ZodString;
+    timestamp: z.ZodString;
+}, "strict", z.ZodTypeAny, {
+    description: string;
+    timestamp: string;
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+}, {
+    description: string;
+    timestamp: string;
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+}>;
+export type ChildTaskAcceptedPayload = z.infer<typeof ChildTaskAcceptedPayloadSchema>;
+export declare const ChildTaskStartedPayloadSchema: z.ZodObject<{
+    childSessionId: z.ZodString;
+    parentSessionId: z.ZodString;
+    profileName: z.ZodString;
+    startedAt: z.ZodString;
+}, "strict", z.ZodTypeAny, {
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+    startedAt: string;
+}, {
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+    startedAt: string;
+}>;
+export type ChildTaskStartedPayload = z.infer<typeof ChildTaskStartedPayloadSchema>;
+export declare const ChildTaskCompletedPayloadSchema: z.ZodObject<{
+    childSessionId: z.ZodString;
+    parentSessionId: z.ZodString;
+    profileName: z.ZodString;
+    completedAt: z.ZodString;
+    result: z.ZodOptional<z.ZodUnknown>;
+}, "strict", z.ZodTypeAny, {
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+    completedAt: string;
+    result?: unknown;
+}, {
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+    completedAt: string;
+    result?: unknown;
+}>;
+export type ChildTaskCompletedPayload = z.infer<typeof ChildTaskCompletedPayloadSchema>;
+export declare const ChildTaskFailedPayloadSchema: z.ZodObject<{
+    childSessionId: z.ZodString;
+    parentSessionId: z.ZodString;
+    profileName: z.ZodString;
+    failedAt: z.ZodString;
+    error: z.ZodString;
+}, "strict", z.ZodTypeAny, {
+    error: string;
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+    failedAt: string;
+}, {
+    error: string;
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+    failedAt: string;
+}>;
+export type ChildTaskFailedPayload = z.infer<typeof ChildTaskFailedPayloadSchema>;
+export declare const ChildTaskCancelledPayloadSchema: z.ZodObject<{
+    childSessionId: z.ZodString;
+    parentSessionId: z.ZodString;
+    profileName: z.ZodString;
+    cancelledAt: z.ZodString;
+    reason: z.ZodString;
+}, "strict", z.ZodTypeAny, {
+    reason: string;
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+    cancelledAt: string;
+}, {
+    reason: string;
+    childSessionId: string;
+    parentSessionId: string;
+    profileName: string;
+    cancelledAt: string;
+}>;
+export type ChildTaskCancelledPayload = z.infer<typeof ChildTaskCancelledPayloadSchema>;
+export type ChildTaskAcceptedSessionEvent = SessionEventEnvelope<ChildTaskAcceptedPayload> & {
+    type: 'child_task.accepted';
+};
+export type ChildTaskStartedSessionEvent = SessionEventEnvelope<ChildTaskStartedPayload> & {
+    type: 'child_task.started';
+};
+export type ChildTaskCompletedSessionEvent = SessionEventEnvelope<ChildTaskCompletedPayload> & {
+    type: 'child_task.completed';
+};
+export type ChildTaskFailedSessionEvent = SessionEventEnvelope<ChildTaskFailedPayload> & {
+    type: 'child_task.failed';
+};
+export type ChildTaskCancelledSessionEvent = SessionEventEnvelope<ChildTaskCancelledPayload> & {
+    type: 'child_task.cancelled';
+};
+export type KnownCopilotV1SessionEvent = PromptSendSessionEvent | PromptCancelSessionEvent | QuestionAnswerSessionEvent | SessionUpdateSessionEvent | SessionSnapshotEvent | SessionUpdatedEvent | SessionClosedEvent | AssistantDeltaSessionEvent | AssistantDoneSessionEvent | AssistantErrorSessionEvent | EntityCreatedSessionEvent | EntityUpdatedSessionEvent | EntityMovedSessionEvent | ChildTaskAcceptedSessionEvent | ChildTaskStartedSessionEvent | ChildTaskCompletedSessionEvent | ChildTaskFailedSessionEvent | ChildTaskCancelledSessionEvent;
 //# sourceMappingURL=copilot-ws-events.d.ts.map

@@ -16,15 +16,15 @@ Prefer clean solutions; avoid conservative patches that preserve bad structure.
 ## Source Structure
 
 ```
-src/lib/
-  index.ts              — Public exports: ChatWidget, adapters, types
-  types.ts              — ChatAdapter interface, StreamCallbacks, ChatRequest, QuestionRequest,
-                          ChatWidgetConfig, PublicQuestionHandler
-  style.css             — Widget stylesheet (also exported as @audako/chat-ui/style.css)
-  ChatWidget.svelte     — Root widget component; accepts ChatWidgetConfig + theme props
+  src/lib/
+    index.ts              — Public exports: ChatWidget, adapters, types
+    types.ts              — ChatAdapter interface, StreamCallbacks, ChatRequest, QuestionRequest,
+                            ChatWidgetConfig, PublicQuestionHandler
+    style.css             — Widget stylesheet (also exported as @audako/chat-ui/style.css)
+    ChatWidget.svelte     — Root widget component; accepts ChatWidgetConfig + theme props
   adapters/
-    websocket-adapter.ts — WebSocketAdapter: connects to copilot server via WebSocket.
-                          Handles real-time event streaming, text deltas, and tool reasoning.
+    socketio-adapter.ts  — SocketIOAdapter: connects to copilot server via Socket.IO.
+                          Handles prompt send/cancel, assistant streaming, questions, and session updates.
     mock-adapter.ts      — MockAdapter: local/demo usage, no network required
   chat/                 — Internal chat state and message management
   components/           — Internal UI components (message bubbles, composer, thinking block, etc.)
@@ -67,49 +67,47 @@ interface ChatAdapter {
 - `onThinking?(text: string)` — optional; combined reasoning + tool call log
 - `onQuestion?(question: QuestionRequest): Promise<string[]>` — optional
 
-## WebSocketAdapter Setup
-const adapter = new WebSocketAdapter({
-  websocketUrl: bootstrapResponse.websocketUrl,       // ws://host/api/session/:id/ws
-  sessionToken: bootstrapResponse.bridgeSessionToken, // from bootstrap response
-  sessionId: bootstrapResponse.sessionId,             // session identifier
+## SocketIOAdapter Setup
+const adapter = new SocketIOAdapter({
+  baseUrl,
+  sessionId: bootstrapResponse.sessionId,
+  realtime: bootstrapResponse.realtime,
 });
-await adapter.init(); // Connect WebSocket
+await adapter.init();
 ```
 
-Key `WebSocketAdapterConfig` options:
+Key `SocketIOAdapterConfig` options:
 
 | Option | Default | Purpose |
 |---|---|---|
-| `websocketUrl` | required | Copilot WebSocket endpoint |
-| `sessionToken` | required | Bridge session token for authentication |
+| `baseUrl` | required | Copilot server origin |
 | `sessionId` | required | Session identifier |
-| `bridgeUrl` | auto-inferred | Base HTTP URL for resolving requests (inferred from websocketUrl) |
+| `realtime` | required | Socket.IO transport descriptor from bootstrap |
 | `reconnectAttempts` | `5` | Maximum number of reconnection attempts |
-| `heartbeatIntervalMs`| `30000` | WebSocket heartbeat interval |
+| `commandAckTimeoutMs` | `8000` | Timeout for command acknowledgements |
 
 Runtime methods:
-- `adapter.init()` — establish WebSocket connection
-- `adapter.sendMessage(request, callbacks)` — send user message and register stream callbacks
-- `adapter.cancel()` — signal agent to stop current turn
+- `adapter.init()` — establish Socket.IO connection
+- `adapter.sendMessage(request, callbacks)` — send user prompt and register stream callbacks
+- `adapter.cancel()` — signal the current turn to stop
+- `adapter.updateSessionInfo(sessionInfo)` — update session metadata
 - `adapter.setPublicQuestionHandler(fn)` — wire up question prompts; called by ChatWidget automatically
 - `adapter.showQuestion(question, opts)` — programmatic question from outside the widget
 - `adapter.disconnect()` — close connection and clean up resources
 
 ## Event Handling
-## Event Handling
-`WebSocketAdapter` subscribes to standardized copilot events:
-- `agent.text_delta` — streams incremental text chunks
-- `agent.turn_start` — signals beginning of assistant response
-- `agent.turn_end` — signals end of response turn
-- `agent.tool_start` / `agent.tool_end` — tracks tool invocation and reasoning state
-- `hub.request` — handles interactive questions via `onQuestion` callback
+`SocketIOAdapter` subscribes to standardized copilot events:
+- `assistant.delta` — streams incremental text chunks
+- `assistant.done` — signals end of assistant response
+- `assistant.error` — reports request failures
+- `question.ask` — handles interactive questions via `onQuestion` callback
 
-The adapter accumulates text and reasoning content and emits via `onChunk(fullText)` and `onThinking(combined)`. Full accumulated text is always sent to the widget (not deltas).
+The adapter accumulates text and emits via `onChunk(fullText)`. Full accumulated text is always sent to the widget, not deltas.
 
 Typical usage with copilot-provisioned session:
 
 ```ts
-import { WebSocketAdapter } from '@audako/chat-ui';
+import { SocketIOAdapter } from '@audako/chat-ui';
 ```
 ## CSS Hooks (for host app overrides)
 
@@ -153,5 +151,5 @@ import { WebSocketAdapter } from '@audako/chat-ui';
 ## Public API Surface
 
 - Exports from `src/lib/index.ts` are the public API.
-- `ChatWidget`, `WebSocketAdapter`, `MockAdapter`, core types.
+- `ChatWidget`, `SocketIOAdapter`, `MockAdapter`, core types.
 - Removing or renaming exports is a breaking change for host apps — do it deliberately.

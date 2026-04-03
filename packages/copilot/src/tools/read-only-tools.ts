@@ -18,6 +18,6 @@ export function createReadOnlyTools(
     getTypeDefinitionTool,
     createGetEntityNameTool(audakoServices),
     createGetGroupPathTool(audakoServices),
-    createQueryEntitiesTool(sessionContext, audakoServices),
+    createQueryEntitiesTool(audakoServices),
   ];
 }

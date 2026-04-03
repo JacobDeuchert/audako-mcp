@@ -18,14 +18,35 @@ export const SessionBootstrapRequestSchema = z
     sessionInfo: SessionInfoFieldsSchema.optional(),
 })
     .strict();
-export const SessionBootstrapResponseSchema = z.object({
-    websocketPath: z.string(),
+export const RealtimeDescriptorSchema = z
+    .object({
+    transport: z.literal('socket.io'),
+    protocolVersion: z.literal('v1'),
+    namespace: z.literal('/session'),
+    path: z.literal('/socket.io'),
+    auth: z
+        .object({
+        type: z.literal('session_token'),
+        token: z.string(),
+    })
+        .strict(),
+    room: z
+        .object({
+        type: z.literal('session'),
+        id: z.string(),
+    })
+        .strict(),
+})
+    .strict();
+export const SessionBootstrapResponseSchema = z
+    .object({
     sessionId: z.string(),
-    bridgeSessionToken: z.string(),
     isNew: z.boolean(),
     scadaUrl: z.string(),
     sessionInfo: SessionInfoSnapshotSchema,
-});
+    realtime: RealtimeDescriptorSchema,
+})
+    .strict();
 export function isSessionInfoResponse(value) {
     return SessionInfoResponseSchema.safeParse(value).success;
 }

@@ -15,12 +15,15 @@
     "@audako/contracts": "^0.1.0",
     "@fastify/cors": "^8.4.0",
     "@fastify/websocket": "^8.3.1",
-    "@mariozechner/pi-agent-core": "^0.55.3",
-    "@mariozechner/pi-ai": "^0.55.3",
+    "@hono/node-server": "^1.19.11",
+    "@mariozechner/pi-agent-core": "^0.64.0",
+    "@mariozechner/pi-ai": "^0.64.0",
     "audako-core": "github:JacobDeuchert/audako-core",
     "dotenv": "^17.3.1",
     "fastify": "^4.25.0",
-    "pino": "^8.21.0"
+    "hono": "^4.12.8",
+    "pino": "^8.21.0",
+    "socket.io": "^4.8.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

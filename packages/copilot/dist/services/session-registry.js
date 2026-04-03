@@ -145,6 +145,13 @@ export class SessionRegistry {
             logger.error({ key, error: error instanceof Error ? error.message : String(error) }, 'Error removing session');
         }
     }
+    async removeSessionBySessionId(sessionId, reason = 'manual') {
+        const key = this.sessionIdToKey.get(sessionId);
+        if (!key) {
+            return;
+        }
+        await this.removeSession(key, reason);
+    }
     cleanupIdleSessions() {
         const now = Date.now();
         const keysToRemove = [];

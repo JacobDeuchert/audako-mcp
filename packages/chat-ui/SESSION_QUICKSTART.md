@@ -1,6 +1,6 @@
 # Session Quickstart (Copilot + chat-ui)
 
-This is the minimal client flow to bootstrap a session and run `@audako/chat-ui` over WebSocket.
+This is the minimal client flow to bootstrap a session and run `@audako/chat-ui` over Socket.IO.
 
 ## 1) Bootstrap a session
 
@@ -30,29 +30,27 @@ if (!bootstrapResponse.ok) {
 
 const bootstrap = await bootstrapResponse.json() as {
   sessionId: string;
-  websocketPath: string;
-  bridgeSessionToken: string;
+  realtime: {
+    transport: 'socket.io';
+    namespace: '/session';
+    path: string;
+    auth: {
+      type: 'session_token';
+      token: string;
+    };
+  };
 };
 ```
 
 ## 2) Create and initialize the adapter
 
 ```ts
-import { WebSocketAdapter } from '@audako/chat-ui';
+import { SocketIOAdapter } from '@audako/chat-ui';
 
-const adapter = new WebSocketAdapter({
+const adapter = new SocketIOAdapter({
   baseUrl,
-  websocketPath: bootstrap.websocketPath,
-  sessionToken: bootstrap.bridgeSessionToken,
+  realtime: bootstrap.realtime,
   sessionId: bootstrap.sessionId,
-  onDebugEvent: (event) => {
-    console.log(`[ws.${event.type}]`, event.payload);
-  },
-  onCustomEvent: (event) => {
-    if (event.type === 'my.tool.progress') {
-      console.log('Custom tool event', event.payload);
-    }
-  },
 });
 
 await adapter.init();
@@ -79,14 +77,14 @@ await adapter.init();
 
 ## 4) What is handled automatically
 
-- Sending chat input (`user_message`) and streaming response events (`agent.text_delta`, `agent.turn_start`, `agent.turn_end`, `agent.error`).
-- Interactive questions (`hub.request`) from copilot; `ChatWidget` shows the question UI and adapter replies with `hub.response`.
-- Heartbeat (`ping`/`pong`) and reconnect behavior.
-- Forwarding unhandled session events to `onCustomEvent`.
+- Sending prompts with `prompt.send` and streaming assistant text via `assistant.delta` and `assistant.done`.
+- Interactive questions via `question.ask`; `ChatWidget` shows the question UI and the adapter replies with `question.answer`.
+- Session metadata updates via `session.update`.
+- Socket.IO reconnection.
 
-## 5) Optional session metadata updates over WebSocket
+## 5) Optional session metadata updates
 
-You can push session metadata updates without HTTP:
+You can push session metadata updates over the realtime connection:
 
 ```ts
 await adapter.updateSessionInfo({
@@ -97,7 +95,7 @@ await adapter.updateSessionInfo({
 });
 ```
 
-The server applies the update and broadcasts `session.info.updated`.
+The server applies the update and acknowledges the command.
 
 ## 6) Teardown
 

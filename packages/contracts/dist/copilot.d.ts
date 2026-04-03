@@ -101,10 +101,61 @@ export declare const SessionBootstrapRequestSchema: z.ZodObject<{
     } | undefined;
 }>;
 export type SessionBootstrapRequest = z.infer<typeof SessionBootstrapRequestSchema>;
+export declare const RealtimeDescriptorSchema: z.ZodObject<{
+    transport: z.ZodLiteral<"socket.io">;
+    protocolVersion: z.ZodLiteral<"v1">;
+    namespace: z.ZodLiteral<"/session">;
+    path: z.ZodLiteral<"/socket.io">;
+    auth: z.ZodObject<{
+        type: z.ZodLiteral<"session_token">;
+        token: z.ZodString;
+    }, "strict", z.ZodTypeAny, {
+        type: "session_token";
+        token: string;
+    }, {
+        type: "session_token";
+        token: string;
+    }>;
+    room: z.ZodObject<{
+        type: z.ZodLiteral<"session">;
+        id: z.ZodString;
+    }, "strict", z.ZodTypeAny, {
+        type: "session";
+        id: string;
+    }, {
+        type: "session";
+        id: string;
+    }>;
+}, "strict", z.ZodTypeAny, {
+    path: "/socket.io";
+    transport: "socket.io";
+    protocolVersion: "v1";
+    namespace: "/session";
+    auth: {
+        type: "session_token";
+        token: string;
+    };
+    room: {
+        type: "session";
+        id: string;
+    };
+}, {
+    path: "/socket.io";
+    transport: "socket.io";
+    protocolVersion: "v1";
+    namespace: "/session";
+    auth: {
+        type: "session_token";
+        token: string;
+    };
+    room: {
+        type: "session";
+        id: string;
+    };
+}>;
+export type RealtimeDescriptor = z.infer<typeof RealtimeDescriptorSchema>;
 export declare const SessionBootstrapResponseSchema: z.ZodObject<{
-    websocketPath: z.ZodString;
     sessionId: z.ZodString;
-    bridgeSessionToken: z.ZodString;
     isNew: z.ZodBoolean;
     scadaUrl: z.ZodString;
     sessionInfo: z.ZodObject<{
@@ -127,7 +178,59 @@ export declare const SessionBootstrapResponseSchema: z.ZodObject<{
         app?: string | undefined;
         updatedAt?: string | undefined;
     }>;
-}, "strip", z.ZodTypeAny, {
+    realtime: z.ZodObject<{
+        transport: z.ZodLiteral<"socket.io">;
+        protocolVersion: z.ZodLiteral<"v1">;
+        namespace: z.ZodLiteral<"/session">;
+        path: z.ZodLiteral<"/socket.io">;
+        auth: z.ZodObject<{
+            type: z.ZodLiteral<"session_token">;
+            token: z.ZodString;
+        }, "strict", z.ZodTypeAny, {
+            type: "session_token";
+            token: string;
+        }, {
+            type: "session_token";
+            token: string;
+        }>;
+        room: z.ZodObject<{
+            type: z.ZodLiteral<"session">;
+            id: z.ZodString;
+        }, "strict", z.ZodTypeAny, {
+            type: "session";
+            id: string;
+        }, {
+            type: "session";
+            id: string;
+        }>;
+    }, "strict", z.ZodTypeAny, {
+        path: "/socket.io";
+        transport: "socket.io";
+        protocolVersion: "v1";
+        namespace: "/session";
+        auth: {
+            type: "session_token";
+            token: string;
+        };
+        room: {
+            type: "session";
+            id: string;
+        };
+    }, {
+        path: "/socket.io";
+        transport: "socket.io";
+        protocolVersion: "v1";
+        namespace: "/session";
+        auth: {
+            type: "session_token";
+            token: string;
+        };
+        room: {
+            type: "session";
+            id: string;
+        };
+    }>;
+}, "strict", z.ZodTypeAny, {
     sessionId: string;
     scadaUrl: string;
     sessionInfo: {
@@ -137,9 +240,21 @@ export declare const SessionBootstrapResponseSchema: z.ZodObject<{
         app?: string | undefined;
         updatedAt?: string | undefined;
     };
-    websocketPath: string;
-    bridgeSessionToken: string;
     isNew: boolean;
+    realtime: {
+        path: "/socket.io";
+        transport: "socket.io";
+        protocolVersion: "v1";
+        namespace: "/session";
+        auth: {
+            type: "session_token";
+            token: string;
+        };
+        room: {
+            type: "session";
+            id: string;
+        };
+    };
 }, {
     sessionId: string;
     scadaUrl: string;
@@ -150,11 +265,23 @@ export declare const SessionBootstrapResponseSchema: z.ZodObject<{
         app?: string | undefined;
         updatedAt?: string | undefined;
     };
-    websocketPath: string;
-    bridgeSessionToken: string;
     isNew: boolean;
+    realtime: {
+        path: "/socket.io";
+        transport: "socket.io";
+        protocolVersion: "v1";
+        namespace: "/session";
+        auth: {
+            type: "session_token";
+            token: string;
+        };
+        room: {
+            type: "session";
+            id: string;
+        };
+    };
 }>;
 export type SessionBootstrapResponse = z.infer<typeof SessionBootstrapResponseSchema>;
 export declare function isSessionInfoResponse(value: unknown): value is SessionInfoResponse;
-export type { BridgeSessionWebSocketEvent, EntityCreatedEventPayload, EntityCreatedSessionEvent, EntityMovedEventPayload, EntityMovedSessionEvent, EntityUpdatedEventPayload, EntityUpdatedSessionEvent, HubRequestPayload, HubRequestSessionEvent, HubResponsePayload, HubResponseSessionEvent, KnownBridgeSessionWebSocketEvent, McpPublishedSessionEvent, QuestionAskHubRequestEvent, QuestionAskHubRequestPayload, SessionClosedEvent, SessionClosedEventPayload, SessionEventEnvelope, SessionInfoUpdatedEvent, SessionSnapshotEvent, SessionSnapshotPayload, } from './copilot-ws-events.js';
+export type { AssistantDeltaPayload, AssistantDeltaSessionEvent, AssistantDonePayload, AssistantDoneSessionEvent, AssistantErrorPayload, AssistantErrorSessionEvent, CommandAcknowledgementPayload, CommandName, CopilotV1EventName, EntityCreatedEventPayload, EntityCreatedSessionEvent, EntityMovedEventPayload, EntityMovedSessionEvent, EntityUpdatedEventPayload, EntityUpdatedSessionEvent, KnownCopilotV1SessionEvent, PromptCancelPayload, PromptCancelSessionEvent, PromptSendPayload, PromptSendSessionEvent, QuestionAnswerPayload, QuestionAnswerSessionEvent, QuestionAskPayload, SessionClosedEvent, SessionClosedEventPayload, SessionCommand, SessionEventEnvelope, SessionSnapshotEvent, SessionSnapshotPayload, SessionUpdatedEvent, SessionUpdatedPayload, SessionUpdatePayload, SessionUpdateSessionEvent, } from './copilot-ws-events.js';
 //# sourceMappingURL=copilot.d.ts.map

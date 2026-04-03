@@ -1,54 +1,45 @@
-const WS_OPEN_STATE = 1;
-const WS_CLOSED_STATE = 3;
 export class SessionEventHub {
-    subscribers = new Map();
-    subscribe(sessionId, socket) {
-        const existing = this.subscribers.get(sessionId);
+    listeners = new Map();
+    subscribe(sessionId, listener) {
+        const existing = this.listeners.get(sessionId);
         if (existing) {
-            existing.add(socket);
-            return;
+            existing.add(listener);
         }
-        this.subscribers.set(sessionId, new Set([socket]));
+        else {
+            this.listeners.set(sessionId, new Set([listener]));
+        }
+        return () => {
+            this.unsubscribe(sessionId, listener);
+        };
     }
-    unsubscribe(sessionId, socket) {
-        const sockets = this.subscribers.get(sessionId);
-        if (!sockets) {
+    unsubscribe(sessionId, listener) {
+        const sessionListeners = this.listeners.get(sessionId);
+        if (!sessionListeners) {
             return;
         }
-        sockets.delete(socket);
-        if (sockets.size === 0) {
-            this.subscribers.delete(sessionId);
+        sessionListeners.delete(listener);
+        if (sessionListeners.size === 0) {
+            this.listeners.delete(sessionId);
         }
     }
     publish(sessionId, event) {
-        const sockets = this.subscribers.get(sessionId);
-        if (!sockets || sockets.size === 0) {
+        const sessionListeners = this.listeners.get(sessionId);
+        if (!sessionListeners || sessionListeners.size === 0) {
             return 0;
         }
-        const payload = JSON.stringify(event);
-        const staleSockets = [];
         let delivered = 0;
-        for (const socket of sockets) {
-            if (socket.readyState !== WS_OPEN_STATE) {
-                staleSockets.push(socket);
-                continue;
-            }
+        for (const listener of sessionListeners) {
             try {
-                socket.send(payload);
+                listener(event);
                 delivered += 1;
             }
-            catch {
-                staleSockets.push(socket);
-            }
-        }
-        for (const socket of staleSockets) {
-            this.unsubscribe(sessionId, socket);
+            catch { }
         }
         return delivered;
     }
     closeSession(sessionId, reason) {
-        const sockets = this.subscribers.get(sessionId);
-        if (!sockets || sockets.size === 0) {
+        const listeners = this.listeners.get(sessionId);
+        if (!listeners || listeners.size === 0) {
             return;
         }
         const event = {
@@ -58,32 +49,18 @@ export class SessionEventHub {
             payload: { reason },
         };
         this.publish(sessionId, event);
-        for (const socket of sockets) {
-            this.tryCloseSocket(socket, reason);
-        }
-        this.subscribers.delete(sessionId);
+        this.listeners.delete(sessionId);
     }
     closeAll(reason = 'server_shutdown') {
-        for (const sessionId of this.subscribers.keys()) {
+        for (const sessionId of this.listeners.keys()) {
             this.closeSession(sessionId, reason);
         }
     }
     getSubscriberCount(sessionId) {
-        return this.subscribers.get(sessionId)?.size ?? 0;
+        return this.listeners.get(sessionId)?.size ?? 0;
     }
     getActiveSessions() {
-        return Array.from(this.subscribers.keys());
-    }
-    tryCloseSocket(socket, reason) {
-        if (socket.readyState === WS_CLOSED_STATE) {
-            return;
-        }
-        try {
-            socket.close(1000, reason);
-        }
-        catch {
-            return;
-        }
+        return Array.from(this.listeners.keys());
     }
 }
 //# sourceMappingURL=session-event-hub.js.map

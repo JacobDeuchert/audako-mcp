@@ -12,25 +12,12 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
         switch (event.type) {
             case 'message_update': {
                 if (event.assistantMessageEvent.type === 'text_delta') {
-                    eventHub.publish(sessionId, buildSessionEvent('agent.text_delta', sessionId, {
+                    eventHub.publish(sessionId, buildSessionEvent('assistant.delta', sessionId, {
+                        kind: 'text',
                         index: event.assistantMessageEvent.contentIndex,
                         delta: event.assistantMessageEvent.delta,
                     }));
                 }
-                break;
-            }
-            case 'tool_execution_start': {
-                eventHub.publish(sessionId, buildSessionEvent('agent.tool_start', sessionId, {
-                    toolName: event.toolName,
-                    toolInput: event.args,
-                }));
-                break;
-            }
-            case 'tool_execution_end': {
-                eventHub.publish(sessionId, buildSessionEvent('agent.tool_end', sessionId, {
-                    toolName: event.toolName,
-                    toolOutput: event.result,
-                }));
                 break;
             }
             case 'turn_start': {
@@ -38,10 +25,6 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
                     break;
                 }
                 currentTurnId = generateTurnId();
-                eventHub.publish(sessionId, buildSessionEvent('agent.turn_start', sessionId, {
-                    turnId: currentTurnId,
-                    userMessage: undefined,
-                }));
                 break;
             }
             case 'turn_end': {
@@ -49,9 +32,10 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
                     break;
                 }
                 const turnId = currentTurnId || generateTurnId();
-                eventHub.publish(sessionId, buildSessionEvent('agent.turn_end', sessionId, {
+                eventHub.publish(sessionId, buildSessionEvent('assistant.done', sessionId, {
                     turnId,
-                    finalMessage: extractAssistantText(event.message),
+                    finalText: extractAssistantText(event.message),
+                    finishReason: extractFinishReason(event.message),
                 }));
                 currentTurnId = null;
                 break;
@@ -59,7 +43,7 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
             case 'agent_end': {
                 const errorMessage = agent.state?.error;
                 if (errorMessage) {
-                    eventHub.publish(sessionId, buildSessionEvent('agent.error', sessionId, {
+                    eventHub.publish(sessionId, buildSessionEvent('assistant.error', sessionId, {
                         errorMessage,
                     }));
                 }
@@ -87,7 +71,7 @@ function isToolUseTurn(message) {
 }
 function extractAssistantText(message) {
     if (!isAssistantMessage(message)) {
-        return undefined;
+        return '';
     }
     let text = '';
     for (const block of message.content) {
@@ -96,8 +80,13 @@ function extractAssistantText(message) {
         }
         text += block.text;
     }
-    const trimmedText = text.trim();
-    return trimmedText || undefined;
+    return text.trim();
+}
+function extractFinishReason(message) {
+    if (!isAssistantMessage(message)) {
+        return 'unknown';
+    }
+    return message.stopReason;
 }
 function generateTurnId() {
     return `turn-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;

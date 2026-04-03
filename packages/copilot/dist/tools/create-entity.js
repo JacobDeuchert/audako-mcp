@@ -68,6 +68,14 @@ export function createCreateEntityTool(deps) {
                 payload: {
                     entityType: contract.entityType,
                     entityId,
+                    groupId: typeof createdEntity.GroupId === 'string'
+                        ? createdEntity.GroupId
+                        : resolvedGroupId ?? '',
+                    metadata: {
+                        tenantId: deps.sessionContext.tenantId,
+                        sourceTool: 'create-entity',
+                        timestamp: new Date().toISOString(),
+                    },
                     data: contract.toPayload(createdEntity),
                 },
             });

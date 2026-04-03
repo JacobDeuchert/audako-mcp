@@ -54,21 +54,4 @@ export const appConfig = {
     // Logging
     logLevel,
 };
-/**
- * Load the system prompt for the OpenCode agent from prompts/scada-agent.md
- * @returns Promise resolving to the system prompt text
- * @throws Error if the file cannot be read
- */
-export async function loadSystemPrompt() {
-    try {
-        const { readFile } = await import('node:fs/promises');
-        const systemPromptPath = path.resolve(__dirname, '../../prompts/scada-agent.md');
-        const content = await readFile(systemPromptPath, 'utf-8');
-        return content;
-    }
-    catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to load system prompt: ${message}`);
-    }
-}
 //# sourceMappingURL=app-config.js.map

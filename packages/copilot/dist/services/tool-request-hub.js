@@ -11,13 +11,12 @@ export class ToolRequestHub {
         const timeoutMs = this.defaultTimeoutMs;
         const pendingRequest = this.requestHub.create(sessionId, timeoutMs);
         const event = {
-            type: 'hub.request',
+            type: 'question.ask',
             sessionId,
             timestamp: new Date().toISOString(),
             payload: {
-                requestId: pendingRequest.requestId,
-                requestType: 'question.ask',
-                payload: request,
+                questionId: pendingRequest.requestId,
+                request,
                 expiresAt: pendingRequest.expiresAt,
             },
         };

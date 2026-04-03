@@ -5,10 +5,13 @@ import type {
 } from '@audako/contracts';
 import type { Context, Hono } from 'hono';
 import { createSessionAgent } from '../agent/agent-factory.js';
+import { getProfile } from '../agent/profiles.js';
 import { createWsEventBridge } from '../agent/ws-event-bridge.js';
 import { createLogger } from '../config/app-config.js';
 import { createAudakoServices } from '../services/audako-services.js';
 import { UpstreamAuthError, validateUpstreamToken } from '../services/auth-validator.js';
+import { ChildSessionExecutor } from '../services/child-session-executor.js';
+import { ChildSessionManager } from '../services/child-session-runtime.js';
 import { DefaultPermissionService } from '../services/permission-service.js';
 import { SessionContext } from '../services/session-context.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
@@ -31,10 +34,19 @@ interface SessionRoutesDependencies {
 
 export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies): void {
   const { registry, eventHub, requestHub } = deps;
+  const childSessionManager = new ChildSessionManager(registry, eventHub);
   const toolRequestHub = new ToolRequestHub(requestHub, eventHub);
   const permissionService = new DefaultPermissionService(registry, toolRequestHub);
+  const childSessionExecutor = new ChildSessionExecutor({
+    registry,
+    eventHub,
+    childSessionManager,
+    requestHub: toolRequestHub,
+    permissionService,
+  });
   registry.onSessionRemoved(entry => {
     permissionService.clearSession(entry.sessionId);
+    childSessionManager.cancelChildSessionsForParent(entry.sessionId, 'parent_session_removed');
   });
 
   // ── Route map ────────────────────────────────────────────────────────
@@ -188,6 +200,8 @@ export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies
             eventHub,
             requestHub: toolRequestHub,
             permissionService,
+            childSessionExecutor,
+            profile: getProfile('primary'),
           });
 
           const wsEventBridgeUnsubscribe = createWsEventBridge(agent, sessionId, eventHub);

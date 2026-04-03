@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@audako/contracts": "^0.1.0",
-    "markdown-it": "^14.1.1"
+    "markdown-it": "^14.1.1",
+    "socket.io-client": "^4.8.3"
   }
 }

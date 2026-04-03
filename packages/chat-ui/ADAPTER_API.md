@@ -27,25 +27,26 @@ export interface ChatAdapter {
 
 `onChunk` and `onThinking` receive the accumulated text.
 
-## WebSocketAdapter custom events
+## Built-in adapters
 
-`WebSocketAdapter` accepts an `onCustomEvent` callback in config. Use it to consume session events that chat-ui does not handle directly.
+### SocketIOAdapter
 
 ```ts
-const adapter = new WebSocketAdapter({
+import { SocketIOAdapter } from '@audako/chat-ui';
+
+const adapter = new SocketIOAdapter({
   baseUrl,
-  websocketPath,
-  sessionToken,
   sessionId,
-  onCustomEvent: (event) => {
-    if (event.type === 'my.tool.progress') {
-      console.log(event.payload);
-    }
-  },
+  realtime: bootstrap.realtime,
 });
 ```
 
-## Built-in adapters
+`SocketIOAdapter` also supports:
+
+- `adapter.init()`
+- `adapter.cancel()`
+- `adapter.updateSessionInfo(sessionInfo)`
+- `adapter.disconnect()`
 
 ### MockAdapter
 
@@ -53,34 +54,6 @@ const adapter = new WebSocketAdapter({
 import { MockAdapter } from '@audako/chat-ui';
 
 const adapter = new MockAdapter({ showThinking: true });
-```
-
-### OpenAIAdapter
-
-```ts
-import { OpenAIAdapter } from '@audako/chat-ui';
-
-const adapter = new OpenAIAdapter({
-  apiKey: 'your-api-key',
-  apiUrl: 'https://api.openai.com/v1/chat/completions',
-  model: 'gpt-4o-mini',
-  systemPrompt: 'You are a helpful assistant.'
-});
-```
-
-### OpenCodeAdapter
-
-```ts
-import { OpenCodeAdapter } from '@audako/chat-ui';
-
-const adapter = new OpenCodeAdapter({
-  baseUrl: 'http://localhost:4096',
-  model: {
-    providerID: 'anthropic',
-    modelID: 'claude-haiku-4-5'
-  },
-  createSession: true
-});
 ```
 
 ## Widget usage with adapter

@@ -38,6 +38,11 @@ export const CopilotV1EventNames = [
   'entity.created',
   'entity.updated',
   'entity.moved',
+  'child_task.accepted',
+  'child_task.started',
+  'child_task.completed',
+  'child_task.failed',
+  'child_task.cancelled',
 ] as const;
 
 export const CopilotV1EventNameSchema = z.enum(CopilotV1EventNames);
@@ -151,9 +156,7 @@ export const AssistantDonePayloadSchema = z
   .object({
     turnId: z.string().describe('Server-generated assistant turn identifier.'),
     finalText: z.string().describe('Final assistant text content for the completed turn.'),
-    finishReason: z
-      .string()
-      .describe('Assistant stop reason reported when the turn completed.'),
+    finishReason: z.string().describe('Assistant stop reason reported when the turn completed.'),
   })
   .strict();
 export type AssistantDonePayload = z.infer<typeof AssistantDonePayloadSchema>;
@@ -267,6 +270,82 @@ export type EntityMovedSessionEvent = SessionEventEnvelope<EntityMovedEventPaylo
   type: 'entity.moved';
 };
 
+// Child task lifecycle events
+
+export const ChildTaskAcceptedPayloadSchema = z
+  .object({
+    childSessionId: z.string(),
+    parentSessionId: z.string(),
+    profileName: z.string(),
+    description: z.string(),
+    timestamp: z.string(),
+  })
+  .strict();
+export type ChildTaskAcceptedPayload = z.infer<typeof ChildTaskAcceptedPayloadSchema>;
+
+export const ChildTaskStartedPayloadSchema = z
+  .object({
+    childSessionId: z.string(),
+    parentSessionId: z.string(),
+    profileName: z.string(),
+    startedAt: z.string(),
+  })
+  .strict();
+export type ChildTaskStartedPayload = z.infer<typeof ChildTaskStartedPayloadSchema>;
+
+export const ChildTaskCompletedPayloadSchema = z
+  .object({
+    childSessionId: z.string(),
+    parentSessionId: z.string(),
+    profileName: z.string(),
+    completedAt: z.string(),
+    result: z.unknown().optional(),
+  })
+  .strict();
+export type ChildTaskCompletedPayload = z.infer<typeof ChildTaskCompletedPayloadSchema>;
+
+export const ChildTaskFailedPayloadSchema = z
+  .object({
+    childSessionId: z.string(),
+    parentSessionId: z.string(),
+    profileName: z.string(),
+    failedAt: z.string(),
+    error: z.string(),
+  })
+  .strict();
+export type ChildTaskFailedPayload = z.infer<typeof ChildTaskFailedPayloadSchema>;
+
+export const ChildTaskCancelledPayloadSchema = z
+  .object({
+    childSessionId: z.string(),
+    parentSessionId: z.string(),
+    profileName: z.string(),
+    cancelledAt: z.string(),
+    reason: z.string(),
+  })
+  .strict();
+export type ChildTaskCancelledPayload = z.infer<typeof ChildTaskCancelledPayloadSchema>;
+
+export type ChildTaskAcceptedSessionEvent = SessionEventEnvelope<ChildTaskAcceptedPayload> & {
+  type: 'child_task.accepted';
+};
+
+export type ChildTaskStartedSessionEvent = SessionEventEnvelope<ChildTaskStartedPayload> & {
+  type: 'child_task.started';
+};
+
+export type ChildTaskCompletedSessionEvent = SessionEventEnvelope<ChildTaskCompletedPayload> & {
+  type: 'child_task.completed';
+};
+
+export type ChildTaskFailedSessionEvent = SessionEventEnvelope<ChildTaskFailedPayload> & {
+  type: 'child_task.failed';
+};
+
+export type ChildTaskCancelledSessionEvent = SessionEventEnvelope<ChildTaskCancelledPayload> & {
+  type: 'child_task.cancelled';
+};
+
 export type KnownCopilotV1SessionEvent =
   | PromptSendSessionEvent
   | PromptCancelSessionEvent
@@ -280,4 +359,9 @@ export type KnownCopilotV1SessionEvent =
   | AssistantErrorSessionEvent
   | EntityCreatedSessionEvent
   | EntityUpdatedSessionEvent
-  | EntityMovedSessionEvent;
+  | EntityMovedSessionEvent
+  | ChildTaskAcceptedSessionEvent
+  | ChildTaskStartedSessionEvent
+  | ChildTaskCompletedSessionEvent
+  | ChildTaskFailedSessionEvent
+  | ChildTaskCancelledSessionEvent;

@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { type Context, Hono, type Next } from 'hono';
 import { cors } from 'hono/cors';
 import { appConfig, createLogger } from './config/app-config.js';
 import { SessionSocketIoGateway } from './gateway/session-socketio-gateway.js';
@@ -31,11 +31,11 @@ export async function createServer(): Promise<CopilotServer> {
   app.use(
     '*',
     cors({
-      origin: appConfig.cors.origins.length === 0 ? '*' : appConfig.cors.origins,
+      origin: appConfig.cors.origins.length === 0 || appConfig.cors.origins.includes('*') ? '*' : appConfig.cors.origins,
     }),
   );
 
-  app.use('*', async (context, next) => {
+  app.use('*', async (context: Context, next: Next) => {
     const startedAt = Date.now();
     await next();
 
@@ -66,7 +66,7 @@ export async function createServer(): Promise<CopilotServer> {
     sessionSocketGateway.handleSessionExpired(entry.sessionId, reason);
   });
 
-  app.get('/health', context => {
+  app.get('/health', (context: Context) => {
     return context.json({
       status: 'ok' as const,
       activeSessions: sessionRegistry.getActiveSessionCount(),

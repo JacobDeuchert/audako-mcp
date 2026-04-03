@@ -31,11 +31,22 @@ export class DefaultPermissionService {
     sessionRegistry;
     toolRequestHub;
     grants = new Map();
+    delegatedScopes = new Map();
     constructor(sessionRegistry, toolRequestHub) {
         this.sessionRegistry = sessionRegistry;
         this.toolRequestHub = toolRequestHub;
     }
     async hasPermission(sessionId, entityType, requestedGroupId, permissionMode, tool) {
+        const delegatedScope = this.delegatedScopes.get(sessionId);
+        if (delegatedScope) {
+            if (!requestedGroupId) {
+                throw new Error(`Mutation blocked: ${tool} targets ${entityType} without a groupId and cannot be evaluated against delegated scope for child session ${sessionId}.`);
+            }
+            if (this.hasDelegatedPermission(sessionId, entityType, requestedGroupId)) {
+                return true;
+            }
+            throw new Error(`Mutation blocked: ${tool} targets ${entityType} in group ${requestedGroupId} which is outside delegated child scope.`);
+        }
         const session = this.sessionRegistry.getSession(sessionId);
         if (!session) {
             throw new Error(`Session not found: ${sessionId}`);
@@ -85,6 +96,31 @@ export class DefaultPermissionService {
         logger.info({ sessionId, entityType, requestedGroupId, tool }, 'Out-of-scope permission granted by user');
         return true;
     }
+    grantDelegatedScope(parentSessionId, childSessionId, scope) {
+        const normalizedScope = {
+            entityTypes: normalizeScopeValues(scope.entityTypes),
+            groupIds: normalizeScopeValues(scope.groupIds),
+            grantedAt: scope.grantedAt,
+        };
+        this.delegatedScopes.set(childSessionId, normalizedScope);
+        logger.info({
+            parentSessionId,
+            childSessionId,
+            entityTypes: normalizedScope.entityTypes,
+            groupIds: normalizedScope.groupIds,
+            grantedAt: normalizedScope.grantedAt,
+        }, 'Delegated child scope granted');
+    }
+    hasDelegatedPermission(childSessionId, entityType, groupId) {
+        const delegatedScope = this.delegatedScopes.get(childSessionId);
+        if (!delegatedScope) {
+            return false;
+        }
+        return (delegatedScope.entityTypes.includes(entityType) && delegatedScope.groupIds.includes(groupId));
+    }
+    clearDelegatedScope(childSessionId) {
+        this.delegatedScopes.delete(childSessionId);
+    }
     async isGroupInScope(entityService, contextGroupId, targetGroupId) {
         try {
             const targetGroup = await entityService.getPartialEntityById(EntityType.Group, targetGroupId, {
@@ -99,6 +135,13 @@ export class DefaultPermissionService {
     }
     clearSession(sessionId) {
         this.grants.delete(sessionId);
+        this.clearDelegatedScope(sessionId);
     }
+}
+function normalizeScopeValues(values) {
+    return Array.from(new Set(values
+        .filter(value => typeof value === 'string')
+        .map(value => value.trim())
+        .filter(value => value.length > 0)));
 }
 //# sourceMappingURL=permission-service.js.map

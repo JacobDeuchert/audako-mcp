@@ -6,7 +6,6 @@ import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { StringEnum, Type } from '@mariozechner/pi-ai';
 import { resolveContract } from '../entity-type-definitions/contract-registry.js';
 import type { AudakoServices } from '../services/audako-services.js';
-import type { SessionContext } from '../services/session-context.js';
 import { listTypeKeys } from '../services/type-registry.js';
 import { isRecord, toErrorResponse, toTextResponse } from './helpers.js';
 
@@ -17,7 +16,7 @@ const queryEntitiesSchema = Type.Object({
   scopeId: Type.Optional(
     Type.String({
       description:
-        'Optional scope identifier. If omitted, groupId or tenantId is taken from session info based on scope.',
+        'Required for non-global scopes. Use get_session_info to resolve the correct ID.',
     }),
   ),
   entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
@@ -28,6 +27,19 @@ const queryEntitiesSchema = Type.Object({
       description:
         'REQUIRED: Mongo-style filter object that supports logical operators like $and, $or, $not, and $nor.',
     },
+  ),
+  skip: Type.Optional(
+    Type.Number({ description: 'Number of entities to skip for pagination.', minimum: 0 }),
+  ),
+  limit: Type.Number({
+    description: 'Maximum number of entities to return. Required — always set an appropriate limit.',
+    minimum: 1,
+  }),
+  includeFullEntity: Type.Optional(
+    Type.Boolean({
+      description:
+        'Return full entity. Defaults to false, returning only Id, Name, Description, and GroupId.',
+    }),
   ),
 });
 
@@ -40,16 +52,18 @@ function isValidFilter(filter: unknown): filter is Record<string, unknown> {
 }
 
 export function createQueryEntitiesTool(
-  sessionContext: SessionContext,
   audakoServices: AudakoServices,
 ): AgentTool<typeof queryEntitiesSchema> {
   return {
     name: 'query_entities',
     label: 'Query Entities',
     description:
-      'Query entities by scope with a Mongo-style filter object. Supports $and, $or, $not, and $nor operators.',
+      'Query entities by scope with a Mongo-style filter object. Supports $and, $or, $not, and $nor operators. Returns matched entities and a total count for pagination.',
     parameters: queryEntitiesSchema,
-    execute: async (_toolCallId, { scope, scopeId, entityType, filter }) => {
+    execute: async (
+      _toolCallId,
+      { scope, scopeId, entityType, filter, skip, limit, includeFullEntity },
+    ) => {
       const contract = resolveContract(entityType);
       if (!contract) {
         const supportedTypes = listTypeKeys();
@@ -64,15 +78,12 @@ export function createQueryEntitiesTool(
 
       let resolvedScopeId: string | undefined;
       if (scope !== 'global') {
-        if (hasNonEmptyScopeId(scopeId)) {
-          resolvedScopeId = scopeId.trim();
-        } else {
-          resolvedScopeId = scope === 'tenant' ? sessionContext.tenantId : sessionContext.groupId;
+        if (!hasNonEmptyScopeId(scopeId)) {
+          return toErrorResponse(
+            `'scopeId' is required for scope '${scope}'. Call get_session_info first to resolve the correct ID.`,
+          );
         }
-
-        if (!resolvedScopeId) {
-          return toErrorResponse(`No '${scope}' scope ID provided and none found in session info.`);
-        }
+        resolvedScopeId = scopeId.trim();
       }
 
       let scopedFilter: Record<string, unknown> = filter;
@@ -110,21 +121,30 @@ export function createQueryEntitiesTool(
       }
 
       try {
+        const paging = { skip: skip ?? 0, limit };
+
+        const projection = includeFullEntity
+          ? undefined
+          : { Id: 1, Name: 1, Description: 1, GroupId: 1 };
+
         const queryResult = await audakoServices.entityService.queryConfiguration(
           contract.entityType,
           scopedFilter,
+          paging,
+          projection,
         );
 
-        const entities = queryResult.data.map(entity => {
-          try {
-            return contract.toPayload(entity as any);
-          } catch {
-            return entity as Record<string, unknown>;
-          }
-        });
+        const entities = includeFullEntity
+          ? queryResult.data.map(entity => {
+              try {
+                return contract.toPayload(entity as any);
+              } catch {
+                return entity as Record<string, unknown>;
+              }
+            })
+          : queryResult.data;
 
         return toTextResponse({
-          message: `${contract.key} query completed successfully.`,
           entityType: contract.key,
           scope: scopePayload,
           count: entities.length,

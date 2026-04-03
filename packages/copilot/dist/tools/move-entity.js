@@ -25,11 +25,13 @@ export function createMoveEntityTool(deps) {
                 throw new Error(`Unsupported entity type '${params.entityType}'.`);
             }
             await deps.permissionService.hasPermission(sessionId, params.entityType, params.targetGroupId, normalizePermissionMode(params.permissionMode), 'move_entity');
+            const existingEntity = await deps.audakoServices.entityService.getPartialEntityById(contract.entityType, params.entityId, { GroupId: 1 });
+            const currentGroupId = existingEntity.GroupId;
             await deps.mutationThrottle.run(async () => {
                 await deps.audakoServices.entityService.moveTo(params.entityId, params.targetGroupId, contract.entityType);
             });
-            const fromGroupId = deps.sessionContext.groupId ?? params.targetGroupId;
-            const toGroupId = params.targetGroupId;
+            const sourceGroupId = typeof currentGroupId === 'string' ? currentGroupId : undefined;
+            const targetGroupId = params.targetGroupId;
             deps.eventHub.publish(sessionId, {
                 type: 'entity.moved',
                 sessionId,
@@ -37,8 +39,13 @@ export function createMoveEntityTool(deps) {
                 payload: {
                     entityType: contract.entityType,
                     entityId: params.entityId,
-                    fromGroupId,
-                    toGroupId,
+                    sourceGroupId,
+                    targetGroupId,
+                    metadata: {
+                        tenantId: deps.sessionContext.tenantId,
+                        sourceTool: 'move-entity',
+                        timestamp: new Date().toISOString(),
+                    },
                 },
             });
             return {
@@ -51,8 +58,8 @@ export function createMoveEntityTool(deps) {
                 details: {
                     entityType: contract.entityType,
                     entityId: params.entityId,
-                    fromGroupId,
-                    toGroupId,
+                    sourceGroupId,
+                    targetGroupId,
                 },
             };
         },

@@ -9,6 +9,12 @@ const logger = createLogger('permission-service');
 
 export type PermissionMode = 'interactive' | 'fail_fast';
 
+export interface DelegatedScope {
+  entityTypes: string[];
+  groupIds: string[];
+  grantedAt: string;
+}
+
 export function normalizePermissionMode(mode: unknown): PermissionMode {
   return mode === 'fail_fast' ? 'fail_fast' : 'interactive';
 }
@@ -21,6 +27,9 @@ export interface PermissionService {
     permissionMode: PermissionMode,
     tool: string,
   ): Promise<boolean>;
+  grantDelegatedScope(parentSessionId: string, childSessionId: string, scope: DelegatedScope): void;
+  hasDelegatedPermission(childSessionId: string, entityType: string, groupId: string): boolean;
+  clearDelegatedScope(childSessionId: string): void;
 }
 
 const ALLOW_OPTION = 'Allow';
@@ -53,6 +62,7 @@ function normalizeGroupPath(pathValue: unknown, targetGroupId: string): string[]
 
 export class DefaultPermissionService implements PermissionService {
   private readonly grants = new Map<string, Set<string>>();
+  private readonly delegatedScopes = new Map<string, DelegatedScope>();
 
   constructor(
     private readonly sessionRegistry: SessionRegistry,
@@ -66,6 +76,23 @@ export class DefaultPermissionService implements PermissionService {
     permissionMode: PermissionMode,
     tool: string,
   ): Promise<boolean> {
+    const delegatedScope = this.delegatedScopes.get(sessionId);
+    if (delegatedScope) {
+      if (!requestedGroupId) {
+        throw new Error(
+          `Mutation blocked: ${tool} targets ${entityType} without a groupId and cannot be evaluated against delegated scope for child session ${sessionId}.`,
+        );
+      }
+
+      if (this.hasDelegatedPermission(sessionId, entityType, requestedGroupId)) {
+        return true;
+      }
+
+      throw new Error(
+        `Mutation blocked: ${tool} targets ${entityType} in group ${requestedGroupId} which is outside delegated child scope.`,
+      );
+    }
+
     const session = this.sessionRegistry.getSession(sessionId);
     if (!session) {
       throw new Error(`Session not found: ${sessionId}`);
@@ -138,6 +165,45 @@ export class DefaultPermissionService implements PermissionService {
     return true;
   }
 
+  grantDelegatedScope(
+    parentSessionId: string,
+    childSessionId: string,
+    scope: DelegatedScope,
+  ): void {
+    const normalizedScope: DelegatedScope = {
+      entityTypes: normalizeScopeValues(scope.entityTypes),
+      groupIds: normalizeScopeValues(scope.groupIds),
+      grantedAt: scope.grantedAt,
+    };
+
+    this.delegatedScopes.set(childSessionId, normalizedScope);
+    logger.info(
+      {
+        parentSessionId,
+        childSessionId,
+        entityTypes: normalizedScope.entityTypes,
+        groupIds: normalizedScope.groupIds,
+        grantedAt: normalizedScope.grantedAt,
+      },
+      'Delegated child scope granted',
+    );
+  }
+
+  hasDelegatedPermission(childSessionId: string, entityType: string, groupId: string): boolean {
+    const delegatedScope = this.delegatedScopes.get(childSessionId);
+    if (!delegatedScope) {
+      return false;
+    }
+
+    return (
+      delegatedScope.entityTypes.includes(entityType) && delegatedScope.groupIds.includes(groupId)
+    );
+  }
+
+  clearDelegatedScope(childSessionId: string): void {
+    this.delegatedScopes.delete(childSessionId);
+  }
+
   private async isGroupInScope(
     entityService: AudakoServices['entityService'],
     contextGroupId: string,
@@ -160,5 +226,17 @@ export class DefaultPermissionService implements PermissionService {
 
   clearSession(sessionId: string): void {
     this.grants.delete(sessionId);
+    this.clearDelegatedScope(sessionId);
   }
+}
+
+function normalizeScopeValues(values: string[]): string[] {
+  return Array.from(
+    new Set(
+      values
+        .filter(value => typeof value === 'string')
+        .map(value => value.trim())
+        .filter(value => value.length > 0),
+    ),
+  );
 }

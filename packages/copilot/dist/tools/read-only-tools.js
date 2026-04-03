@@ -11,7 +11,7 @@ export function createReadOnlyTools(sessionContext, audakoServices) {
         getTypeDefinitionTool,
         createGetEntityNameTool(audakoServices),
         createGetGroupPathTool(audakoServices),
-        createQueryEntitiesTool(sessionContext, audakoServices),
+        createQueryEntitiesTool(audakoServices),
     ];
 }
 //# sourceMappingURL=read-only-tools.js.map

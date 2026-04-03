@@ -6,6 +6,11 @@ import {
 } from './copilot.js';
 import {
   AssistantDonePayloadSchema,
+  ChildTaskAcceptedPayloadSchema,
+  ChildTaskCancelledPayloadSchema,
+  ChildTaskCompletedPayloadSchema,
+  ChildTaskFailedPayloadSchema,
+  ChildTaskStartedPayloadSchema,
   CommandAcknowledgementPayloadSchema,
   CopilotV1EventNameSchema,
   CopilotV1EventNames,
@@ -98,6 +103,11 @@ describe('@audako/contracts - Copilot v1 Socket.IO contracts', () => {
       'entity.created',
       'entity.updated',
       'entity.moved',
+      'child_task.accepted',
+      'child_task.started',
+      'child_task.completed',
+      'child_task.failed',
+      'child_task.cancelled',
     ]);
 
     expect(CopilotV1EventNameSchema.safeParse('hub.request').success).toBe(false);
@@ -108,6 +118,8 @@ describe('@audako/contracts - Copilot v1 Socket.IO contracts', () => {
     expect(CopilotV1EventNameSchema.safeParse('agent.tool_end').success).toBe(false);
     expect(CopilotV1EventNameSchema.safeParse('agent.turn_start').success).toBe(false);
     expect(CopilotV1EventNameSchema.safeParse('agent.turn_end').success).toBe(false);
+    expect(CopilotV1EventNameSchema.safeParse('child_session.created').success).toBe(false);
+    expect(CopilotV1EventNameSchema.safeParse('child_session.completed').success).toBe(false);
   });
 
   it('validates command acknowledgement payloads', () => {
@@ -202,6 +214,94 @@ describe('@audako/contracts - Copilot v1 Socket.IO contracts', () => {
     expect(created.success).toBe(true);
     expect(updated.success).toBe(true);
     expect(moved.success).toBe(true);
+  });
+
+  it('validates child_task lifecycle payloads', () => {
+    const accepted = ChildTaskAcceptedPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+      parentSessionId: 'parent_sess_1',
+      profileName: 'diagnostics',
+      description: 'Run system diagnostics',
+      timestamp: '2026-01-01T00:00:00.000Z',
+    });
+
+    const started = ChildTaskStartedPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+      parentSessionId: 'parent_sess_1',
+      profileName: 'diagnostics',
+      startedAt: '2026-01-01T00:00:01.000Z',
+    });
+
+    const completed = ChildTaskCompletedPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+      parentSessionId: 'parent_sess_1',
+      profileName: 'diagnostics',
+      completedAt: '2026-01-01T00:01:00.000Z',
+      result: { status: 'ok' },
+    });
+
+    const failed = ChildTaskFailedPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+      parentSessionId: 'parent_sess_1',
+      profileName: 'diagnostics',
+      failedAt: '2026-01-01T00:01:00.000Z',
+      error: 'Connection timeout',
+    });
+
+    const cancelled = ChildTaskCancelledPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+      parentSessionId: 'parent_sess_1',
+      profileName: 'diagnostics',
+      cancelledAt: '2026-01-01T00:00:30.000Z',
+      reason: 'User cancelled',
+    });
+
+    expect(accepted.success).toBe(true);
+    expect(started.success).toBe(true);
+    expect(completed.success).toBe(true);
+    expect(failed.success).toBe(true);
+    expect(cancelled.success).toBe(true);
+  });
+
+  it('rejects malformed child_task payloads', () => {
+    const acceptedMissingFields = ChildTaskAcceptedPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+    });
+
+    const startedWrongType = ChildTaskStartedPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+      parentSessionId: 'parent_sess_1',
+      profileName: 'diagnostics',
+      startedAt: 12345,
+    });
+
+    const completedExtraField = ChildTaskCompletedPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+      parentSessionId: 'parent_sess_1',
+      profileName: 'diagnostics',
+      completedAt: '2026-01-01T00:01:00.000Z',
+      status: 'done',
+    });
+
+    const failedMissingError = ChildTaskFailedPayloadSchema.safeParse({
+      childSessionId: 'child_sess_1',
+      parentSessionId: 'parent_sess_1',
+      profileName: 'diagnostics',
+      failedAt: '2026-01-01T00:01:00.000Z',
+    });
+
+    const cancelledLegacyShape = ChildTaskCancelledPayloadSchema.safeParse({
+      sessionId: 'child_sess_1',
+      parentId: 'parent_sess_1',
+      cancelledAt: '2026-01-01T00:00:30.000Z',
+      reason: 'User cancelled',
+    });
+
+    expect(acceptedMissingFields.success).toBe(false);
+    expect(startedWrongType.success).toBe(false);
+    expect(completedExtraField.success).toBe(false);
+    expect(failedMissingError.success).toBe(false);
+    expect(cancelledLegacyShape.success).toBe(false);
   });
 
   it('provides question.ask payload schema but no legacy websocket exports', () => {
