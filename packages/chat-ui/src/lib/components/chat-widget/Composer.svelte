@@ -1,6 +1,18 @@
 <script lang="ts">
+import '@mariozechner/pi-web-ui';
 import type { SlashCommand } from '../../types';
 import SlashCommandMenu from './SlashCommandMenu.svelte';
+
+type MessageEditorElement = HTMLElement & {
+  value: string;
+  isStreaming: boolean;
+  showAttachmentButton: boolean;
+  showModelSelector: boolean;
+  showThinkingSelector: boolean;
+  onInput?: (value: string) => void;
+  onSend?: (input: string, attachments: unknown[]) => void;
+  onAbort?: () => void;
+};
 
 let {
   draft,
@@ -24,10 +36,10 @@ let {
   onSlashCommand?: (command: SlashCommand) => void;
 } = $props();
 
-const MAX_TEXTAREA_HEIGHT = 160;
-
-let textArea = $state<HTMLTextAreaElement | undefined>();
+let editorElement = $state<MessageEditorElement | undefined>();
+let editorTextarea = $state<HTMLTextAreaElement | undefined>();
 let selectedCommandIndex = $state(0);
+let preventedInitialAutofocus = false;
 
 const slashQuery = $derived(
   draft.startsWith('/') ? draft.slice(1).toLowerCase() : null,
@@ -35,41 +47,29 @@ const slashQuery = $derived(
 
 const filteredCommands = $derived(
   slashQuery !== null
-    ? slashCommands.filter(cmd =>
-        cmd.name.toLowerCase().startsWith(slashQuery),
+    ? slashCommands.filter(command =>
+        command.name.toLowerCase().startsWith(slashQuery),
       )
     : [],
 );
 
 const showSlashMenu = $derived(slashQuery !== null && filteredCommands.length > 0);
 
-const isSendDisabled = $derived(!draft.trim() || disabled || showSlashMenu);
-
-// Reset selection when filtered list changes
-$effect(() => {
-  filteredCommands;
-  selectedCommandIndex = 0;
-});
-
-const resizeTextarea = (element: HTMLTextAreaElement | undefined = textArea) => {
-  if (!element) {
-    return;
-  }
-
-  element.style.height = 'auto';
-  const nextHeight = Math.min(element.scrollHeight, MAX_TEXTAREA_HEIGHT);
-  element.style.height = `${nextHeight}px`;
-  element.style.overflowY = element.scrollHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden';
+const focusEditor = () => {
+  editorTextarea?.focus();
 };
 
 const selectSlashCommand = (command: SlashCommand) => {
   onSlashCommand?.(command);
   onDraftChange('');
+  requestAnimationFrame(focusEditor);
 };
 
-const handleSubmit = (event: Event) => {
-  event.preventDefault();
+const handleEditorInput = (value: string) => {
+  onDraftChange(value);
+};
 
+const handleEditorSend = (_input: string, _attachments: unknown[]) => {
   if (showSlashMenu) {
     const command = filteredCommands[selectedCommandIndex];
     if (command) {
@@ -78,84 +78,125 @@ const handleSubmit = (event: Event) => {
     return;
   }
 
-  if (isSendDisabled) {
+  if (!draft.trim() || disabled) {
     return;
   }
 
   onSubmit();
 };
-const handleInputKeydown = (event: KeyboardEvent) => {
-  if (event.isComposing) {
+
+const handleTextareaKeydown = (event: Event) => {
+  const keyboardEvent = event as KeyboardEvent;
+
+  if (keyboardEvent.isComposing || !showSlashMenu) {
     return;
   }
 
-  if (showSlashMenu) {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      selectedCommandIndex = (selectedCommandIndex + 1) % filteredCommands.length;
-      return;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      selectedCommandIndex =
-        (selectedCommandIndex - 1 + filteredCommands.length) % filteredCommands.length;
-      return;
-    }
-
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      const command = filteredCommands[selectedCommandIndex];
-      if (command) {
-        selectSlashCommand(command);
-      }
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      onDraftChange('');
-      return;
-    }
-
-    if (event.key === 'Tab') {
-      event.preventDefault();
-      const command = filteredCommands[selectedCommandIndex];
-      if (command) {
-        onDraftChange(`/${command.name}`);
-      }
-      return;
-    }
-
+  if (keyboardEvent.key === 'ArrowDown') {
+    keyboardEvent.preventDefault();
+    keyboardEvent.stopImmediatePropagation();
+    selectedCommandIndex = (selectedCommandIndex + 1) % filteredCommands.length;
     return;
   }
 
-  if (event.key === 'Escape') {
-    event.preventDefault();
-    onCancel?.();
+  if (keyboardEvent.key === 'ArrowUp') {
+    keyboardEvent.preventDefault();
+    keyboardEvent.stopImmediatePropagation();
+    selectedCommandIndex =
+      (selectedCommandIndex - 1 + filteredCommands.length) % filteredCommands.length;
     return;
   }
 
-  if (event.key !== 'Enter' || event.shiftKey) {
+  if (keyboardEvent.key === 'Tab') {
+    const command = filteredCommands[selectedCommandIndex];
+    if (!command) {
+      return;
+    }
+
+    keyboardEvent.preventDefault();
+    keyboardEvent.stopImmediatePropagation();
+    onDraftChange(`/${command.name}`);
     return;
   }
 
-  event.preventDefault();
-  if (isSendDisabled) {
-    return;
+  if (keyboardEvent.key === 'Escape') {
+    keyboardEvent.preventDefault();
+    keyboardEvent.stopImmediatePropagation();
+    onDraftChange('');
   }
-
-  onSubmit();
 };
-const handleInput = (event: Event) => {
-  const target = event.currentTarget as HTMLTextAreaElement;
-  onDraftChange(target.value);
-  resizeTextarea(target);
+
+const clearTextareaBinding = () => {
+  if (!editorTextarea) {
+    return;
+  }
+
+  editorTextarea.removeEventListener('keydown', handleTextareaKeydown, true);
+  editorTextarea = undefined;
+};
+
+const syncTextarea = (nextPlaceholder: string, nextDisabled: boolean) => {
+  const nextTextarea = editorElement?.querySelector('textarea') ?? undefined;
+
+  if (!nextTextarea) {
+    clearTextareaBinding();
+    return;
+  }
+
+  if (editorTextarea !== nextTextarea) {
+    clearTextareaBinding();
+    editorTextarea = nextTextarea;
+    editorTextarea.addEventListener('keydown', handleTextareaKeydown, true);
+  }
+
+  editorTextarea.classList.add('chat-widget__input');
+  editorTextarea.disabled = nextDisabled;
+  editorTextarea.placeholder = nextPlaceholder;
+
+  if (!preventedInitialAutofocus) {
+    preventedInitialAutofocus = true;
+    requestAnimationFrame(() => {
+      if (typeof document !== 'undefined' && document.activeElement === editorTextarea) {
+        editorTextarea.blur();
+      }
+    });
+  }
 };
 
 $effect(() => {
-  draft;
-  resizeTextarea();
+  filteredCommands;
+  selectedCommandIndex = 0;
+});
+
+$effect(() => {
+  if (!editorElement) {
+    clearTextareaBinding();
+    return;
+  }
+
+  if (editorElement.value !== draft) {
+    editorElement.value = draft;
+  }
+
+  editorElement.isStreaming = isStreaming;
+  editorElement.showAttachmentButton = false;
+  editorElement.showModelSelector = false;
+  editorElement.showThinkingSelector = false;
+  editorElement.onInput = handleEditorInput;
+  editorElement.onSend = handleEditorSend;
+  editorElement.onAbort = onCancel;
+
+  const nextPlaceholder = placeholder;
+  const nextDisabled = disabled;
+  queueMicrotask(() => {
+    syncTextarea(nextPlaceholder, nextDisabled);
+  });
+});
+
+$effect(() => {
+  return () => {
+    clearTextareaBinding();
+  };
 });
 </script>
 
@@ -169,46 +210,47 @@ $effect(() => {
       />
     </div>
   {/if}
-  <form onsubmit={handleSubmit} class="chat-widget__composer">
-    <div class="chat-widget__input-wrap">
-      <textarea
-        bind:this={textArea}
-        class="chat-widget__input"
-        {placeholder}
-        value={draft}
-        oninput={handleInput}
-        onkeydown={handleInputKeydown}
-        rows="1"
-      ></textarea>
-    </div>
-    {#if isStreaming}
-      <button
-        type="button"
-        class="chat-widget__send chat-widget__send--cancel"
-        onclick={onCancel}
-        title="Stop generating"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="chat-widget__send-icon" viewBox="0 0 20 20" fill="currentColor">
-          <rect x="5" y="5" width="10" height="10" rx="1.5" />
-        </svg>
-      </button>
-    {:else}
-      <button
-        type="submit"
-        class="chat-widget__send"
-        disabled={isSendDisabled}
-        title="Send message"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="chat-widget__send-icon" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-        </svg>
-      </button>
-    {/if}
-  </form>
+
+  <svelte:element
+    this={'message-editor'}
+    bind:this={editorElement}
+    class="chat-widget__composer"
+  />
 </div>
 
 <style>
   .chat-widget__composer-wrap {
+    --background: var(--md-surface);
+    --foreground: var(--md-on-surface);
+    --card: var(--md-surface-bright);
+    --card-foreground: var(--md-on-surface);
+    --popover: var(--md-surface-bright);
+    --popover-foreground: var(--md-on-surface);
+    --primary: var(--md-primary);
+    --primary-foreground: var(--md-on-primary);
+    --secondary: var(--md-surface-container);
+    --secondary-foreground: var(--md-on-surface);
+    --muted: color-mix(in srgb, var(--md-surface-container) 92%, var(--md-surface));
+    --muted-foreground: color-mix(in srgb, var(--md-on-surface-variant) 82%, transparent);
+    --accent: color-mix(in srgb, var(--md-primary) 12%, var(--md-surface));
+    --accent-foreground: var(--md-on-surface);
+    --destructive: #c62828;
+    --destructive-foreground: #ffffff;
+    --border: color-mix(in srgb, var(--md-outline) 45%, transparent);
+    --input: color-mix(in srgb, var(--md-outline) 55%, transparent);
+    --ring: color-mix(in srgb, var(--md-outline) 70%, transparent);
+    --sidebar: var(--md-surface);
+    --sidebar-foreground: var(--md-on-surface);
+    --sidebar-primary: var(--md-primary);
+    --sidebar-primary-foreground: var(--md-on-primary);
+    --sidebar-accent: var(--accent);
+    --sidebar-accent-foreground: var(--accent-foreground);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--ring);
+    --radius: 1.25rem;
+    --shadow-sm: var(--md-shadow-1);
+    --shadow-xs: var(--md-shadow-1);
+    --font-sans: inherit;
     position: relative;
   }
 
@@ -222,96 +264,16 @@ $effect(() => {
   }
 
   .chat-widget__composer {
-    align-items: flex-end;
-    background: var(--md-surface-bright);
-    border: 1px solid color-mix(in srgb, var(--md-outline) 45%, transparent);
-    border-radius: 20px;
-    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--md-outline) 12%, transparent);
-    display: flex;
-    gap: 8px;
-    padding: 6px 8px 6px 12px;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .chat-widget__input-wrap {
-    display: flex;
-    flex: 1;
-  }
-
-  .chat-widget__input {
-    background: transparent;
-    border: 0;
-    color: var(--md-on-surface);
     display: block;
+  }
+
+  :global(.chat-widget__composer > div) {
+    border-radius: 20px;
+  }
+
+  :global(.chat-widget__composer textarea) {
     font-family: inherit;
     font-size: 0.88rem;
     line-height: 1.45;
-    max-height: 160px;
-    min-height: 22px;
-    overflow-y: hidden;
-    padding: 7px 6px;
-    resize: none;
-    width: 100%;
-  }
-
-  .chat-widget__input::placeholder {
-    color: color-mix(in srgb, var(--md-on-surface-variant) 72%, transparent);
-  }
-
-  .chat-widget__input:focus {
-    outline: none;
-  }
-
-  .chat-widget__composer:focus-within {
-    border-color: color-mix(in srgb, var(--md-outline) 70%, transparent);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-outline) 20%, transparent);
-  }
-
-  .chat-widget__input:disabled {
-    cursor: not-allowed;
-    opacity: 0.64;
-  }
-
-  .chat-widget__send {
-    align-self: flex-end;
-    align-items: center;
-    background: color-mix(in srgb, var(--md-surface) 92%, white);
-    border: 1px solid color-mix(in srgb, var(--md-outline) 55%, transparent);
-    border-radius: 999px;
-    box-shadow: none;
-    color: var(--md-primary);
-    cursor: pointer;
-    display: inline-flex;
-    height: 36px;
-    justify-content: center;
-    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease;
-    width: 36px;
-  }
-
-  .chat-widget__send:hover:enabled {
-    background: color-mix(in srgb, var(--md-surface) 86%, white);
-    border-color: color-mix(in srgb, var(--md-outline) 75%, transparent);
-  }
-
-  .chat-widget__send:disabled {
-    cursor: not-allowed;
-    opacity: 0.4;
-  }
-
-  .chat-widget__send--cancel {
-    background: color-mix(in srgb, var(--md-primary) 12%, var(--md-surface));
-    border-color: color-mix(in srgb, var(--md-primary) 45%, transparent);
-    color: var(--md-primary);
-    opacity: 1;
-  }
-
-  .chat-widget__send--cancel:hover {
-    background: color-mix(in srgb, var(--md-primary) 20%, var(--md-surface));
-    border-color: color-mix(in srgb, var(--md-primary) 65%, transparent);
-  }
-
-  .chat-widget__send-icon {
-    height: 18px;
-    width: 18px;
   }
 </style>

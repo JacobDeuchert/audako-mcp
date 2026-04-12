@@ -51,9 +51,7 @@ const controller = useChatController({
   scrollToBottom,
 });
 
-const composerDisabled = $derived(
-  controller.state.isTyping || !!controller.state.streamingMessageId,
-);
+const isStreaming = $derived(!!controller.state.streamingMessageId);
 
 $effect(() => {
   controller.syncConfig();
@@ -63,6 +61,7 @@ $effect(() => {
 <div
   class="chat-widget"
   class:chat-widget--dark={darkMode}
+  role="presentation"
   style={themeStyle}
   onkeydown={(e) => e.stopPropagation()}
   onkeyup={(e) => e.stopPropagation()}
@@ -74,7 +73,7 @@ $effect(() => {
     <MessageList
       messages={controller.state.messages}
       {showThinking}
-      isTyping={composerDisabled}
+      isTyping={controller.state.isTyping}
     />
   </div>
 
@@ -93,8 +92,8 @@ $effect(() => {
       <Composer
         draft={controller.state.draft}
         placeholder={composerPlaceholder}
-        disabled={composerDisabled}
-        isStreaming={!!controller.state.streamingMessageId}
+        disabled={false}
+        {isStreaming}
         slashCommands={controller.getSlashCommands()}
         onDraftChange={controller.setDraft}
         onSubmit={controller.sendMessage}

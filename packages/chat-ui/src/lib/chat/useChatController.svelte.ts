@@ -20,8 +20,6 @@ interface ChatControllerOptions {
   scrollToBottom: () => void;
 }
 
-const TYPING_DELAY_MS = 300;
-
 export const useChatController = ({
   getConfig,
   getShowThinking,
@@ -201,14 +199,10 @@ export const useChatController = ({
     state.draft = '';
     scrollToBottom();
 
-    state.isTyping = true;
-    await new Promise(resolve => setTimeout(resolve, TYPING_DELAY_MS));
-
     const messageId = createMessageId(1);
     const streamingMessage = createAssistantStreamingMessage(messageId);
 
     state.messages = [...state.messages, streamingMessage];
-    state.isTyping = false;
     state.streamingMessageId = messageId;
     debug('assistant streaming message created', {
       messageId,
@@ -265,7 +259,7 @@ export const useChatController = ({
             const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
             const shouldFocusQuestion =
               activeElement instanceof HTMLElement &&
-              activeElement.classList.contains('chat-widget__input');
+              !!activeElement.closest('.chat-widget__composer');
 
             return askQuestion(question, shouldFocusQuestion);
           },

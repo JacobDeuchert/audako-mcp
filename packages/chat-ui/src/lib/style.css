@@ -1,3 +1,5 @@
+@import "@mariozechner/pi-web-ui/app.css";
+
 /* ─── Shared keyframes ────────────────────────────────────────────────────── */
 
 @keyframes chat-widget-pulse {

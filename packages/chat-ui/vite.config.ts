@@ -3,7 +3,12 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 
+const externalPackages = [/^svelte($|\/)/, /^@mariozechner\/pi-web-ui($|\/)/];
+
 export default defineConfig({
+  server: {
+    host: '0.0.0.0',
+  },
   plugins: [
     svelte({
       compilerOptions: {
@@ -26,7 +31,7 @@ export default defineConfig({
       formats: ['es'],
     },
     rollupOptions: {
-      external: id => /^svelte($|\/)/.test(id),
+      external: id => externalPackages.some(pattern => pattern.test(id)),
       output: {
         globals: {
           svelte: 'Svelte',
