@@ -1,6 +1,8 @@
 // Import type files to trigger self-registration
 import '../entity-type-definitions/Signal/contract.js';
 import '../entity-type-definitions/Group/contract.js';
+import '../entity-type-definitions/DataConnection/contract.js';
+import '../entity-type-definitions/DataSource/contract.js';
 import { Type } from '@mariozechner/pi-ai';
 import { createLogger } from '../config/app-config.js';
 import { resolveContract } from '../entity-type-definitions/contract-registry.js';
@@ -25,8 +27,6 @@ export function createCreateEntityTool(deps) {
         execute: async (_toolCallId, params) => {
             logger.info({
                 sessionId: deps.sessionId,
-                tenantId: deps.sessionContext.tenantId,
-                groupId: deps.sessionContext.groupId,
                 entityType: params.entityType,
                 payload: params.payload,
             }, 'LLM create_entity payload');
@@ -38,15 +38,10 @@ export function createCreateEntityTool(deps) {
             const payload = {
                 ...params.payload,
             };
-            // Resolve "context" keyword to tenant root group ID
-            if (payload.groupId === 'context') {
-                const tenantRootGroupId = deps.sessionContext.resolvedTenant?.tenantRootGroupId;
-                if (!tenantRootGroupId) {
-                    throw new Error('groupId is "context" but no tenant root group is available in session context. Ensure a tenant is selected.');
-                }
-                payload.groupId = tenantRootGroupId;
-            }
             const resolvedGroupId = typeof payload.groupId === 'string' ? payload.groupId : undefined;
+            if (resolvedGroupId && !/^[a-f\d]{24}$/i.test(resolvedGroupId)) {
+                throw new Error(`Invalid groupId '${resolvedGroupId}'. Must be a valid 24-character MongoDB ObjectId. Use get_session_info to resolve IDs from the current session context.`);
+            }
             await deps.permissionService.hasPermission(sessionId, params.entityType, resolvedGroupId, normalizePermissionMode(params.permissionMode), 'create_entity');
             const validationErrors = contract.validate(payload, 'create');
             if (validationErrors.length > 0) {
@@ -70,7 +65,7 @@ export function createCreateEntityTool(deps) {
                     entityId,
                     groupId: typeof createdEntity.GroupId === 'string'
                         ? createdEntity.GroupId
-                        : resolvedGroupId ?? '',
+                        : (resolvedGroupId ?? ''),
                     metadata: {
                         tenantId: deps.sessionContext.tenantId,
                         sourceTool: 'create-entity',

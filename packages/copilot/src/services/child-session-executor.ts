@@ -1,19 +1,13 @@
-import type { AgentEvent } from '@mariozechner/pi-agent-core';
 import { createSessionAgent } from '../agent/agent-factory.js';
 import type { AgentProfile } from '../agent/profiles.js';
+import { BaseSession } from '../session/base-session.js';
 import type { ChildSessionManager, ChildSessionRuntime } from './child-session-runtime.js';
 import type { DelegatedScope, PermissionService } from './permission-service.js';
-import type { SessionContext } from './session-context.js';
 import type { SessionEventHub } from './session-event-hub.js';
 import { buildSessionEvent } from './session-event-utils.js';
 import type { SessionRegistry } from './session-registry.js';
+import type { SessionTodoStore } from './session-todo-store.js';
 import type { ToolRequestHub } from './tool-request-hub.js';
-
-interface ChildAgent {
-  prompt: (input: string) => Promise<unknown>;
-  subscribe: (listener: (event: AgentEvent) => void) => () => void;
-  abort: () => void;
-}
 
 export interface ExecuteChildSessionInput {
   parentSessionId: string;
@@ -38,6 +32,7 @@ interface ChildSessionExecutorDependencies {
   childSessionManager: ChildSessionManager;
   requestHub: ToolRequestHub;
   permissionService: PermissionService;
+  sessionTodoStore: SessionTodoStore;
 }
 
 export class ChildSessionExecutor {
@@ -64,7 +59,10 @@ export class ChildSessionExecutor {
       },
     );
 
-    this.publishAccepted(runtime, input.description);
+    this.publishChildEvent(runtime, 'accepted', {
+      description: input.description,
+      timestamp: new Date().toISOString(),
+    });
 
     const inputAbortHandler = () => {
       this.deps.childSessionManager.cancelChildSession(runtime.childSessionId);
@@ -72,36 +70,39 @@ export class ChildSessionExecutor {
 
     input.abortSignal?.addEventListener('abort', inputAbortHandler);
 
-    const childSessionContext = this.createChildSessionContext(
-      parentSession.sessionContext,
-      runtime,
-    );
-    childSessionContext.bindServices(parentSession.audakoServices);
-
     const { agent, destroy } = await createSessionAgent({
-      sessionContext: childSessionContext,
-      audakoServices: parentSession.audakoServices,
+      sessionContext: parentSession.session.sessionContext,
+      audakoServices: parentSession.session.audakoServices,
       eventHub: this.deps.eventHub,
       requestHub: this.deps.requestHub,
       permissionService: this.deps.permissionService,
+      sessionTodoStore: this.deps.sessionTodoStore,
       profile: input.profile,
       requestedTools: input.requestedTools,
     });
 
-    const childAgent = agent as unknown as ChildAgent;
+    const childSession = new BaseSession({
+      sessionId: runtime.childSessionId,
+      agent,
+      destroyAgent: destroy,
+    });
+
     const runtimeAbortHandler = () => {
-      childAgent.abort();
+      childSession.abort();
     };
     runtime.abortController.signal.addEventListener('abort', runtimeAbortHandler);
 
-    this.publishStarted(runtime);
+    this.publishChildEvent(runtime, 'started', { startedAt: new Date().toISOString() });
 
     try {
-      const resultText = await this.runChildPrompt(childAgent, input.prompt);
+      const resultText = await childSession.prompt(input.prompt);
 
       if (runtime.status === 'cancelled') {
         const reason = runtime.error ?? 'cancelled';
-        this.publishCancelled(runtime, reason);
+        this.publishChildEvent(runtime, 'cancelled', {
+          cancelledAt: new Date().toISOString(),
+          reason,
+        });
         return {
           childSessionId: runtime.childSessionId,
           status: 'cancelled',
@@ -110,7 +111,10 @@ export class ChildSessionExecutor {
       }
 
       this.deps.childSessionManager.completeChildSession(runtime.childSessionId, resultText);
-      this.publishCompleted(runtime, resultText);
+      this.publishChildEvent(runtime, 'completed', {
+        completedAt: new Date().toISOString(),
+        result: resultText,
+      });
 
       return {
         childSessionId: runtime.childSessionId,
@@ -122,7 +126,10 @@ export class ChildSessionExecutor {
 
       if (runtime.status === 'cancelled' || runtime.abortController.signal.aborted) {
         const reason = runtime.error ?? errorMessage;
-        this.publishCancelled(runtime, reason);
+        this.publishChildEvent(runtime, 'cancelled', {
+          cancelledAt: new Date().toISOString(),
+          reason,
+        });
         return {
           childSessionId: runtime.childSessionId,
           status: 'cancelled',
@@ -131,7 +138,10 @@ export class ChildSessionExecutor {
       }
 
       this.deps.childSessionManager.failChildSession(runtime.childSessionId, error);
-      this.publishFailed(runtime, errorMessage);
+      this.publishChildEvent(runtime, 'failed', {
+        failedAt: new Date().toISOString(),
+        error: errorMessage,
+      });
 
       return {
         childSessionId: runtime.childSessionId,
@@ -142,137 +152,23 @@ export class ChildSessionExecutor {
       this.deps.permissionService.clearDelegatedScope(runtime.childSessionId);
       runtime.abortController.signal.removeEventListener('abort', runtimeAbortHandler);
       input.abortSignal?.removeEventListener('abort', inputAbortHandler);
-      destroy();
+      childSession.destroy();
     }
   }
 
-  private createChildSessionContext(
-    parentSessionContext: SessionContext,
+  private publishChildEvent(
     runtime: ChildSessionRuntime,
-  ): SessionContext {
-    const SessionContextCtor = parentSessionContext.constructor as typeof SessionContext;
-
-    return new SessionContextCtor({
-      sessionId: runtime.childSessionId,
-      scadaUrl: parentSessionContext.scadaUrl,
-      accessToken: parentSessionContext.accessToken,
-      tenantId: parentSessionContext.tenantId,
-      groupId: parentSessionContext.groupId,
-      entityType: parentSessionContext.entityType,
-      app: parentSessionContext.app,
-    });
-  }
-
-  private publishAccepted(runtime: ChildSessionRuntime, description: string): void {
+    event: 'accepted' | 'started' | 'completed' | 'failed' | 'cancelled',
+    extra: Record<string, unknown> = {},
+  ): void {
     this.deps.eventHub.publish(
       runtime.parentSessionId,
-      buildSessionEvent('child_task.accepted', runtime.parentSessionId, {
+      buildSessionEvent(`child_task.${event}`, runtime.parentSessionId, {
         childSessionId: runtime.childSessionId,
         parentSessionId: runtime.parentSessionId,
         profileName: runtime.profileName,
-        description,
-        timestamp: new Date().toISOString(),
+        ...extra,
       }),
     );
   }
-
-  private publishStarted(runtime: ChildSessionRuntime): void {
-    this.deps.eventHub.publish(
-      runtime.parentSessionId,
-      buildSessionEvent('child_task.started', runtime.parentSessionId, {
-        childSessionId: runtime.childSessionId,
-        parentSessionId: runtime.parentSessionId,
-        profileName: runtime.profileName,
-        startedAt: new Date().toISOString(),
-      }),
-    );
-  }
-
-  private publishCompleted(runtime: ChildSessionRuntime, result: unknown): void {
-    this.deps.eventHub.publish(
-      runtime.parentSessionId,
-      buildSessionEvent('child_task.completed', runtime.parentSessionId, {
-        childSessionId: runtime.childSessionId,
-        parentSessionId: runtime.parentSessionId,
-        profileName: runtime.profileName,
-        completedAt: new Date().toISOString(),
-        result,
-      }),
-    );
-  }
-
-  private publishFailed(runtime: ChildSessionRuntime, error: string): void {
-    this.deps.eventHub.publish(
-      runtime.parentSessionId,
-      buildSessionEvent('child_task.failed', runtime.parentSessionId, {
-        childSessionId: runtime.childSessionId,
-        parentSessionId: runtime.parentSessionId,
-        profileName: runtime.profileName,
-        failedAt: new Date().toISOString(),
-        error,
-      }),
-    );
-  }
-
-  private publishCancelled(runtime: ChildSessionRuntime, reason: string): void {
-    this.deps.eventHub.publish(
-      runtime.parentSessionId,
-      buildSessionEvent('child_task.cancelled', runtime.parentSessionId, {
-        childSessionId: runtime.childSessionId,
-        parentSessionId: runtime.parentSessionId,
-        profileName: runtime.profileName,
-        cancelledAt: new Date().toISOString(),
-        reason,
-      }),
-    );
-  }
-
-  private async runChildPrompt(agent: ChildAgent, prompt: string): Promise<string> {
-    let finalText = '';
-
-    const unsubscribe = agent.subscribe(event => {
-      if (event.type !== 'turn_end') {
-        return;
-      }
-
-      if (!isAssistantMessage(event.message) || event.message.stopReason === 'toolUse') {
-        return;
-      }
-
-      finalText = event.message.content
-        .filter(block => block.type === 'text')
-        .map(block => block.text)
-        .join('')
-        .trim();
-    });
-
-    try {
-      await agent.prompt(prompt);
-      return finalText;
-    } finally {
-      unsubscribe();
-    }
-  }
-}
-
-function isAssistantMessage(message: unknown): message is {
-  role: 'assistant';
-  content: Array<{ type: string; text: string }>;
-  stopReason: string;
-} {
-  if (!message || typeof message !== 'object') {
-    return false;
-  }
-
-  const candidate = message as {
-    role?: unknown;
-    content?: unknown;
-    stopReason?: unknown;
-  };
-
-  return (
-    candidate.role === 'assistant' &&
-    Array.isArray(candidate.content) &&
-    typeof candidate.stopReason === 'string'
-  );
 }

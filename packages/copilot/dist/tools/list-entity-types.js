@@ -1,6 +1,8 @@
 // Import type files to trigger self-registration
 import '../entity-type-definitions/Signal/contract.js';
 import '../entity-type-definitions/Group/contract.js';
+import '../entity-type-definitions/DataConnection/contract.js';
+import '../entity-type-definitions/DataSource/contract.js';
 import { Type } from '@mariozechner/pi-ai';
 import { listTypes } from '../services/type-registry.js';
 import { toTextResponse } from './helpers.js';

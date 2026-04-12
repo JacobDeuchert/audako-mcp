@@ -1,8 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
-import type { Agent } from '@mariozechner/pi-agent-core';
 import { createLogger } from '../config/app-config.js';
-import type { AudakoServices } from './audako-services.js';
-import type { SessionContext } from './session-context.js';
+import type { InteractiveSession } from '../session/interactive-session.js';
 
 const logger = createLogger('session-registry');
 
@@ -12,11 +10,7 @@ export interface SessionRegistryEntry {
   accessToken: string;
   sessionToken: string;
   sessionTokenHash: string;
-  agent: Agent;
-  agentDestroy: () => void;
-  wsEventBridgeUnsubscribe: () => void;
-  sessionContext: SessionContext;
-  audakoServices: AudakoServices;
+  session: InteractiveSession;
   createdAt: Date;
   lastAccessedAt: Date;
 }
@@ -119,11 +113,7 @@ export class SessionRegistry {
       sessionId: string,
       sessionToken: string,
     ) => Promise<{
-      agent: Agent;
-      agentDestroy: () => void;
-      wsEventBridgeUnsubscribe: () => void;
-      sessionContext: SessionContext;
-      audakoServices: AudakoServices;
+      session: InteractiveSession;
     }>,
   ): Promise<{ entry: SessionRegistryEntry; isNew: boolean; sessionToken: string }> {
     const key = this.generateKey(scadaUrl, accessToken);
@@ -151,11 +141,7 @@ export class SessionRegistry {
       sessionId: string,
       sessionToken: string,
     ) => Promise<{
-      agent: Agent;
-      agentDestroy: () => void;
-      wsEventBridgeUnsubscribe: () => void;
-      sessionContext: SessionContext;
-      audakoServices: AudakoServices;
+      session: InteractiveSession;
     }>,
   ): Promise<{ entry: SessionRegistryEntry; isNew: boolean; sessionToken: string }> {
     const existingEntry = this.sessions.get(key);
@@ -182,8 +168,7 @@ export class SessionRegistry {
     const sessionId = randomBytes(16).toString('hex');
     const sessionToken = this.generateSessionToken();
 
-    const { agent, agentDestroy, wsEventBridgeUnsubscribe, sessionContext, audakoServices } =
-      await createSessionFn(sessionId, sessionToken);
+    const { session } = await createSessionFn(sessionId, sessionToken);
 
     const entry: SessionRegistryEntry = {
       sessionId,
@@ -191,11 +176,7 @@ export class SessionRegistry {
       accessToken,
       sessionToken,
       sessionTokenHash: this.hashToken(sessionToken),
-      agent,
-      agentDestroy,
-      wsEventBridgeUnsubscribe,
-      sessionContext,
-      audakoServices,
+      session,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
     };
@@ -222,8 +203,7 @@ export class SessionRegistry {
     }
 
     try {
-      entry.wsEventBridgeUnsubscribe();
-      entry.agentDestroy();
+      entry.session.destroy();
 
       this.sessions.delete(key);
       this.sessionIdToKey.delete(entry.sessionId);

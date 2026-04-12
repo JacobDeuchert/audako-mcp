@@ -7,11 +7,14 @@ import { registerSessionRoutes } from './routes/session.routes.js';
 import { SessionEventHub } from './services/session-event-hub.js';
 import { SessionRegistry } from './services/session-registry.js';
 import { SessionRequestHub } from './services/session-request-hub.js';
+import { SessionTodoStore } from './services/session-todo-store.js';
 const logger = createLogger('server');
 export async function createServer() {
     const app = new Hono();
     app.use('*', cors({
-        origin: appConfig.cors.origins.length === 0 || appConfig.cors.origins.includes('*') ? '*' : appConfig.cors.origins,
+        origin: appConfig.cors.origins.length === 0 || appConfig.cors.origins.includes('*')
+            ? '*'
+            : appConfig.cors.origins,
     }));
     app.use('*', async (context, next) => {
         const startedAt = Date.now();
@@ -27,6 +30,7 @@ export async function createServer() {
     const sessionRegistry = new SessionRegistry(appConfig.session.idleTimeout);
     const sessionEventHub = new SessionEventHub();
     const sessionRequestHub = new SessionRequestHub();
+    const sessionTodoStore = new SessionTodoStore();
     const sessionSocketGateway = new SessionSocketIoGateway({
         registry: sessionRegistry,
         eventHub: sessionEventHub,
@@ -36,6 +40,7 @@ export async function createServer() {
         sessionRequestHub.cancelSession(entry.sessionId);
         sessionEventHub.closeSession(entry.sessionId, reason);
         sessionSocketGateway.handleSessionExpired(entry.sessionId, reason);
+        sessionTodoStore.clear(entry.sessionId);
     });
     app.get('/health', (context) => {
         return context.json({
@@ -48,6 +53,7 @@ export async function createServer() {
         registry: sessionRegistry,
         eventHub: sessionEventHub,
         requestHub: sessionRequestHub,
+        sessionTodoStore,
     });
     // Start cleanup task
     sessionRegistry.startCleanupTask(900000); // 15 minutes

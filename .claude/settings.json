@@ -1,0 +1,32 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(find:*)",
+            "Bash(grep:*)",
+            "Bash(rg:*)",
+            "Bash(cat:*)",
+            "Bash(head:*)",
+            "Bash(tail:*)",
+            "Bash(ls:*)",
+            "Bash(wc:*)",
+            "Bash(file:*)",
+            "Bash(stat:*)",
+            "Bash(du:*)",
+            "Bash(df:*)",
+            "Bash(echo:*)",
+            "Bash(pwd:*)",
+            "Bash(which:*)",
+            "Bash(env:*)",
+            "Bash(printenv:*)",
+            "Bash(whoami:*)",
+            "Bash(hostname:*)",
+            "Bash(uname:*)",
+            "Bash(date:*)",
+            "Bash(git status:*)",
+            "Bash(git log:*)",
+            "Bash(git diff:*)",
+            "Bash(git show:*)",
+            "Bash(git branch:*)"
+        ]
+    }
+}

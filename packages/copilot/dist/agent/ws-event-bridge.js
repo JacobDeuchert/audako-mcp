@@ -1,5 +1,6 @@
 import { createLogger } from '../config/app-config.js';
 import { buildSessionEvent } from '../services/session-event-utils.js';
+import { isAssistantMessage } from '../session/message-utils.js';
 const wsBridgeLogger = createLogger('ws-event-bridge');
 export function createWsEventBridge(agent, sessionId, eventHub) {
     let currentTurnId = null;
@@ -56,15 +57,6 @@ export function createWsEventBridge(agent, sessionId, eventHub) {
     };
     const unsubscribe = agent.subscribe(handleAgentEvent);
     return unsubscribe;
-}
-function isAssistantMessage(message) {
-    if (!message || typeof message !== 'object') {
-        return false;
-    }
-    const candidate = message;
-    return (candidate.role === 'assistant' &&
-        Array.isArray(candidate.content) &&
-        typeof candidate.stopReason === 'string');
 }
 function isToolUseTurn(message) {
     return isAssistantMessage(message) && message.stopReason === 'toolUse';

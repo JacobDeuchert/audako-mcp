@@ -33,7 +33,7 @@ const signalFieldDefinitions = [
     {
         key: 'dataConnectionId',
         dtoName: 'dataConnectionId',
-        description: 'Data connection ID (required by backend for online signals). Should always be provided, when user specifically asks for virtual signals set it to "virtual". If set to "context" the system will try to find a suitable data connection based on session info.',
+        description: 'Data connection ID (required by backend for online signals). Use query_entities with entityType "DataConnection" to find available connections. Set to "virtual" when the user specifically asks for virtual signals.',
         type: 'string',
         entityPath: 'DataConnectionId',
         isEntityField: true,

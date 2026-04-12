@@ -48,11 +48,7 @@ async function createParentSession(
       sessionContext.bindServices(audakoServices);
 
       return {
-        agent: {} as never,
-        agentDestroy: vi.fn(),
-        wsEventBridgeUnsubscribe: vi.fn(),
-        sessionContext,
-        audakoServices,
+        session: { sessionContext, audakoServices } as never,
       };
     },
   );

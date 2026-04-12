@@ -8,11 +8,7 @@ async function createParentSession(registry: SessionRegistry, key: string): Prom
     `https://example-${key}.audako.dev`,
     `token-${key}`,
     async () => ({
-      agent: {} as never,
-      agentDestroy: vi.fn(),
-      wsEventBridgeUnsubscribe: vi.fn(),
-      sessionContext: {} as never,
-      audakoServices: {} as never,
+      session: { destroy: vi.fn(), sessionContext: {}, audakoServices: {} } as never,
     }),
   );
 

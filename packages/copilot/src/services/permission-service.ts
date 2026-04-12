@@ -98,14 +98,14 @@ export class DefaultPermissionService implements PermissionService {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
-    const contextGroupId = session.sessionContext.groupId;
+    const contextGroupId = session.session.sessionContext.groupId;
 
     if (!requestedGroupId || !contextGroupId) {
       return true;
     }
 
     const inScope = await this.isGroupInScope(
-      session.audakoServices.entityService,
+      session.session.audakoServices.entityService,
       contextGroupId,
       requestedGroupId,
     );

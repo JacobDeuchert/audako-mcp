@@ -9,10 +9,10 @@ function buildSnapshotPayload(entry) {
         sessionId: entry.sessionId,
         scadaUrl: entry.scadaUrl,
         sessionInfo: {
-            tenantId: entry.sessionContext.tenantId,
-            groupId: entry.sessionContext.groupId,
-            entityType: entry.sessionContext.entityType,
-            app: entry.sessionContext.app,
+            tenantId: entry.session.sessionContext.tenantId,
+            groupId: entry.session.sessionContext.groupId,
+            entityType: entry.session.sessionContext.entityType,
+            app: entry.session.sessionContext.app,
             updatedAt: new Date().toISOString(),
         },
         isActive: true,
@@ -146,7 +146,6 @@ export class SessionSocketIoGateway {
         if (!state) {
             state = {
                 controllerSocketId: socket.id,
-                inFlightTurn: false,
             };
             state.eventHubUnsubscribe = this.deps.eventHub.subscribe(sessionId, event => {
                 this.namespace?.to(sessionId).emit(event.type, event);
@@ -211,26 +210,19 @@ export class SessionSocketIoGateway {
             sendAck(rejectedAck(commandId, 'prompt.send', 'PROMPT_EMPTY', 'Prompt content cannot be empty'));
             return;
         }
-        if (state.inFlightTurn) {
+        if (entry.session.inFlightTurn) {
             sendAck(rejectedAck(commandId, 'prompt.send', 'TURN_ALREADY_IN_FLIGHT', 'An assistant turn is already in progress for this session'));
             return;
         }
-        state.inFlightTurn = true;
         sendAck(acceptedAck(commandId, 'prompt.send'));
         try {
-            await entry.agent.prompt(prompt);
+            await entry.session.promptInteractive(prompt);
         }
         catch (error) {
             this.deps.eventHub.publish(sessionId, buildSessionEvent('assistant.error', sessionId, {
                 errorMessage: error instanceof Error ? error.message : String(error),
                 errorCode: 'PROMPT_SEND_FAILED',
             }));
-        }
-        finally {
-            const currentState = this.sessionStates.get(sessionId);
-            if (currentState) {
-                currentState.inFlightTurn = false;
-            }
         }
     }
     handlePromptCancel(socket, payload, ack) {
@@ -251,12 +243,11 @@ export class SessionSocketIoGateway {
             sendAck(rejectedAck(commandId, 'prompt.cancel', 'SESSION_NOT_FOUND', 'Session is no longer available'));
             return;
         }
-        if (!state.inFlightTurn) {
+        if (!entry.session.inFlightTurn) {
             sendAck(rejectedAck(commandId, 'prompt.cancel', 'TURN_NOT_IN_FLIGHT', 'No assistant turn is currently in progress'));
             return;
         }
-        entry.agent.abort();
-        state.inFlightTurn = false;
+        entry.session.abort();
         sendAck(acceptedAck(commandId, 'prompt.cancel'));
     }
     handleQuestionAnswer(socket, payload, ack) {
@@ -301,12 +292,12 @@ export class SessionSocketIoGateway {
             return;
         }
         const sanitized = sanitizeSessionInfoUpdate(sessionInfo);
-        await entry.sessionContext.update(sanitized);
+        await entry.session.updateContext(sanitized);
         this.deps.eventHub.publish(sessionId, buildSessionEvent('session.updated', sessionId, toSessionInfoResponse(sessionId, {
-            tenantId: entry.sessionContext.tenantId,
-            groupId: entry.sessionContext.groupId,
-            entityType: entry.sessionContext.entityType,
-            app: entry.sessionContext.app,
+            tenantId: entry.session.sessionContext.tenantId,
+            groupId: entry.session.sessionContext.groupId,
+            entityType: entry.session.sessionContext.entityType,
+            app: entry.session.sessionContext.app,
         })));
         sendAck(acceptedAck(commandId, 'session.update'));
     }
@@ -317,13 +308,11 @@ export class SessionSocketIoGateway {
             return;
         }
         state.controllerSocketId = '';
-        if (!state.inFlightTurn) {
+        const entry = this.deps.registry.getSession(sessionId);
+        if (!entry?.session.inFlightTurn) {
             return;
         }
-        const entry = this.deps.registry.getSession(sessionId);
-        if (entry) {
-            entry.agent.abort();
-        }
+        entry.session.abort();
         this.deps.eventHub.publish(sessionId, buildSessionEvent('assistant.error', sessionId, {
             errorMessage: 'Active controller disconnected during an in-flight turn. Session expired; bootstrap a fresh session to continue.',
             errorCode: 'CONTROLLER_DISCONNECTED_SESSION_EXPIRED',

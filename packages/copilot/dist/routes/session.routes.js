@@ -11,9 +11,10 @@ import { SessionContext } from '../services/session-context.js';
 import { buildSessionEvent } from '../services/session-event-utils.js';
 import { sanitizeSessionInfoUpdate, toSessionInfoResponse, } from '../services/session-info-utils.js';
 import { ToolRequestHub } from '../services/tool-request-hub.js';
+import { InteractiveSession } from '../session/interactive-session.js';
 const logger = createLogger('session-routes');
 export function registerSessionRoutes(app, deps) {
-    const { registry, eventHub, requestHub } = deps;
+    const { registry, eventHub, requestHub, sessionTodoStore } = deps;
     const childSessionManager = new ChildSessionManager(registry, eventHub);
     const toolRequestHub = new ToolRequestHub(requestHub, eventHub);
     const permissionService = new DefaultPermissionService(registry, toolRequestHub);
@@ -23,6 +24,7 @@ export function registerSessionRoutes(app, deps) {
         childSessionManager,
         requestHub: toolRequestHub,
         permissionService,
+        sessionTodoStore,
     });
     registry.onSessionRemoved(entry => {
         permissionService.clearSession(entry.sessionId);
@@ -134,34 +136,37 @@ export function registerSessionRoutes(app, deps) {
                     eventHub,
                     requestHub: toolRequestHub,
                     permissionService,
+                    sessionTodoStore,
                     childSessionExecutor,
                     profile: getProfile('primary'),
                 });
-                const wsEventBridgeUnsubscribe = createWsEventBridge(agent, sessionId, eventHub);
-                return {
+                const eventBridgeUnsubscribe = createWsEventBridge(agent, sessionId, eventHub);
+                const session = new InteractiveSession({
+                    sessionId,
                     agent,
-                    agentDestroy,
-                    wsEventBridgeUnsubscribe,
+                    destroyAgent: agentDestroy,
                     sessionContext,
                     audakoServices,
-                };
+                    eventBridgeUnsubscribe,
+                });
+                return { session };
             });
             // Update session info if provided
             if (sessionInfo && !isNew) {
                 const sanitized = sanitizeSessionInfoUpdate(sessionInfo);
-                await entry.sessionContext.update(sanitized);
+                await entry.session.updateContext(sanitized);
                 eventHub.publish(entry.sessionId, buildSessionEvent('session.updated', entry.sessionId, toSessionInfoResponse(entry.sessionId, {
-                    tenantId: entry.sessionContext.tenantId,
-                    groupId: entry.sessionContext.groupId,
-                    entityType: entry.sessionContext.entityType,
-                    app: entry.sessionContext.app,
+                    tenantId: entry.session.sessionContext.tenantId,
+                    groupId: entry.session.sessionContext.groupId,
+                    entityType: entry.session.sessionContext.entityType,
+                    app: entry.session.sessionContext.app,
                 })));
             }
             const response = {
                 sessionId: entry.sessionId,
                 isNew,
                 scadaUrl: entry.scadaUrl,
-                sessionInfo: toSessionInfoSnapshot(entry.sessionContext.tenantId, entry.sessionContext.groupId, entry.sessionContext.entityType, entry.sessionContext.app),
+                sessionInfo: toSessionInfoSnapshot(entry.session.sessionContext.tenantId, entry.session.sessionContext.groupId, entry.session.sessionContext.entityType, entry.session.sessionContext.app),
                 realtime: {
                     transport: 'socket.io',
                     protocolVersion: 'v1',
@@ -215,10 +220,10 @@ export function registerSessionRoutes(app, deps) {
             }, 404);
         }
         return context.json(toSessionInfoResponse(sessionId, {
-            tenantId: entry.sessionContext.tenantId,
-            groupId: entry.sessionContext.groupId,
-            entityType: entry.sessionContext.entityType,
-            app: entry.sessionContext.app,
+            tenantId: entry.session.sessionContext.tenantId,
+            groupId: entry.session.sessionContext.groupId,
+            entityType: entry.session.sessionContext.entityType,
+            app: entry.session.sessionContext.app,
         }));
     }
 }

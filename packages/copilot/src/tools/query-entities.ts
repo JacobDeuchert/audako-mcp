@@ -1,6 +1,8 @@
 // Import type files to trigger self-registration
 import '../entity-type-definitions/Signal/contract.js';
 import '../entity-type-definitions/Group/contract.js';
+import '../entity-type-definitions/DataConnection/contract.js';
+import '../entity-type-definitions/DataSource/contract.js';
 
 import type { AgentTool } from '@mariozechner/pi-agent-core';
 import { StringEnum, Type } from '@mariozechner/pi-ai';
@@ -15,8 +17,7 @@ const queryEntitiesSchema = Type.Object({
   }),
   scopeId: Type.Optional(
     Type.String({
-      description:
-        'Required for non-global scopes. Use get_session_info to resolve the correct ID.',
+      description: 'Required for non-global scopes.',
     }),
   ),
   entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
@@ -32,7 +33,8 @@ const queryEntitiesSchema = Type.Object({
     Type.Number({ description: 'Number of entities to skip for pagination.', minimum: 0 }),
   ),
   limit: Type.Number({
-    description: 'Maximum number of entities to return. Required — always set an appropriate limit.',
+    description:
+      'Maximum number of entities to return. Required — always set an appropriate limit.',
     minimum: 1,
   }),
   includeFullEntity: Type.Optional(
@@ -84,6 +86,12 @@ export function createQueryEntitiesTool(
           );
         }
         resolvedScopeId = scopeId.trim();
+
+        if (!/^[a-f\d]{24}$/i.test(resolvedScopeId)) {
+          return toErrorResponse(
+            `Invalid scopeId '${resolvedScopeId}'. Must be a valid 24-character MongoDB ObjectId. Use get_session_info to resolve IDs from the current session context.`,
+          );
+        }
       }
 
       let scopedFilter: Record<string, unknown> = filter;

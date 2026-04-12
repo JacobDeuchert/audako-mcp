@@ -22,7 +22,9 @@ import {
 } from '../services/session-info-utils.js';
 import type { SessionRegistry } from '../services/session-registry.js';
 import type { SessionRequestHub } from '../services/session-request-hub.js';
+import type { SessionTodoStore } from '../services/session-todo-store.js';
 import { ToolRequestHub } from '../services/tool-request-hub.js';
+import { InteractiveSession } from '../session/interactive-session.js';
 
 const logger = createLogger('session-routes');
 
@@ -30,10 +32,11 @@ interface SessionRoutesDependencies {
   registry: SessionRegistry;
   eventHub: SessionEventHub;
   requestHub: SessionRequestHub;
+  sessionTodoStore: SessionTodoStore;
 }
 
 export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies): void {
-  const { registry, eventHub, requestHub } = deps;
+  const { registry, eventHub, requestHub, sessionTodoStore } = deps;
   const childSessionManager = new ChildSessionManager(registry, eventHub);
   const toolRequestHub = new ToolRequestHub(requestHub, eventHub);
   const permissionService = new DefaultPermissionService(registry, toolRequestHub);
@@ -43,6 +46,7 @@ export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies
     childSessionManager,
     requestHub: toolRequestHub,
     permissionService,
+    sessionTodoStore,
   });
   registry.onSessionRemoved(entry => {
     permissionService.clearSession(entry.sessionId);
@@ -200,26 +204,30 @@ export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies
             eventHub,
             requestHub: toolRequestHub,
             permissionService,
+            sessionTodoStore,
             childSessionExecutor,
             profile: getProfile('primary'),
           });
 
-          const wsEventBridgeUnsubscribe = createWsEventBridge(agent, sessionId, eventHub);
+          const eventBridgeUnsubscribe = createWsEventBridge(agent, sessionId, eventHub);
 
-          return {
+          const session = new InteractiveSession({
+            sessionId,
             agent,
-            agentDestroy,
-            wsEventBridgeUnsubscribe,
+            destroyAgent: agentDestroy,
             sessionContext,
             audakoServices,
-          };
+            eventBridgeUnsubscribe,
+          });
+
+          return { session };
         },
       );
 
       // Update session info if provided
       if (sessionInfo && !isNew) {
         const sanitized = sanitizeSessionInfoUpdate(sessionInfo);
-        await entry.sessionContext.update(sanitized);
+        await entry.session.updateContext(sanitized);
 
         eventHub.publish(
           entry.sessionId,
@@ -227,10 +235,10 @@ export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies
             'session.updated',
             entry.sessionId,
             toSessionInfoResponse(entry.sessionId, {
-              tenantId: entry.sessionContext.tenantId,
-              groupId: entry.sessionContext.groupId,
-              entityType: entry.sessionContext.entityType,
-              app: entry.sessionContext.app,
+              tenantId: entry.session.sessionContext.tenantId,
+              groupId: entry.session.sessionContext.groupId,
+              entityType: entry.session.sessionContext.entityType,
+              app: entry.session.sessionContext.app,
             }),
           ),
         );
@@ -241,10 +249,10 @@ export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies
         isNew,
         scadaUrl: entry.scadaUrl,
         sessionInfo: toSessionInfoSnapshot(
-          entry.sessionContext.tenantId,
-          entry.sessionContext.groupId,
-          entry.sessionContext.entityType,
-          entry.sessionContext.app,
+          entry.session.sessionContext.tenantId,
+          entry.session.sessionContext.groupId,
+          entry.session.sessionContext.entityType,
+          entry.session.sessionContext.app,
         ),
         realtime: {
           transport: 'socket.io',
@@ -322,10 +330,10 @@ export function registerSessionRoutes(app: Hono, deps: SessionRoutesDependencies
 
     return context.json(
       toSessionInfoResponse(sessionId, {
-        tenantId: entry.sessionContext.tenantId,
-        groupId: entry.sessionContext.groupId,
-        entityType: entry.sessionContext.entityType,
-        app: entry.sessionContext.app,
+        tenantId: entry.session.sessionContext.tenantId,
+        groupId: entry.session.sessionContext.groupId,
+        entityType: entry.session.sessionContext.entityType,
+        app: entry.session.sessionContext.app,
       }),
     );
   }

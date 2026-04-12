@@ -32,7 +32,6 @@ interface SocketAuthPayload {
 
 interface SessionOwnershipState {
   controllerSocketId: string;
-  inFlightTurn: boolean;
   eventHubUnsubscribe?: () => void;
 }
 
@@ -57,10 +56,10 @@ function buildSnapshotPayload(entry: SessionRegistryEntry): SessionSnapshotPaylo
     sessionId: entry.sessionId,
     scadaUrl: entry.scadaUrl,
     sessionInfo: {
-      tenantId: entry.sessionContext.tenantId,
-      groupId: entry.sessionContext.groupId,
-      entityType: entry.sessionContext.entityType,
-      app: entry.sessionContext.app,
+      tenantId: entry.session.sessionContext.tenantId,
+      groupId: entry.session.sessionContext.groupId,
+      entityType: entry.session.sessionContext.entityType,
+      app: entry.session.sessionContext.app,
       updatedAt: new Date().toISOString(),
     },
     isActive: true,
@@ -226,7 +225,6 @@ export class SessionSocketIoGateway {
     if (!state) {
       state = {
         controllerSocketId: socket.id,
-        inFlightTurn: false,
       };
       state.eventHubUnsubscribe = this.deps.eventHub.subscribe(sessionId, event => {
         this.namespace?.to(sessionId).emit(event.type, event);
@@ -333,7 +331,7 @@ export class SessionSocketIoGateway {
       return;
     }
 
-    if (state.inFlightTurn) {
+    if (entry.session.inFlightTurn) {
       sendAck(
         rejectedAck(
           commandId,
@@ -345,11 +343,10 @@ export class SessionSocketIoGateway {
       return;
     }
 
-    state.inFlightTurn = true;
     sendAck(acceptedAck(commandId, 'prompt.send'));
 
     try {
-      await entry.agent.prompt(prompt);
+      await entry.session.promptInteractive(prompt);
     } catch (error) {
       this.deps.eventHub.publish(
         sessionId,
@@ -358,11 +355,6 @@ export class SessionSocketIoGateway {
           errorCode: 'PROMPT_SEND_FAILED',
         }),
       );
-    } finally {
-      const currentState = this.sessionStates.get(sessionId);
-      if (currentState) {
-        currentState.inFlightTurn = false;
-      }
     }
   }
 
@@ -401,7 +393,7 @@ export class SessionSocketIoGateway {
       return;
     }
 
-    if (!state.inFlightTurn) {
+    if (!entry.session.inFlightTurn) {
       sendAck(
         rejectedAck(
           commandId,
@@ -413,8 +405,7 @@ export class SessionSocketIoGateway {
       return;
     }
 
-    entry.agent.abort();
-    state.inFlightTurn = false;
+    entry.session.abort();
     sendAck(acceptedAck(commandId, 'prompt.cancel'));
   }
 
@@ -513,17 +504,17 @@ export class SessionSocketIoGateway {
     }
 
     const sanitized = sanitizeSessionInfoUpdate(sessionInfo);
-    await entry.sessionContext.update(sanitized);
+    await entry.session.updateContext(sanitized);
     this.deps.eventHub.publish(
       sessionId,
       buildSessionEvent(
         'session.updated',
         sessionId,
         toSessionInfoResponse(sessionId, {
-          tenantId: entry.sessionContext.tenantId,
-          groupId: entry.sessionContext.groupId,
-          entityType: entry.sessionContext.entityType,
-          app: entry.sessionContext.app,
+          tenantId: entry.session.sessionContext.tenantId,
+          groupId: entry.session.sessionContext.groupId,
+          entityType: entry.session.sessionContext.entityType,
+          app: entry.session.sessionContext.app,
         }),
       ),
     );
@@ -540,14 +531,12 @@ export class SessionSocketIoGateway {
 
     state.controllerSocketId = '';
 
-    if (!state.inFlightTurn) {
+    const entry = this.deps.registry.getSession(sessionId);
+    if (!entry?.session.inFlightTurn) {
       return;
     }
 
-    const entry = this.deps.registry.getSession(sessionId);
-    if (entry) {
-      entry.agent.abort();
-    }
+    entry.session.abort();
 
     this.deps.eventHub.publish(
       sessionId,

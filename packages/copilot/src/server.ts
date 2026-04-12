@@ -7,6 +7,7 @@ import { registerSessionRoutes } from './routes/session.routes.js';
 import { SessionEventHub } from './services/session-event-hub.js';
 import { SessionRegistry } from './services/session-registry.js';
 import { SessionRequestHub } from './services/session-request-hub.js';
+import { SessionTodoStore } from './services/session-todo-store.js';
 
 const logger = createLogger('server');
 
@@ -31,7 +32,10 @@ export async function createServer(): Promise<CopilotServer> {
   app.use(
     '*',
     cors({
-      origin: appConfig.cors.origins.length === 0 || appConfig.cors.origins.includes('*') ? '*' : appConfig.cors.origins,
+      origin:
+        appConfig.cors.origins.length === 0 || appConfig.cors.origins.includes('*')
+          ? '*'
+          : appConfig.cors.origins,
     }),
   );
 
@@ -54,6 +58,7 @@ export async function createServer(): Promise<CopilotServer> {
   const sessionRegistry = new SessionRegistry(appConfig.session.idleTimeout);
   const sessionEventHub = new SessionEventHub();
   const sessionRequestHub = new SessionRequestHub();
+  const sessionTodoStore = new SessionTodoStore();
   const sessionSocketGateway = new SessionSocketIoGateway({
     registry: sessionRegistry,
     eventHub: sessionEventHub,
@@ -64,6 +69,7 @@ export async function createServer(): Promise<CopilotServer> {
     sessionRequestHub.cancelSession(entry.sessionId);
     sessionEventHub.closeSession(entry.sessionId, reason);
     sessionSocketGateway.handleSessionExpired(entry.sessionId, reason);
+    sessionTodoStore.clear(entry.sessionId);
   });
 
   app.get('/health', (context: Context) => {
@@ -78,6 +84,7 @@ export async function createServer(): Promise<CopilotServer> {
     registry: sessionRegistry,
     eventHub: sessionEventHub,
     requestHub: sessionRequestHub,
+    sessionTodoStore,
   });
 
   // Start cleanup task

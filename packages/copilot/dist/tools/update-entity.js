@@ -1,6 +1,8 @@
 // Import type files to trigger self-registration
 import '../entity-type-definitions/Signal/contract.js';
 import '../entity-type-definitions/Group/contract.js';
+import '../entity-type-definitions/DataConnection/contract.js';
+import '../entity-type-definitions/DataSource/contract.js';
 import { Type } from '@mariozechner/pi-ai';
 import { resolveContract } from '../entity-type-definitions/contract-registry.js';
 import { normalizePermissionMode } from '../services/permission-service.js';
@@ -49,7 +51,9 @@ export function createUpdateEntityTool(deps) {
                 payload: {
                     entityType: contract.entityType,
                     entityId,
-                    groupId: typeof updatedEntity.GroupId === 'string' ? updatedEntity.GroupId : entityGroupId ?? '',
+                    groupId: typeof updatedEntity.GroupId === 'string'
+                        ? updatedEntity.GroupId
+                        : (entityGroupId ?? ''),
                     changedFields,
                     changes: params.changes,
                     metadata: {

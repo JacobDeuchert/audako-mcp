@@ -9,6 +9,7 @@ import { createMutationThrottle } from '../services/mutation-throttle.js';
 import type { PermissionService } from '../services/permission-service.js';
 import type { SessionContext } from '../services/session-context.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
+import type { SessionTodoStore } from '../services/session-todo-store.js';
 import type { ToolRequestHub } from '../services/tool-request-hub.js';
 import { loadSkillsFromDir } from '../skills/loader.js';
 import { createAskQuestionTool } from '../tools/ask-question.js';
@@ -16,6 +17,7 @@ import { createMutationTools } from '../tools/mutation-tools.js';
 import { createReadOnlyTools } from '../tools/read-only-tools.js';
 import { createReadSkillTool } from '../tools/skill-tools.js';
 import { createTaskTool } from '../tools/task-tool.js';
+import { createTodowriteTool } from '../tools/todowrite.js';
 import type { AgentProfile } from './profiles.js';
 import { resolveEffectiveTools } from './profiles.js';
 
@@ -39,6 +41,7 @@ export interface CreateSessionAgentConfig {
   eventHub: SessionEventHub;
   requestHub: ToolRequestHub;
   permissionService: PermissionService;
+  sessionTodoStore: SessionTodoStore;
   childSessionExecutor?: ChildSessionExecutor;
   profile: AgentProfile;
   requestedTools?: readonly string[];
@@ -87,7 +90,7 @@ export async function createSessionAgent(
     config.permissionService,
     config.eventHub,
   );
-  
+
   selectedTools.push(...mutationTools.filter(tool => effectiveToolNameSet.has(tool.name)));
 
   if (effectiveToolNameSet.has('ask_question')) {
@@ -96,6 +99,14 @@ export async function createSessionAgent(
       config.requestHub,
     );
     selectedTools.push(askQuestionTool);
+  }
+
+  if (effectiveToolNameSet.has('todowrite')) {
+    const todowriteTool = createTodowriteTool(
+      config.sessionContext.sessionId,
+      config.sessionTodoStore,
+    );
+    selectedTools.push(todowriteTool);
   }
 
   if (effectiveToolNameSet.has('skill')) {

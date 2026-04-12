@@ -1,6 +1,8 @@
 // Import type files to trigger self-registration
 import '../entity-type-definitions/Signal/contract.js';
 import '../entity-type-definitions/Group/contract.js';
+import '../entity-type-definitions/DataConnection/contract.js';
+import '../entity-type-definitions/DataSource/contract.js';
 import { StringEnum, Type } from '@mariozechner/pi-ai';
 import { resolveContract } from '../entity-type-definitions/contract-registry.js';
 import { listTypeKeys } from '../services/type-registry.js';
@@ -10,7 +12,7 @@ const queryEntitiesSchema = Type.Object({
         description: 'Scope for the query.',
     }),
     scopeId: Type.Optional(Type.String({
-        description: 'Required for non-global scopes. Use get_session_info to resolve the correct ID.',
+        description: 'Required for non-global scopes.',
     })),
     entityType: Type.String({ description: "Entity type name, for example 'Signal'." }),
     filter: Type.Object({}, {
@@ -18,8 +20,13 @@ const queryEntitiesSchema = Type.Object({
         description: 'REQUIRED: Mongo-style filter object that supports logical operators like $and, $or, $not, and $nor.',
     }),
     skip: Type.Optional(Type.Number({ description: 'Number of entities to skip for pagination.', minimum: 0 })),
-    limit: Type.Optional(Type.Number({ description: 'Maximum number of entities to return. Defaults to returning all.', minimum: 1 })),
-    includeFullEntity: Type.Optional(Type.Boolean({ description: 'Return full entity. Defaults to false, returning only Id, Name, Description, and GroupId.' })),
+    limit: Type.Number({
+        description: 'Maximum number of entities to return. Required — always set an appropriate limit.',
+        minimum: 1,
+    }),
+    includeFullEntity: Type.Optional(Type.Boolean({
+        description: 'Return full entity. Defaults to false, returning only Id, Name, Description, and GroupId.',
+    })),
 });
 function hasNonEmptyScopeId(scopeId) {
     return typeof scopeId === 'string' && scopeId.trim().length > 0;
@@ -31,7 +38,7 @@ export function createQueryEntitiesTool(audakoServices) {
     return {
         name: 'query_entities',
         label: 'Query Entities',
-        description: 'Query entities by scope with a Mongo-style filter object. Supports $and, $or, $not, and $nor operators.',
+        description: 'Query entities by scope with a Mongo-style filter object. Supports $and, $or, $not, and $nor operators. Returns matched entities and a total count for pagination.',
         parameters: queryEntitiesSchema,
         execute: async (_toolCallId, { scope, scopeId, entityType, filter, skip, limit, includeFullEntity }) => {
             const contract = resolveContract(entityType);
@@ -50,6 +57,9 @@ export function createQueryEntitiesTool(audakoServices) {
                     return toErrorResponse(`'scopeId' is required for scope '${scope}'. Call get_session_info first to resolve the correct ID.`);
                 }
                 resolvedScopeId = scopeId.trim();
+                if (!/^[a-f\d]{24}$/i.test(resolvedScopeId)) {
+                    return toErrorResponse(`Invalid scopeId '${resolvedScopeId}'. Must be a valid 24-character MongoDB ObjectId. Use get_session_info to resolve IDs from the current session context.`);
+                }
             }
             let scopedFilter = filter;
             const scopePayload = {
@@ -79,10 +89,10 @@ export function createQueryEntitiesTool(audakoServices) {
                 }
             }
             try {
-                const paging = skip !== undefined || limit !== undefined
-                    ? { skip: skip ?? 0, limit: limit ?? 0 }
-                    : undefined;
-                const projection = includeFullEntity ? undefined : { Id: 1, Name: 1, Description: 1, GroupId: 1 };
+                const paging = { skip: skip ?? 0, limit };
+                const projection = includeFullEntity
+                    ? undefined
+                    : { Id: 1, Name: 1, Description: 1, GroupId: 1 };
                 const queryResult = await audakoServices.entityService.queryConfiguration(contract.entityType, scopedFilter, paging, projection);
                 const entities = includeFullEntity
                     ? queryResult.data.map(entity => {
@@ -95,7 +105,6 @@ export function createQueryEntitiesTool(audakoServices) {
                     })
                     : queryResult.data;
                 return toTextResponse({
-                    message: `${contract.key} query completed successfully.`,
                     entityType: contract.key,
                     scope: scopePayload,
                     count: entities.length,

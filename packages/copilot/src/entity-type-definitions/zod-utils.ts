@@ -116,7 +116,10 @@ export function buildSettingsZodSchema(settingsDef: SettingsTypeDefinition): z.Z
       throw new Error(`Duplicate settings DTO field definition '${dtoFieldName}'.`);
     }
 
-    const baseSchema = settingsFieldToZodSchema(field);
+    let baseSchema = settingsFieldToZodSchema(field);
+    if (field.defaultValue !== undefined) {
+      baseSchema = baseSchema.default(field.defaultValue);
+    }
     shape[dtoFieldName] = field.required ? baseSchema : baseSchema.optional();
   }
 

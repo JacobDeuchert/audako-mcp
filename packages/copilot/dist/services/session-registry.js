@@ -99,18 +99,14 @@ export class SessionRegistry {
         }
         const sessionId = randomBytes(16).toString('hex');
         const sessionToken = this.generateSessionToken();
-        const { agent, agentDestroy, wsEventBridgeUnsubscribe, sessionContext, audakoServices } = await createSessionFn(sessionId, sessionToken);
+        const { session } = await createSessionFn(sessionId, sessionToken);
         const entry = {
             sessionId,
             scadaUrl,
             accessToken,
             sessionToken,
             sessionTokenHash: this.hashToken(sessionToken),
-            agent,
-            agentDestroy,
-            wsEventBridgeUnsubscribe,
-            sessionContext,
-            audakoServices,
+            session,
             createdAt: new Date(),
             lastAccessedAt: new Date(),
         };
@@ -129,8 +125,7 @@ export class SessionRegistry {
             return;
         }
         try {
-            entry.wsEventBridgeUnsubscribe();
-            entry.agentDestroy();
+            entry.session.destroy();
             this.sessions.delete(key);
             this.sessionIdToKey.delete(entry.sessionId);
             this.notifySessionRemoved(entry, reason);

@@ -1,8 +1,8 @@
 import type { AgentEvent } from '@mariozechner/pi-agent-core';
-import type { AssistantMessage } from '@mariozechner/pi-ai';
 import { createLogger } from '../config/app-config.js';
 import type { SessionEventHub } from '../services/session-event-hub.js';
 import { buildSessionEvent } from '../services/session-event-utils.js';
+import { isAssistantMessage } from '../session/message-utils.js';
 
 interface Agent {
   subscribe: (fn: (e: AgentEvent) => void) => () => void;
@@ -93,24 +93,6 @@ export function createWsEventBridge(
   const unsubscribe = agent.subscribe(handleAgentEvent);
 
   return unsubscribe;
-}
-
-function isAssistantMessage(message: unknown): message is AssistantMessage {
-  if (!message || typeof message !== 'object') {
-    return false;
-  }
-
-  const candidate = message as {
-    role?: unknown;
-    content?: unknown;
-    stopReason?: unknown;
-  };
-
-  return (
-    candidate.role === 'assistant' &&
-    Array.isArray(candidate.content) &&
-    typeof candidate.stopReason === 'string'
-  );
 }
 
 function isToolUseTurn(message: unknown): boolean {

@@ -10,6 +10,7 @@ import { createMutationTools } from '../tools/mutation-tools.js';
 import { createReadOnlyTools } from '../tools/read-only-tools.js';
 import { createReadSkillTool } from '../tools/skill-tools.js';
 import { createTaskTool } from '../tools/task-tool.js';
+import { createTodowriteTool } from '../tools/todowrite.js';
 import { resolveEffectiveTools } from './profiles.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 async function loadSystemPrompt(systemPromptPath) {
@@ -46,6 +47,10 @@ export async function createSessionAgent(config) {
     if (effectiveToolNameSet.has('ask_question')) {
         const askQuestionTool = createAskQuestionTool(config.sessionContext.sessionId, config.requestHub);
         selectedTools.push(askQuestionTool);
+    }
+    if (effectiveToolNameSet.has('todowrite')) {
+        const todowriteTool = createTodowriteTool(config.sessionContext.sessionId, config.sessionTodoStore);
+        selectedTools.push(todowriteTool);
     }
     if (effectiveToolNameSet.has('skill')) {
         const skillTool = createReadSkillTool(skills);

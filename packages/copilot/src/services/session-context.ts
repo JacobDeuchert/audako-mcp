@@ -11,6 +11,15 @@ export interface SessionDynamicFields {
   app?: string;
 }
 
+export interface SessionContextSnapshot {
+  tenantId?: string;
+  groupId?: string;
+  entityType?: string;
+  app?: string;
+  resolvedTenant?: ResolvedTenant;
+  resolvedGroup?: ResolvedGroup;
+}
+
 export interface ResolvedTenant {
   tenantId: string;
   tenantName: string;
@@ -42,6 +51,7 @@ export class SessionContext {
   resolvedTenant?: ResolvedTenant;
   resolvedGroup?: ResolvedGroup;
 
+  private _promptSnapshot?: SessionContextSnapshot;
   private services?: AudakoServices;
 
   constructor(fields: SessionContextFields) {
@@ -56,6 +66,33 @@ export class SessionContext {
 
   bindServices(services: AudakoServices): void {
     this.services = services;
+  }
+
+  /**
+   * Freeze the current dynamic fields into a snapshot.
+   * Call this before each agent prompt so tools see a consistent view
+   * throughout the entire tool-call chain.
+   */
+  takePromptSnapshot(): void {
+    this._promptSnapshot = {
+      tenantId: this.tenantId,
+      groupId: this.groupId,
+      entityType: this.entityType,
+      app: this.app,
+      resolvedTenant: this.resolvedTenant,
+      resolvedGroup: this.resolvedGroup,
+    };
+  }
+
+  get promptSnapshot(): SessionContextSnapshot {
+    return this._promptSnapshot ?? {
+      tenantId: this.tenantId,
+      groupId: this.groupId,
+      entityType: this.entityType,
+      app: this.app,
+      resolvedTenant: this.resolvedTenant,
+      resolvedGroup: this.resolvedGroup,
+    };
   }
 
   async update(fields: SessionDynamicFields): Promise<void> {

@@ -15,11 +15,12 @@ export function createGetSessionInfoTool(
       'Get current client session context from backend bridge (tenantId, groupId, entityType, app).',
     parameters: getSessionInfoSchema,
     execute: async () => {
+      const snapshot = sessionContext.promptSnapshot;
       return toTextResponse({
-        tenantId: sessionContext.tenantId,
-        groupId: sessionContext.groupId,
-        entityType: sessionContext.entityType,
-        app: sessionContext.app,
+        tenantId: snapshot.tenantId,
+        groupId: snapshot.groupId,
+        entityType: snapshot.entityType,
+        app: snapshot.app,
       });
     },
   };

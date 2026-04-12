@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   agentConstructor: vi.fn(),
   getModel: vi.fn(() => ({ id: 'model' })),
-  loadSystemPrompt: vi.fn(async () => 'SYSTEM_PROMPT\n'),
+  readFile: vi.fn(async () => 'SYSTEM_PROMPT\n'),
   loadSkillsFromDir: vi.fn(() => ({
     skills: [
       {
@@ -17,7 +17,6 @@ const mocks = vi.hoisted(() => ({
     ],
     diagnostics: [],
   })),
-  formatSkillsForPrompt: vi.fn(() => '\n<available_skills />'),
   createMutationThrottle: vi.fn(() => ({ run: async <T>(fn: () => Promise<T>) => fn() })),
   createReadOnlyTools: vi.fn(() => [
     { name: 'get_session_info' },
@@ -33,6 +32,7 @@ const mocks = vi.hoisted(() => ({
     { name: 'move_entity' },
   ]),
   createAskQuestionTool: vi.fn(() => ({ name: 'ask_question' })),
+  createTodowriteTool: vi.fn(() => ({ name: 'todowrite' })),
   createReadSkillTool: vi.fn(() => ({ name: 'skill' })),
   createTaskTool: vi.fn(() => ({ name: 'task' })),
 }));
@@ -56,6 +56,10 @@ vi.mock('@mariozechner/pi-ai', () => ({
   streamSimple: vi.fn(),
 }));
 
+vi.mock('node:fs/promises', () => ({
+  readFile: mocks.readFile,
+}));
+
 vi.mock('../../src/config/app-config.js', () => ({
   appConfig: {
     llm: {
@@ -63,15 +67,10 @@ vi.mock('../../src/config/app-config.js', () => ({
       modelName: 'claude-sonnet-4-20250514',
     },
   },
-  loadSystemPrompt: mocks.loadSystemPrompt,
 }));
 
 vi.mock('../../src/skills/loader.js', () => ({
   loadSkillsFromDir: mocks.loadSkillsFromDir,
-}));
-
-vi.mock('../../src/skills/prompt.js', () => ({
-  formatSkillsForPrompt: mocks.formatSkillsForPrompt,
 }));
 
 vi.mock('../../src/services/mutation-throttle.js', () => ({
@@ -88,6 +87,10 @@ vi.mock('../../src/tools/mutation-tools.js', () => ({
 
 vi.mock('../../src/tools/ask-question.js', () => ({
   createAskQuestionTool: mocks.createAskQuestionTool,
+}));
+
+vi.mock('../../src/tools/todowrite.js', () => ({
+  createTodowriteTool: mocks.createTodowriteTool,
 }));
 
 vi.mock('../../src/tools/skill-tools.js', () => ({
@@ -114,6 +117,7 @@ describe('createSessionAgent', () => {
       eventHub: {},
       requestHub: {},
       permissionService: {},
+      sessionTodoStore: {},
       childSessionExecutor: {},
     } as unknown as Omit<CreateSessionAgentConfig, 'profile' | 'requestedTools'>;
   }
@@ -133,8 +137,9 @@ describe('createSessionAgent', () => {
       profile,
     });
 
-    expect(mocks.loadSystemPrompt).toHaveBeenCalledTimes(1);
+    expect(mocks.readFile).toHaveBeenCalledTimes(1);
     expect(mocks.getModel).toHaveBeenCalledWith(profile.model.provider, profile.model.modelName);
+    expect(mocks.createTodowriteTool).toHaveBeenCalledTimes(1);
     expect(mocks.createTaskTool).toHaveBeenCalledTimes(1);
     expect(getToolNamesFromAgentState()).toEqual(profile.toolAllowlist);
   });
@@ -143,15 +148,16 @@ describe('createSessionAgent', () => {
     await createSessionAgent({
       ...createBaseConfig(),
       profile: getProfile('primary'),
-      requestedTools: ['get_session_info', 'skill'],
+      requestedTools: ['get_session_info', 'todowrite', 'skill'],
     });
 
     expect(mocks.createReadOnlyTools).toHaveBeenCalledTimes(1);
-    expect(mocks.createMutationTools).not.toHaveBeenCalled();
+    expect(mocks.createMutationTools).toHaveBeenCalledTimes(1);
     expect(mocks.createAskQuestionTool).not.toHaveBeenCalled();
+    expect(mocks.createTodowriteTool).toHaveBeenCalledTimes(1);
     expect(mocks.createReadSkillTool).toHaveBeenCalledTimes(1);
     expect(mocks.createTaskTool).not.toHaveBeenCalled();
-    expect(getToolNamesFromAgentState()).toEqual(['get_session_info', 'skill']);
+    expect(getToolNamesFromAgentState()).toEqual(['get_session_info', 'todowrite', 'skill']);
   });
 
   it('rejects widening requests outside profile allowlist', async () => {
@@ -176,8 +182,9 @@ describe('createSessionAgent', () => {
     });
 
     expect(mocks.createReadOnlyTools).toHaveBeenCalledTimes(1);
-    expect(mocks.createMutationTools).not.toHaveBeenCalled();
+    expect(mocks.createMutationTools).toHaveBeenCalledTimes(1);
     expect(mocks.createAskQuestionTool).not.toHaveBeenCalled();
+    expect(mocks.createTodowriteTool).not.toHaveBeenCalled();
     expect(mocks.createReadSkillTool).toHaveBeenCalledTimes(1);
     expect(mocks.createTaskTool).not.toHaveBeenCalled();
     expect(getToolNamesFromAgentState()).toEqual(profile.toolAllowlist);

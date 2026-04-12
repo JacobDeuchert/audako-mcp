@@ -16,6 +16,7 @@ const PROFILE_REGISTRY = [
             'get_entity_name',
             'get_group_path',
             'query_entities',
+            'todowrite',
             'create_entity',
             'update_entity',
             'move_entity',

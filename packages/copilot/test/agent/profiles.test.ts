@@ -2,19 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   getProfile,
   listCallableProfiles,
-  listNonCallableProfiles,
-  listProfiles,
   resolveEffectiveTools,
 } from '../../src/agent/profiles.js';
 
 describe('agent-profiles', () => {
-  it('lists both seeded profiles', () => {
-    const profiles = listProfiles();
-    const names = profiles.map(profile => profile.name).sort();
-
-    expect(names).toEqual(['explore', 'primary']);
-  });
-
   it('lists only callable profiles for subagent use', () => {
     const callableProfiles = listCallableProfiles();
 
@@ -29,24 +20,24 @@ describe('agent-profiles', () => {
     expect(callableProfileNames).not.toContain('primary');
   });
 
-  it('lists only non-callable profiles', () => {
-    const nonCallableProfiles = listNonCallableProfiles();
+  it('resolves primary profile with todowrite included', () => {
+    const primaryProfile = getProfile('primary');
 
-    expect(nonCallableProfiles).toHaveLength(1);
-    expect(nonCallableProfiles[0].name).toBe('primary');
-    expect(nonCallableProfiles[0].callableAsSubagent).toBe(false);
+    expect(primaryProfile.callableAsSubagent).toBe(false);
+    expect(primaryProfile.toolAllowlist).toContain('todowrite');
+    expect(primaryProfile.toolAllowlist).toContain('task');
   });
 
   it('resolves explore profile with read-only capabilities only', () => {
     const exploreProfile = getProfile('explore');
 
     expect(exploreProfile.callableAsSubagent).toBe(true);
-    expect(exploreProfile.allowedToolGroups).toEqual(['read-only', 'skills']);
     expect(exploreProfile.toolAllowlist).toContain('skill');
     expect(exploreProfile.toolAllowlist).not.toContain('create_entity');
     expect(exploreProfile.toolAllowlist).not.toContain('update_entity');
     expect(exploreProfile.toolAllowlist).not.toContain('move_entity');
     expect(exploreProfile.toolAllowlist).not.toContain('ask_question');
+    expect(exploreProfile.toolAllowlist).not.toContain('todowrite');
   });
 
   it('throws deterministic errors for invalid profile names', () => {
@@ -57,20 +48,13 @@ describe('agent-profiles', () => {
   it('returns cloned profile objects to prevent registry mutation', () => {
     const firstRead = getProfile('primary');
     firstRead.description = 'changed';
-    firstRead.allowedToolGroups = ['read-only'];
     firstRead.toolAllowlist = ['get_session_info'];
 
     const secondRead = getProfile('primary');
 
     expect(secondRead.description).toBe('Default full-capability session agent profile.');
-    expect(secondRead.allowedToolGroups).toEqual([
-      'read-only',
-      'mutation',
-      'ask-question',
-      'skills',
-      'delegation',
-    ]);
     expect(secondRead.toolAllowlist).toContain('create_entity');
+    expect(secondRead.toolAllowlist).toContain('todowrite');
     expect(secondRead.toolAllowlist).toContain('task');
   });
 

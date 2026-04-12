@@ -49,6 +49,7 @@ export interface SettingsFieldDefinition {
   entityPath?: string;
   required?: boolean;
   enumValues?: string[];
+  defaultValue?: string | number | boolean;
 }
 
 export interface SettingsTypeDefinition {

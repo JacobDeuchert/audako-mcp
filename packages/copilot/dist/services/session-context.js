@@ -11,6 +11,7 @@ export class SessionContext {
     app;
     resolvedTenant;
     resolvedGroup;
+    _promptSnapshot;
     services;
     constructor(fields) {
         this.sessionId = fields.sessionId;
@@ -23,6 +24,31 @@ export class SessionContext {
     }
     bindServices(services) {
         this.services = services;
+    }
+    /**
+     * Freeze the current dynamic fields into a snapshot.
+     * Call this before each agent prompt so tools see a consistent view
+     * throughout the entire tool-call chain.
+     */
+    takePromptSnapshot() {
+        this._promptSnapshot = {
+            tenantId: this.tenantId,
+            groupId: this.groupId,
+            entityType: this.entityType,
+            app: this.app,
+            resolvedTenant: this.resolvedTenant,
+            resolvedGroup: this.resolvedGroup,
+        };
+    }
+    get promptSnapshot() {
+        return this._promptSnapshot ?? {
+            tenantId: this.tenantId,
+            groupId: this.groupId,
+            entityType: this.entityType,
+            app: this.app,
+            resolvedTenant: this.resolvedTenant,
+            resolvedGroup: this.resolvedGroup,
+        };
     }
     async update(fields) {
         const tenantChanged = 'tenantId' in fields && fields.tenantId !== this.tenantId;

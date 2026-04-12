@@ -18,11 +18,7 @@ async function createMockParentSession(
   token = 'test-token',
 ): Promise<string> {
   const { entry } = await registry.getOrCreateSession(scadaUrl, token, async () => ({
-    agent: {} as never,
-    agentDestroy: vi.fn(),
-    wsEventBridgeUnsubscribe: vi.fn(),
-    sessionContext: {} as never,
-    audakoServices: {} as never,
+    session: { destroy: vi.fn(), sessionContext: {}, audakoServices: {} } as never,
   }));
 
   return entry.sessionId;

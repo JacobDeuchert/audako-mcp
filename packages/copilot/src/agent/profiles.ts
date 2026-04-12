@@ -33,6 +33,7 @@ const PROFILE_REGISTRY: readonly AgentProfile[] = [
       'get_entity_name',
       'get_group_path',
       'query_entities',
+      'todowrite',
       'create_entity',
       'update_entity',
       'move_entity',
